@@ -51,6 +51,9 @@ npm run typecheck
 npm run test
 ```
 ```bash
+npm run test:e2e
+```
+```bash
 npm run build
 ```
 Depois, no navegador:

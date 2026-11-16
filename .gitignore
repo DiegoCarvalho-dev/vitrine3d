@@ -29,6 +29,9 @@ next-env.d.ts
 # logs de debug
 npm-debug.log*
 
+# configuração local de ferramentas (plugins etc.)
+/.claude/
+
 # sistema operacional
 .DS_Store
 Thumbs.db

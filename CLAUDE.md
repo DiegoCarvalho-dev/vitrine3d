@@ -31,7 +31,7 @@ Ao fim de uma sprint (ou quando o usuário pedir o planejamento da próxima):
 2. Listar os arquivos que serão criados ou alterados.
 3. Registrar o ANTES (print/descrição no navegador; para bug, escrever um teste que falha).
 4. Implementar em passos pequenos.
-5. Verificar o DEPOIS: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` e teste no navegador (desktop + 390 px), sem erros no console.
+5. Verificar o DEPOIS: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e`, `npm run build` e teste no navegador (desktop + 390 px), sem erros no console.
 6. Enviar ao usuário os prints e um **roteiro curto de teste visual**, e esperar o ok.
 7. Rodar `/code-review`, e `/security-review` quando mexer em auth, RLS, uploads, formulários públicos, env ou Server Actions.
 8. Commit em Conventional Commits citando a issue (`feat(tour): ... (#N)`).
