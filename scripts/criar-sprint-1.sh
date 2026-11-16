@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 # Cria labels, a milestone da Sprint 1 e as issues a partir de docs/sprints/sprint-1/*.md
 # Uso (na raiz do repositório, com `gh auth login` feito):  bash scripts/criar-sprint-1.sh
+# Usa só a API REST do GitHub (gh api) e pode ser executado mais de uma vez sem duplicar.
 set -euo pipefail
 
+REPO="repos/{owner}/{repo}"
 MILESTONE="Sprint 1 – Ambiente"
 DIR="docs/sprints/sprint-1"
 
-echo "→ Criando labels..."
+echo "→ Labels..."
+existentes=$(gh api "$REPO/labels?per_page=100" --paginate --jq '.[].name')
 while IFS='|' read -r nome cor desc; do
-  gh label create "$nome" --color "$cor" --description "$desc" --force >/dev/null
+  if grep -qxF "$nome" <<<"$existentes"; then
+    echo "   (já existe) $nome"
+  else
+    gh api "$REPO/labels" -f name="$nome" -f color="$cor" -f description="$desc" >/dev/null
+    echo "   ✓ $nome"
+  fi
 done <<'LABELS'
 tipo:feature|1D76DB|Nova funcionalidade
 tipo:bug|D73A4A|Algo não funciona
@@ -24,21 +32,27 @@ prioridade:alta|B60205|Fazer primeiro
 seguranca|E99695|Exige /security-review
 LABELS
 
-echo "→ Criando milestone..."
-if ! gh api "repos/{owner}/{repo}/milestones?state=all" --jq '.[].title' | grep -qx "$MILESTONE"; then
-  gh api "repos/{owner}/{repo}/milestones" -f title="$MILESTONE" \
-    -f description="Preparar o ambiente local, repositório, Supabase, Vercel e a prova de conceito 3D." >/dev/null
+echo "→ Milestone..."
+num=$(gh api "$REPO/milestones?state=all&per_page=100" --jq ".[] | select(.title==\"$MILESTONE\") | .number")
+if [ -z "$num" ]; then
+  num=$(gh api "$REPO/milestones" -f title="$MILESTONE" \
+    -f description="Preparar o ambiente local, repositório, Supabase, Vercel e a prova de conceito 3D." --jq .number)
 fi
+echo "   $MILESTONE (#$num)"
 
-echo "→ Criando issues..."
+echo "→ Issues..."
+titulos=$(gh api "$REPO/issues?state=all&per_page=100" --paginate --jq '.[].title')
 for f in "$DIR"/*.md; do
   titulo=$(sed -n 's/^title: "\(.*\)"$/\1/p' "$f" | head -1)
   labels=$(sed -n 's/^labels: "\(.*\)"$/\1/p' "$f" | head -1)
-  if gh issue list --state all --search "in:title \"$titulo\"" --json title --jq '.[].title' | grep -qxF "$titulo"; then
+  if grep -qxF "$titulo" <<<"$titulos"; then
     echo "   (já existe) $titulo"; continue
   fi
   corpo=$(awk 'BEGIN{n=0} /^---$/{n++; next} n>=2' "$f")
-  gh issue create --title "$titulo" --body "$corpo" --label "$labels" --milestone "$MILESTONE" >/dev/null
-  echo "   ✓ $titulo"
+  args=()
+  IFS=',' read -ra ls <<<"$labels"
+  for l in "${ls[@]}"; do args+=(-f "labels[]=$l"); done
+  n=$(gh api "$REPO/issues" -f title="$titulo" -f body="$corpo" -F milestone="$num" "${args[@]}" --jq .number)
+  echo "   ✓ #$n $titulo"
 done
 echo "Pronto."
