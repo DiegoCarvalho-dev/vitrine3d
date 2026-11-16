@@ -77,6 +77,12 @@ begin
   insert into public.eventos (empreendimento_id, unidade_id, comodo_id, sessao_id, tipo) values (emp_pub, uni, com, 'sessao_teste_123', 'viu_comodo');
 
   -- ===== Arquivar tira do ar na hora =====
+  -- Controle positivo: ANTES de arquivar, o visitante vê o empreendimento e a unidade.
+  select count(*) into n from public.empreendimentos where id = emp_pub;
+  r := r || format(E'\n[%s] antes de arquivar, visitante vê o empreendimento publicado', case when n = 1 then 'OK' else 'FALHOU' end);
+  select count(*) into n from public.unidades where empreendimento_id = emp_pub;
+  r := r || format(E'\n[%s] antes de arquivar, visitante vê a unidade publicada', case when n = 1 then 'OK' else 'FALHOU' end);
+
   perform set_config('role', 'authenticated', true);
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   update public.empreendimentos set status = 'arquivado' where id = emp_pub;
@@ -84,6 +90,8 @@ begin
   perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
   select count(*) into n from public.empreendimentos where id = emp_pub;
   r := r || format(E'\n[%s] arquivar tira o empreendimento do ar na hora', case when n = 0 then 'OK' else 'FALHOU' end);
+  select count(*) into n from public.unidades where empreendimento_id = emp_pub;
+  r := r || format(E'\n[%s] ... e as unidades dele', case when n = 0 then 'OK' else 'FALHOU' end);
   select count(*) into n from public.perfis where id = a;
   r := r || format(E'\n[%s] sem nada publicado, o perfil de A também some para o visitante', case when n = 0 then 'OK' else 'FALHOU' end);
 
