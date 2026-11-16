@@ -10,7 +10,7 @@ Antes de qualquer código, a máquina precisa ter as ferramentas da stack (ver `
 - [ ] Instalar **Git** e configurar `user.name` e `user.email`
 - [ ] Instalar **GitHub CLI** (`gh`) e logar com `gh auth login`
 - [ ] Instalar **VS Code** e as extensões: Claude Code, ESLint, Prettier, Tailwind CSS IntelliSense (GitLens opcional)
-- [ ] Instalar **Supabase CLI** (`npm i -g supabase` ou o instalador oficial)
+- [ ] Instalar **Supabase CLI**. No Windows, via [Scoop](https://scoop.sh): `scoop install supabase`. No macOS/Linux: `brew install supabase/tap/supabase`. **Não use `npm i -g supabase`**: a instalação global pelo npm não é suportada.
 - [ ] Instalar **Google Chrome** + extensão **Claude in Chrome**
 
 ## Critérios de aceite
@@ -25,6 +25,7 @@ node -v && npm -v && git --version && gh --version && supabase --version
 ```bash
 gh auth status
 ```
+No Windows PowerShell 5.1 o `&&` não existe: separe os comandos com `;`.
 
 ## Referências
 - https://nodejs.org · https://cli.github.com · https://supabase.com/docs/guides/local-development/cli/getting-started
