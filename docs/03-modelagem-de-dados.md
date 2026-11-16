@@ -185,7 +185,8 @@ O campo `versao` permite mudar o formato no futuro sem quebrar plantas antigas. 
 O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) vai para o navegador, então **o banco é quem protege os dados**, não o front-end.
 
 **Padrões adotados nas migrations** (desde a issue #13):
-- `GRANT` explícito só das operações necessárias, inclusive **por coluna** quando o visitante não pode ver tudo (ex.: `perfis.notificar_leads_email` não é concedido a `anon`).
+- **Nada nasce acessível pela API.** A migration `fecha_acesso_padrao_da_api` mudou as permissões padrão do schema `public`: tabelas, sequências e funções novas não dão acesso nenhum a `anon`/`authenticated`, em **qualquer** ambiente (não depende da opção "Automatically expose new tables" do projeto). O teste `supabase/tests/rls/00_privilegios.sql` confere isso no catálogo.
+- `GRANT` explícito só das operações necessárias, inclusive **por coluna** quando o visitante não pode ver tudo (ex.: `perfis.notificar_leads_email` não é concedido a `anon`). Ao mudar permissões de uma tabela existente, faça `revoke all ... from anon, authenticated` e conceda de novo só o necessário.
 - Policies usam `(select auth.uid())`, que é avaliado uma vez por consulta, e não `auth.uid()` direto, que seria avaliado linha a linha.
 - `UPDATE` sempre com `USING` **e** `WITH CHECK`, para ninguém "transferir" uma linha para outro dono.
 - Uma policy de leitura por tabela, combinando os casos com `or` (várias policies permissivas pesam no desempenho).
