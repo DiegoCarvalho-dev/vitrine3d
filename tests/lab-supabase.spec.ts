@@ -15,6 +15,8 @@ test.describe("Lab: Supabase", () => {
     await page.goto("/lab/supabase");
 
     await expect(page.getByRole("status")).toContainText("conectado");
-    await expect(page.getByRole("alert")).toHaveCount(0);
+    // Procura o NOSSO aviso de erro. (Não usar getByRole("alert"): o Next.js
+    // coloca um anunciador de rotas vazio com role="alert" na página.)
+    await expect(page.getByText("Não foi possível ler o banco")).toHaveCount(0);
   });
 });

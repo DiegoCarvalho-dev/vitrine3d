@@ -174,7 +174,8 @@ O campo `versao` permite mudar o formato no futuro sem quebrar plantas antigas. 
 - `empreendimentos.slug` único, minúsculo, só `a-z0-9-`.
 - `unidades`: único por `(empreendimento_id, numero)` e por `(empreendimento_id, andar, posicao_no_andar)`.
 - `tipologias.empreendimento_id` deve ser o mesmo da `unidade` que a usa: garantido por **chave estrangeira composta** `(tipologia_id, empreendimento_id) → tipologias(id, empreendimento_id)`. Apagar a tipologia deixa a unidade sem tipologia (`on delete set null (tipologia_id)`).
-- `leads.consentimento_lgpd` **obrigatório = true** (check constraint).
+- `leads.consentimento_lgpd` **obrigatório = true** (check constraint) e `consentimento_em` preenchido pelo **banco** (hora do servidor; o visitante não tem permissão nessa coluna). Lead precisa de telefone **ou** e-mail.
+- Nenhuma referência cruzada entre empreendimentos: `unidade_id` em `midias`, `leads` e `eventos` usa FK composta com `empreendimento_id`; `comodo_id` em `midias` e `eventos` é checado na policy (`privado.comodo_do_empreendimento`); a mídia de um hotspot precisa ser do mesmo empreendimento do cômodo.
 - `unidades.preco` **nunca vai para o visitante** quando `exibir_preco = false`. Como o RLS filtra linhas e não colunas, usamos a **coluna gerada** `preco_publico` (`preco` só quando `exibir_preco = true`) e **GRANT por coluna**: `anon` lê `preco_publico`, nunca `preco` nem `observacoes`. Toda unidade nasce com `exibir_preco = false` (padrão seguro). *(Antes previsto como view `unidades_publicas`; trocado na issue #14 porque uma view comum ignora o RLS e o advisor do Supabase a marca como erro.)*
 - **Corretor logado vê só as próprias unidades.** Como o GRANT por coluna vale para o papel inteiro, se `authenticated` pudesse ler unidades publicadas de outros, um concorrente logado leria o `preco` "sob consulta" pela API. Por isso **as páginas públicas (tour) leem com um cliente anônimo, sem os cookies de login** (a criar na Sprint 4).
 - `ON DELETE CASCADE` de empreendimento para os filhos; `ON DELETE SET NULL` em referências opcionais (ex.: `leads.unidade_id`).
@@ -206,7 +207,9 @@ O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) 
 
 **Storage**: bucket `midias` público para leitura de arquivos de empreendimentos publicados. A escrita só é permitida pelo dono, no caminho `{dono_id}/{empreendimento_id}/...`.
 
-**Anti-spam** (leads e eventos): limite de tamanho dos campos, validação Zod no servidor e, se precisar, rate limit simples por sessão. ⚠️ É ponto obrigatório de `/security-review`.
+**Escrita do visitante** (`leads` e `eventos`, issue #15): só `INSERT`, só nas colunas de dados (nunca `status`, datas ou `id`), só em empreendimento publicado e **sem nenhum `SELECT`** (nem o próprio lead volta). Os inserts públicos usam o cliente **anônimo** (sem cookies de login), como as demais leituras públicas. O corretor lê os seus, muda só o `status` do lead e pode apagá-lo (pedido de exclusão LGPD); eventos são imutáveis.
+
+**Anti-spam** (leads e eventos): limite de tamanho dos campos (no banco), `sessao_id` com formato fixo, `dados` com até ~2 KB, validação Zod no servidor e, se precisar, rate limit simples por sessão (Sprint 6). ⚠️ É ponto obrigatório de `/security-review`.
 
 ## Notificação de lead por e-mail
 

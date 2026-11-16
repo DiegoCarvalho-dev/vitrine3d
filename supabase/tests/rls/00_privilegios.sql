@@ -10,7 +10,7 @@ declare
   r text := '';
 begin
   -- Nenhuma tabela do public dá TRUNCATE, REFERENCES, TRIGGER ou MAINTAIN à API.
-  foreach t in array array['saude', 'perfis', 'empreendimentos', 'tipologias', 'comodos', 'unidades'] loop
+  foreach t in array array['saude', 'perfis', 'empreendimentos', 'tipologias', 'comodos', 'unidades', 'midias', 'hotspots', 'leads', 'eventos'] loop
     foreach p in array array['TRUNCATE', 'REFERENCES', 'TRIGGER'] loop
       if has_table_privilege('anon', 'public.' || t, p) or has_table_privilege('authenticated', 'public.' || t, p) then
         r := r || format(E'\n[FALHOU] %s: API tem %s', t, p);
@@ -32,6 +32,21 @@ begin
     case when has_column_privilege('anon', 'public.unidades', 'observacoes', 'SELECT') then 'FALHOU' else 'OK' end);
   r := r || format(E'\n[%s] perfis.notificar_leads_email: visitante sem acesso',
     case when has_column_privilege('anon', 'public.perfis', 'notificar_leads_email', 'SELECT') then 'FALHOU' else 'OK' end);
+
+  -- leads e eventos: visitante só insere, não lê nenhuma coluna, não altera, não apaga.
+  foreach t in array array['leads', 'eventos'] loop
+    select count(*) into n
+    from information_schema.column_privileges
+    where table_schema = 'public' and table_name = t and grantee = 'anon' and privilege_type = 'SELECT';
+    r := r || format(E'\n[%s] %s: visitante não lê nenhuma coluna (%s)',
+      case when n = 0 and not has_table_privilege('anon', 'public.' || t, 'SELECT') then 'OK' else 'FALHOU' end, t, n);
+    r := r || format(E'\n[%s] %s: visitante não altera nem apaga',
+      case when has_table_privilege('anon', 'public.' || t, 'UPDATE') or has_table_privilege('anon', 'public.' || t, 'DELETE') then 'FALHOU' else 'OK' end, t);
+  end loop;
+  r := r || format(E'\n[%s] leads.status: visitante não escolhe',
+    case when has_column_privilege('anon', 'public.leads', 'status', 'INSERT') then 'FALHOU' else 'OK' end);
+  r := r || format(E'\n[%s] leads.consentimento_em: visitante não escolhe',
+    case when has_column_privilege('anon', 'public.leads', 'consentimento_em', 'INSERT') then 'FALHOU' else 'OK' end);
 
   -- Corretor logado não altera colunas de controle.
   r := r || format(E'\n[%s] empreendimentos.dono_id: corretor não edita',

@@ -160,6 +160,221 @@ export type Database = {
           },
         ];
       };
+      eventos: {
+        Row: {
+          comodo_id: string | null;
+          criado_em: string;
+          dados: Json;
+          empreendimento_id: string;
+          id: number;
+          sessao_id: string;
+          tipo: Database["public"]["Enums"]["tipo_evento"];
+          unidade_id: string | null;
+        };
+        Insert: {
+          comodo_id?: string | null;
+          criado_em?: string;
+          dados?: Json;
+          empreendimento_id: string;
+          id?: never;
+          sessao_id: string;
+          tipo: Database["public"]["Enums"]["tipo_evento"];
+          unidade_id?: string | null;
+        };
+        Update: {
+          comodo_id?: string | null;
+          criado_em?: string;
+          dados?: Json;
+          empreendimento_id?: string;
+          id?: never;
+          sessao_id?: string;
+          tipo?: Database["public"]["Enums"]["tipo_evento"];
+          unidade_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "eventos_comodo_id_fkey";
+            columns: ["comodo_id"];
+            isOneToOne: false;
+            referencedRelation: "comodos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "eventos_empreendimento_id_fkey";
+            columns: ["empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "empreendimentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "eventos_unidade_do_mesmo_empreendimento";
+            columns: ["unidade_id", "empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "unidades";
+            referencedColumns: ["id", "empreendimento_id"];
+          },
+        ];
+      };
+      hotspots: {
+        Row: {
+          comodo_id: string;
+          descricao: string | null;
+          id: string;
+          midia_id: string | null;
+          posicao: Json;
+          titulo: string;
+        };
+        Insert: {
+          comodo_id: string;
+          descricao?: string | null;
+          id?: string;
+          midia_id?: string | null;
+          posicao: Json;
+          titulo: string;
+        };
+        Update: {
+          comodo_id?: string;
+          descricao?: string | null;
+          id?: string;
+          midia_id?: string | null;
+          posicao?: Json;
+          titulo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "hotspots_comodo_id_fkey";
+            columns: ["comodo_id"];
+            isOneToOne: false;
+            referencedRelation: "comodos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hotspots_midia_id_fkey";
+            columns: ["midia_id"];
+            isOneToOne: false;
+            referencedRelation: "midias";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      leads: {
+        Row: {
+          consentimento_em: string;
+          consentimento_lgpd: boolean;
+          criado_em: string;
+          email: string | null;
+          empreendimento_id: string;
+          id: string;
+          mensagem: string | null;
+          nome: string;
+          origem: string | null;
+          status: Database["public"]["Enums"]["status_lead"];
+          telefone: string | null;
+          unidade_id: string | null;
+        };
+        Insert: {
+          consentimento_em?: string;
+          consentimento_lgpd: boolean;
+          criado_em?: string;
+          email?: string | null;
+          empreendimento_id: string;
+          id?: string;
+          mensagem?: string | null;
+          nome: string;
+          origem?: string | null;
+          status?: Database["public"]["Enums"]["status_lead"];
+          telefone?: string | null;
+          unidade_id?: string | null;
+        };
+        Update: {
+          consentimento_em?: string;
+          consentimento_lgpd?: boolean;
+          criado_em?: string;
+          email?: string | null;
+          empreendimento_id?: string;
+          id?: string;
+          mensagem?: string | null;
+          nome?: string;
+          origem?: string | null;
+          status?: Database["public"]["Enums"]["status_lead"];
+          telefone?: string | null;
+          unidade_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "leads_empreendimento_id_fkey";
+            columns: ["empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "empreendimentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "leads_unidade_do_mesmo_empreendimento";
+            columns: ["unidade_id", "empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "unidades";
+            referencedColumns: ["id", "empreendimento_id"];
+          },
+        ];
+      };
+      midias: {
+        Row: {
+          caminho_storage: string;
+          comodo_id: string | null;
+          criado_em: string;
+          empreendimento_id: string;
+          id: string;
+          legenda: string | null;
+          ordem: number;
+          tipo: Database["public"]["Enums"]["tipo_midia"];
+          unidade_id: string | null;
+        };
+        Insert: {
+          caminho_storage: string;
+          comodo_id?: string | null;
+          criado_em?: string;
+          empreendimento_id: string;
+          id?: string;
+          legenda?: string | null;
+          ordem?: number;
+          tipo?: Database["public"]["Enums"]["tipo_midia"];
+          unidade_id?: string | null;
+        };
+        Update: {
+          caminho_storage?: string;
+          comodo_id?: string | null;
+          criado_em?: string;
+          empreendimento_id?: string;
+          id?: string;
+          legenda?: string | null;
+          ordem?: number;
+          tipo?: Database["public"]["Enums"]["tipo_midia"];
+          unidade_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "midias_comodo_id_fkey";
+            columns: ["comodo_id"];
+            isOneToOne: false;
+            referencedRelation: "comodos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "midias_empreendimento_id_fkey";
+            columns: ["empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "empreendimentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "midias_unidade_do_mesmo_empreendimento";
+            columns: ["unidade_id", "empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "unidades";
+            referencedColumns: ["id", "empreendimento_id"];
+          },
+        ];
+      };
       perfis: {
         Row: {
           avatar_url: string | null;
@@ -338,6 +553,8 @@ export type Database = {
       [_ in never]: never;
     };
     Enums: {
+      status_lead:
+        "novo" | "em_contato" | "visita_agendada" | "ganho" | "perdido";
       status_publicacao: "rascunho" | "publicado" | "arquivado";
       status_unidade: "disponivel" | "reservado" | "vendido";
       tipo_comodo:
@@ -350,6 +567,13 @@ export type Database = {
         | "lavanderia"
         | "outro";
       tipo_empreendimento: "predio" | "casa";
+      tipo_evento:
+        | "abriu_tour"
+        | "abriu_unidade"
+        | "viu_comodo"
+        | "clicou_whatsapp"
+        | "enviou_lead";
+      tipo_midia: "foto" | "panorama_360" | "video" | "splat";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -480,6 +704,13 @@ export const Constants = {
   },
   public: {
     Enums: {
+      status_lead: [
+        "novo",
+        "em_contato",
+        "visita_agendada",
+        "ganho",
+        "perdido",
+      ],
       status_publicacao: ["rascunho", "publicado", "arquivado"],
       status_unidade: ["disponivel", "reservado", "vendido"],
       tipo_comodo: [
@@ -493,6 +724,14 @@ export const Constants = {
         "outro",
       ],
       tipo_empreendimento: ["predio", "casa"],
+      tipo_evento: [
+        "abriu_tour",
+        "abriu_unidade",
+        "viu_comodo",
+        "clicou_whatsapp",
+        "enviou_lead",
+      ],
+      tipo_midia: ["foto", "panorama_360", "video", "splat"],
     },
   },
 } as const;
