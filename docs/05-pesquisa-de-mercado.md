@@ -73,9 +73,9 @@
 
 ---
 
-## Propostas de mudança no produto (decidir juntos)
+## Propostas de mudança no produto
 
-> Pelo `CLAUDE.md`, nada entra no MVP sem aprovação. Abaixo estão as sugestões da pesquisa, com a fase recomendada.
+> ✅ **Itens do MVP aprovados em 16/11/2026** e já incorporados em `docs/01` (escopo) e `docs/03` (modelagem). Os itens das Fases 2 e 4 continuam como sugestão.
 
 | Proposta | Dor/objeção | Esforço | Fase sugerida |
 |---|---|---|---|
@@ -90,7 +90,6 @@
 | Simulador SAC/Price | O4 | 🟢 Baixo | Fase 2 |
 | Plano grátis (1 empreendimento) + plano pago barato | D1 | — | Fase 4 (modelo de negócio) |
 
-Se aprovadas, as propostas do MVP exigem atualizar `docs/01-visao-do-produto.md` e `docs/03-modelagem-de-dados.md` (novas colunas em `empreendimentos` e `unidades`).
 
 ---
 
