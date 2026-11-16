@@ -14,6 +14,14 @@ Plataforma para corretores apresentarem imóveis em 3D por link, com captação 
 - **Próximo planejamento:** Sprint 2 – Banco e login (rascunho em `docs/sprints/sprint-1.md`).
 - **O usuário é júnior e está aprendendo:** explique o porquê das decisões, em linguagem simples, e mostre os comandos que ele mesmo pode rodar.
 
+## Como planejar uma nova sprint
+Ao fim de uma sprint (ou quando o usuário pedir o planejamento da próxima):
+1. Revise o que foi entregue, atualize a seção "Onde estamos" e marque o que mudou em `docs/`.
+2. Use o rascunho de sprints em `docs/sprints/sprint-1.md` e o escopo do MVP em `docs/01` como base. Nada fora do escopo sem perguntar.
+3. Crie `docs/sprints/sprint-N.md` (primeira linha `# Sprint N – Nome`, uma linha `**Objetivo:** ...` e a tabela de issues) e um arquivo por issue em `docs/sprints/sprint-N/NN-nome.md`, no mesmo formato da Sprint 1 (frontmatter `title`/`labels`, Contexto, O que fazer, Arquivos envolvidos, Critérios de aceite, Como testar).
+4. Issues pequenas: no máximo 1 a 2 dias de trabalho cada. Se mexer em auth, RLS, uploads, formulários públicos ou env, inclua a label `seguranca`.
+5. **Mostre o plano ao usuário e espere a aprovação.** Só então faça o commit e rode `bash scripts/criar-sprint.sh N`.
+
 ## Idioma
 - Conversa, issues, commits e documentação em **português**.
 - Código (variáveis, funções, componentes) em **inglês**. Tabelas e colunas do banco em **português snake_case** (como na modelagem).
