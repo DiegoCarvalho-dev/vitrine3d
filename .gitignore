@@ -24,6 +24,7 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/.playwright-mcp/
 
 # logs de debug
 npm-debug.log*
