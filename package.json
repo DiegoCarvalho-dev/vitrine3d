@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "db:types": "supabase gen types typescript --remote > src/types/database.ts && prettier --write src/types/database.ts"
+    "db:types": "supabase gen types typescript --remote > src/types/database.ts && prettier --write src/types/database.ts",
+    "test:rls": "node supabase/tests/rls/rodar.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
