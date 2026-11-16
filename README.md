@@ -23,6 +23,37 @@ O corretor vende mandando fotos de celular e textos soltos no WhatsApp. O client
 | [04 – Fluxo de trabalho](docs/04-fluxo-de-trabalho.md) | Git, branches, commits, PRs, como trabalhar com o Claude Code |
 | [05 – Pesquisa de mercado](docs/05-pesquisa-de-mercado.md) | Dores dos corretores, objeções dos compradores, propostas para o produto |
 | [Sprint 1](docs/sprints/sprint-1.md) | Preparação do ambiente (issues) |
+| [Sprint 2](docs/sprints/sprint-2.md) | Banco de dados e login (issues) |
+
+## Como rodar
+
+Pré-requisitos: Node.js 22+, e um `.env.local` copiado do `.env.example` com os dados do projeto no Supabase.
+
+```bash
+npm install
+npm run dev          # http://localhost:3000
+```
+
+## Testes
+
+| Comando | O que testa |
+|---|---|
+| `npm run test` | Unitários e de componentes (Vitest) |
+| `npm run test:e2e` | Navegador de verdade (Playwright), em desktop e iPhone 13 |
+| `npm run test:rls` | **Segurança do banco**: regras de acesso (RLS) e permissões |
+| `npm run lint` / `npm run typecheck` | Qualidade do código e tipos |
+
+### Por que `test:rls` existe
+
+A chave pública do Supabase vai para o navegador, então **quem protege os dados é o banco**, não o front-end. Os testes em `supabase/tests/rls/` simulam um visitante anônimo e corretores concorrentes tentando ler e alterar o que não podem, por exemplo:
+
+- o preço marcado como "sob consulta" nunca chega ao visitante, nem a um corretor concorrente logado, nem por filtro ou ordenação;
+- o visitante envia um lead, mas não consegue lê-lo de volta;
+- um corretor não vê nem altera os dados de outro;
+- excluir a conta de um corretor apaga em cascata tudo o que é dele;
+- nenhuma tabela ou função fica acessível pela API sem permissão explícita.
+
+Cada teste roda **dentro de uma transação desfeita no fim**: não deixa dados no banco e não precisa de chave secreta. Requer a [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) com `supabase login` e `supabase link` feitos.
 
 ## Stack (resumo)
 
@@ -30,4 +61,4 @@ Next.js · TypeScript · Tailwind CSS · shadcn/ui · React Three Fiber (Three.j
 
 ## Status
 
-🚧 Sprint 1: preparação do ambiente.
+🚧 Sprint 2: banco de dados (concluído, com RLS testado) e login do corretor.
