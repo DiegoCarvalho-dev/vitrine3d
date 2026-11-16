@@ -51,9 +51,10 @@ O produto **capta e qualifica** leads: identifica quem visitou, o que olhou e qu
 - [ ] Login do corretor (e-mail/senha ou link mágico)
 - [ ] Perfil do corretor: nome, WhatsApp, CRECI, foto, cor da marca
 - [ ] Cadastro de empreendimento (prédio ou casa): nome, endereço, descrição, capa, nº de andares, unidades por andar
+- [ ] Dados de **segurança da compra**: construtora, nº do registro de incorporação, previsão de entrega, e a data em que as informações foram conferidas *(ver `docs/05`, O6/O2)*
 - [ ] Cadastro de **tipologias** (plantas que se repetem: "Tipo A, 2 quartos, 65 m²") e seus **cômodos**, com descrição e área
 - [ ] Editor simples de planta: o corretor desenha os cômodos como retângulos numa grade (gera o 3D)
-- [ ] Unidades: número, andar, tipologia, preço, status (disponível / reservado / vendido)
+- [ ] Unidades: número, andar, tipologia, preço, status (disponível / reservado / vendido), e a opção **mostrar preço ou "sob consulta"** *(ver `docs/05`, D3/O4)*
 - [ ] Página pública por link (`/e/[slug]`):
   - [ ] Prédio 3D gerado automaticamente, unidades coloridas por status
   - [ ] Filtros: quartos, faixa de preço, andar, só disponíveis
@@ -62,7 +63,10 @@ O produto **capta e qualifica** leads: identifica quem visitou, o que olhou e qu
   - [ ] Etiquetas por cômodo com descrição e área
   - [ ] Botão WhatsApp com mensagem pronta ("Olá! Vi a unidade 902 no tour…")
   - [ ] Formulário de interesse com consentimento LGPD
-- [ ] Painel de leads e de visualizações básicas
+  - [ ] Seção **"Segurança da compra"** (construtora, registro de incorporação, previsão de entrega)
+  - [ ] Selo **"imagem ilustrativa"** no 3D + "informações conferidas em [data]"
+- [ ] Painel de leads e de visualizações básicas, com **resumo de resultados** ("seu tour gerou X leads e Y visualizações este mês")
+- [ ] **E-mail para o corretor a cada lead novo**, com o contexto do que a pessoa viu (unidades, tempo, cômodos) *(ver `docs/05`, D4)*
 - [ ] Prévia do link no WhatsApp (Open Graph)
 - [ ] Funciona bem no celular
 

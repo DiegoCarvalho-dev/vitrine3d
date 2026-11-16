@@ -18,6 +18,7 @@ Regra do projeto: **tudo grátis até existir um cliente pagando.** Só começam
 | Testes | **Vitest** (unitário) + **Playwright** (navegador) | Vitest é rápido e simples. O Playwright abre um navegador de verdade e clica como um usuário, tanto local quanto no CI. | Grátis |
 | Qualidade | **ESLint** + **Prettier** | Padroniza o código e pega erros comuns. | Grátis |
 | CI | **GitHub Actions** (sprint posterior) | Roda lint, tipos, testes e build em todo PR. Grátis para repositório público. | Grátis |
+| E-mail | **Resend** + **React Email** | Avisa o corretor a cada lead novo. Tem plano grátis com cota mensal de envios e integra fácil com Next.js. A chave fica só no servidor. | Grátis* |
 | Fase 2 | **Photo Sphere Viewer** (fotos 360°), **Leaflet + OpenStreetMap** (mapa) | Bibliotecas livres. | Grátis |
 | Fase 2 | **API do Claude** (descrição por IA) | Gera texto a partir das fotos. | ⚠️ Paga por uso (centavos por imóvel) |
 | Fase 3 | **Gaussian Splatting** (ex.: viewer Spark/gsplat) | 3D fotorrealista a partir de vídeo. O processamento precisa de GPU. | ⚠️ A definir |
@@ -38,6 +39,7 @@ Sim, e ele é o **Next.js**. Ele organiza rotas, páginas, chamadas ao servidor 
 |---|---|
 | **Supabase Free** | Banco e storage pequenos (na casa de centenas de MB e ~1 GB), poucos projetos ativos, e o **projeto pausa após ~1 semana sem uso** (reativa com um clique). Por isso: **fotos comprimidas** (WebP) e modelos 3D leves. |
 | **Vercel Hobby** | Grátis, mas é **para uso pessoal e não comercial**. Para portfólio e demo está ok. **Quando um cliente pagar**, migramos para o plano Pro ou outra hospedagem. |
+| **Resend Free** | Cota mensal e diária de e-mails (confira no site) e, sem domínio próprio verificado, só envia para o e-mail da sua conta. Para a demo isso basta; com um cliente real, verificamos um domínio. |
 | **GitHub** | Repositório público: Actions grátis. Repositório privado tem limite de minutos/mês. Para portfólio, **público** é o ideal (mas nunca com segredos!). |
 
 ## Arquitetura

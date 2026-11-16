@@ -38,6 +38,7 @@ erDiagram
     text avatar_url
     text logo_url
     text cor_marca "hex #RRGGBB"
+    boolean notificar_leads_email "default true"
     timestamptz criado_em
   }
 
@@ -56,6 +57,10 @@ erDiagram
     int numero_andares
     int unidades_por_andar
     text capa_url
+    text construtora
+    text registro_incorporacao "nº do R.I. no cartório"
+    date previsao_entrega "null para imóvel pronto"
+    date informacoes_conferidas_em
     status_publicacao status "rascunho | publicado | arquivado"
     timestamptz criado_em
     timestamptz atualizado_em
@@ -93,6 +98,7 @@ erDiagram
     text numero "902"
     int posicao_no_andar "1..unidades_por_andar"
     numeric preco
+    boolean exibir_preco "false = sob consulta"
     status_unidade status "disponivel | reservado | vendido"
     text observacoes
   }
@@ -168,6 +174,7 @@ O campo `versao` permite mudar o formato no futuro sem quebrar plantas antigas. 
 - `unidades`: único por `(empreendimento_id, numero)` e por `(empreendimento_id, andar, posicao_no_andar)`.
 - `tipologias.empreendimento_id` deve ser o mesmo da `unidade` que a usa (checado na aplicação e por trigger).
 - `leads.consentimento_lgpd` **obrigatório = true** (check constraint).
+- `unidades.preco` **nunca vai para o visitante** quando `exibir_preco = false`: a leitura pública passa por uma **view** que devolve `null` nesse caso (o RLS filtra linhas, não colunas).
 - `ON DELETE CASCADE` de empreendimento para os filhos; `ON DELETE SET NULL` em referências opcionais (ex.: `leads.unidade_id`).
 - `atualizado_em` mantido por trigger.
 
@@ -181,11 +188,20 @@ O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) 
 | `empreendimentos` | CRUD dos seus | lê se `status = 'publicado'` |
 | `tipologias`, `comodos`, `unidades`, `midias`, `hotspots` | CRUD se o empreendimento é seu | lê se o empreendimento está publicado |
 | `leads` | lê/edita os seus | **só insere** (nunca lê) |
+| `unidades` (preço) | vê sempre | vê o preço só se `exibir_preco = true` (via view `unidades_publicas`) |
 | `eventos` | lê os seus | **só insere** (nunca lê) |
 
 **Storage**: bucket `midias` público para leitura de arquivos de empreendimentos publicados. A escrita só é permitida pelo dono, no caminho `{dono_id}/{empreendimento_id}/...`.
 
 **Anti-spam** (leads e eventos): limite de tamanho dos campos, validação Zod no servidor e, se precisar, rate limit simples por sessão. ⚠️ É ponto obrigatório de `/security-review`.
+
+## Notificação de lead por e-mail
+
+Quando um lead é inserido, o corretor recebe um e-mail (se `perfis.notificar_leads_email = true`) com nome, contato, unidade de interesse e o **resumo da navegação** daquela sessão (unidades e cômodos vistos, tempo no tour), montado a partir de `eventos`.
+
+- O envio acontece na **Server Action** que salva o lead, depois do insert, usando a API do **Resend** (ver `docs/02`).
+- Se o envio falhar, **o lead continua salvo**: o e-mail é um aviso, e o painel é a fonte da verdade.
+- O e-mail do corretor vem de `auth.users.email`, que só é acessível no servidor.
 
 ## Índices iniciais
 
