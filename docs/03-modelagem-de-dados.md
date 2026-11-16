@@ -1,0 +1,202 @@
+# 03 – Modelagem de dados
+
+Banco: **PostgreSQL (Supabase)**. Tabelas e colunas em **português e snake_case**, chaves `uuid`, datas `timestamptz`.
+
+## Conceitos do domínio
+
+- **Empreendimento**: o que o corretor está vendendo. Pode ser um **prédio** (várias unidades) ou uma **casa** (uma unidade).
+- **Tipologia**: uma **planta que se repete**. Num prédio, o "Tipo A, 2 quartos, 65 m²" se repete do 2º ao 10º andar. Cadastrar a planta **uma vez** e reaproveitar economiza muito trabalho do corretor.
+- **Cômodo**: sala, quarto, cozinha… Pertence a uma tipologia e tem **geometria** (polígono em metros), área e descrição.
+- **Unidade**: o apartamento concreto (ex.: 902), com andar, preço e status. Aponta para uma tipologia.
+- **Mídia**: fotos, fotos 360° e vídeos ligados ao empreendimento, unidade ou cômodo.
+- **Hotspot**: etiqueta clicável posicionada dentro do 3D ("Piso porcelanato", "Janela antirruído").
+- **Lead**: pessoa que demonstrou interesse.
+- **Evento**: registro anônimo de navegação (abriu o tour, entrou na unidade, clicou no WhatsApp) que alimenta o analytics e o termômetro de interesse.
+
+## Diagrama ER
+
+```mermaid
+erDiagram
+  perfis ||--o{ empreendimentos : "possui"
+  empreendimentos ||--o{ tipologias : "tem"
+  empreendimentos ||--o{ unidades : "tem"
+  tipologias ||--o{ unidades : "planta de"
+  tipologias ||--o{ comodos : "composta por"
+  comodos ||--o{ hotspots : "tem"
+  empreendimentos ||--o{ midias : "tem"
+  unidades |o--o{ midias : "tem"
+  comodos |o--o{ midias : "tem"
+  empreendimentos ||--o{ leads : "recebe"
+  unidades |o--o{ leads : "interesse em"
+  empreendimentos ||--o{ eventos : "registra"
+
+  perfis {
+    uuid id PK "= auth.users.id"
+    text nome
+    text whatsapp "E.164: +5511999999999"
+    text creci
+    text avatar_url
+    text logo_url
+    text cor_marca "hex #RRGGBB"
+    timestamptz criado_em
+  }
+
+  empreendimentos {
+    uuid id PK
+    uuid dono_id FK
+    tipo_empreendimento tipo "predio | casa"
+    text nome
+    text slug UK "usado na URL /e/slug"
+    text descricao
+    text endereco
+    text cidade
+    text uf
+    numeric latitude
+    numeric longitude
+    int numero_andares
+    int unidades_por_andar
+    text capa_url
+    status_publicacao status "rascunho | publicado | arquivado"
+    timestamptz criado_em
+    timestamptz atualizado_em
+  }
+
+  tipologias {
+    uuid id PK
+    uuid empreendimento_id FK
+    text nome "Tipo A"
+    int quartos
+    int suites
+    int banheiros
+    int vagas
+    numeric area_privativa_m2
+    jsonb planta "paredes, portas, janelas"
+    text planta_imagem_url
+  }
+
+  comodos {
+    uuid id PK
+    uuid tipologia_id FK
+    text nome "Suíte master"
+    tipo_comodo tipo "sala | quarto | suite | cozinha | banheiro | varanda | lavanderia | outro"
+    text descricao
+    numeric area_m2
+    jsonb geometria "polígono em metros"
+    int ordem
+  }
+
+  unidades {
+    uuid id PK
+    uuid empreendimento_id FK
+    uuid tipologia_id FK
+    int andar "0 = térreo"
+    text numero "902"
+    int posicao_no_andar "1..unidades_por_andar"
+    numeric preco
+    status_unidade status "disponivel | reservado | vendido"
+    text observacoes
+  }
+
+  midias {
+    uuid id PK
+    uuid empreendimento_id FK
+    uuid unidade_id FK "opcional"
+    uuid comodo_id FK "opcional"
+    tipo_midia tipo "foto | panorama_360 | video | splat"
+    text caminho_storage
+    text legenda
+    int ordem
+  }
+
+  hotspots {
+    uuid id PK
+    uuid comodo_id FK
+    text titulo
+    text descricao
+    jsonb posicao "x, y, z em metros"
+    uuid midia_id FK "opcional"
+  }
+
+  leads {
+    uuid id PK
+    uuid empreendimento_id FK
+    uuid unidade_id FK "opcional"
+    text nome
+    text telefone
+    text email
+    text mensagem
+    text origem "utm_source / campanha"
+    boolean consentimento_lgpd
+    timestamptz consentimento_em
+    status_lead status "novo | em_contato | visita_agendada | ganho | perdido"
+    timestamptz criado_em
+  }
+
+  eventos {
+    bigint id PK
+    uuid empreendimento_id FK
+    uuid unidade_id FK "opcional"
+    uuid comodo_id FK "opcional"
+    text sessao_id "id anônimo do navegador"
+    tipo_evento tipo "abriu_tour | abriu_unidade | viu_comodo | clicou_whatsapp | enviou_lead"
+    jsonb dados
+    timestamptz criado_em
+  }
+```
+
+## Formato da planta (`tipologias.planta` e `comodos.geometria`)
+
+Tudo em **metros**, com origem (0,0) no canto inferior esquerdo da unidade. No MVP, os cômodos são retângulos desenhados numa grade. O formato aceita polígonos para evoluir depois.
+
+```json
+// comodos.geometria
+{ "tipo": "poligono", "pontos": [[0,0],[4,0],[4,3.5],[0,3.5]], "pe_direito": 2.7 }
+
+// tipologias.planta  (elementos extras além dos cômodos)
+{
+  "versao": 1,
+  "portas":  [{ "de": [4,1], "ate": [4,1.8] }],
+  "janelas": [{ "de": [1,0], "ate": [3,0], "peitoril": 1.0, "altura": 1.2 }]
+}
+```
+
+O campo `versao` permite mudar o formato no futuro sem quebrar plantas antigas. O formato será validado com **Zod** antes de salvar.
+
+## Regras de integridade
+
+- `empreendimentos.slug` único, minúsculo, só `a-z0-9-`.
+- `unidades`: único por `(empreendimento_id, numero)` e por `(empreendimento_id, andar, posicao_no_andar)`.
+- `tipologias.empreendimento_id` deve ser o mesmo da `unidade` que a usa (checado na aplicação e por trigger).
+- `leads.consentimento_lgpd` **obrigatório = true** (check constraint).
+- `ON DELETE CASCADE` de empreendimento para os filhos; `ON DELETE SET NULL` em referências opcionais (ex.: `leads.unidade_id`).
+- `atualizado_em` mantido por trigger.
+
+## Segurança (Row Level Security)
+
+O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) vai para o navegador, então **o banco é quem protege os dados**, não o front-end.
+
+| Tabela | Corretor (dono) | Visitante anônimo |
+|---|---|---|
+| `perfis` | lê/edita o próprio | lê nome, whatsapp, creci, foto, marca de quem tem empreendimento publicado (via view) |
+| `empreendimentos` | CRUD dos seus | lê se `status = 'publicado'` |
+| `tipologias`, `comodos`, `unidades`, `midias`, `hotspots` | CRUD se o empreendimento é seu | lê se o empreendimento está publicado |
+| `leads` | lê/edita os seus | **só insere** (nunca lê) |
+| `eventos` | lê os seus | **só insere** (nunca lê) |
+
+**Storage**: bucket `midias` público para leitura de arquivos de empreendimentos publicados. A escrita só é permitida pelo dono, no caminho `{dono_id}/{empreendimento_id}/...`.
+
+**Anti-spam** (leads e eventos): limite de tamanho dos campos, validação Zod no servidor e, se precisar, rate limit simples por sessão. ⚠️ É ponto obrigatório de `/security-review`.
+
+## Índices iniciais
+
+- `empreendimentos(slug)` único
+- `unidades(empreendimento_id, status)`
+- `leads(empreendimento_id, criado_em desc)`
+- `eventos(empreendimento_id, criado_em desc)` e `eventos(sessao_id)`
+
+## Migrations
+
+- Cada mudança no banco é um arquivo em `supabase/migrations/` (gerado com `supabase migration new <nome>`).
+- **Nunca** alterar o banco pelo painel web sem criar a migration correspondente.
+- `supabase/seed.sql` cria um **prédio demo** (10 andares, 4 unidades por andar, 2 tipologias) para desenvolvimento e para a demo do portfólio.
+- Os tipos TypeScript são gerados do banco com `supabase gen types typescript`.
