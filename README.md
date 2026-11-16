@@ -21,6 +21,7 @@ O corretor vende mandando fotos de celular e textos soltos no WhatsApp. O client
 | [02 – Stack e arquitetura](docs/02-stack-e-arquitetura.md) | Tecnologias, por que cada uma, limites dos planos grátis |
 | [03 – Modelagem de dados](docs/03-modelagem-de-dados.md) | Diagrama ER, tabelas, regras de acesso (RLS) |
 | [04 – Fluxo de trabalho](docs/04-fluxo-de-trabalho.md) | Git, branches, commits, PRs, como trabalhar com o Claude Code |
+| [05 – Pesquisa de mercado](docs/05-pesquisa-de-mercado.md) | Dores dos corretores, objeções dos compradores, propostas para o produto |
 | [Sprint 1](docs/sprints/sprint-1.md) | Preparação do ambiente (issues) |
 
 ## Stack (resumo)
