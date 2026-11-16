@@ -50,6 +50,20 @@ begin
     r := r || E'\n[OK] A NÃO transfere o empreendimento para B (with check)';
   end;
 
+  begin
+    update public.empreendimentos set id = gen_random_uuid() where id = emp_a;
+    r := r || E'\n[FALHOU] A conseguiu trocar o id do empreendimento';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] A NÃO troca o id do empreendimento (sem GRANT na coluna)';
+  end;
+
+  begin
+    update public.empreendimentos set criado_em = now() - interval '1 year' where id = emp_a;
+    r := r || E'\n[FALHOU] A conseguiu alterar criado_em';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] A NÃO altera criado_em';
+  end;
+
   select atualizado_em into t1 from public.empreendimentos where id = emp_a;
   perform pg_sleep(0.01);
   update public.empreendimentos set nome = 'Rascunho A editado' where id = emp_a;

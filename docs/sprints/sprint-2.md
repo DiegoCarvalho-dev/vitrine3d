@@ -27,7 +27,7 @@
 
 ## Próximas sprints (rascunho, a refinar)
 
-- **Sprint 3 – Painel:** Storage (bucket `midias` + policies), CRUD de empreendimento, tipologias, cômodos, unidades; upload de capa e foto do corretor.
+- **Sprint 3 – Painel:** Storage (bucket `midias` + policies), CRUD de empreendimento, tipologias, cômodos, unidades; upload de capa e foto do corretor. Validar `avatar_url`, `logo_url` e `capa_url` com Zod (só `https:` ou caminho do nosso Storage) antes de exibir (apontado no /security-review do PR #20).
 - **Sprint 4 – Tour (prédio):** deploy na Vercel (ex-#8), página pública `/e/[slug]`, prédio 3D com dados reais e visual de edifício real (#12), filtros, corte por andar, Open Graph.
 - **Sprint 5 – Tour (unidade):** planta → 3D (paredes, portas), etiquetas, vista dollhouse, modo caminhar (desktop + toque).
 - **Sprint 6 – Leads e analytics:** botão WhatsApp, formulário LGPD, eventos, e-mail de lead (Resend), painel de leads e de visualizações.
