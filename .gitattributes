@@ -1,0 +1,10 @@
+# Sempre LF (padrão do Prettier), mesmo no Windows com core.autocrlf=true.
+* text=auto eol=lf
+
+# Binários: o Git não deve mexer.
+*.ico binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.ktx2 binary
+*.glb binary
