@@ -3,18 +3,24 @@ import { z } from "zod";
 // Variáveis públicas do Supabase. O prefixo NEXT_PUBLIC_ faz o Next.js
 // colocá-las no código do navegador, então aqui NUNCA entram segredos
 // (a service role / secret key fica só no servidor e nunca com esse prefixo).
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
+
+// https sempre; http só para o Supabase rodando na própria máquina.
+// Compara o hostname (não o texto inteiro), para "http://site.com/?localhost" não passar.
+function isSecureOrLocal(value: string): boolean {
+  const url = new URL(value);
+  return (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && LOCAL_HOSTNAMES.has(url.hostname))
+  );
+}
+
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z
     .url({ message: "NEXT_PUBLIC_SUPABASE_URL precisa ser uma URL válida." })
-    .refine(
-      (value) =>
-        value.startsWith("https://") ||
-        value.includes("localhost") ||
-        value.includes("127.0.0.1"),
-      {
-        message: "NEXT_PUBLIC_SUPABASE_URL precisa usar https.",
-      },
-    ),
+    .refine(isSecureOrLocal, {
+      message: "NEXT_PUBLIC_SUPABASE_URL precisa usar https.",
+    }),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z
     .string()
     .min(1, "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY está vazia.")

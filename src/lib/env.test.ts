@@ -38,6 +38,11 @@ describe("getPublicEnv", () => {
     expect(() => getPublicEnv()).toThrow(/https/);
   });
 
+  it("recusa http com 'localhost' fora do hostname", () => {
+    setEnv("http://example.com/?localhost", VALID_KEY);
+    expect(() => getPublicEnv()).toThrow(/https/);
+  });
+
   it("aceita o Supabase local (localhost) para desenvolvimento", () => {
     setEnv("http://127.0.0.1:54321", VALID_KEY);
     expect(getPublicEnv().NEXT_PUBLIC_SUPABASE_URL).toBe(
