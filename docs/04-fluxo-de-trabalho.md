@@ -99,7 +99,24 @@ Os problemas encontrados são corrigidos (volta ao passo 4) ou viram uma nova is
 
 ## Branches
 
-**Agora (sem clientes):** pode trabalhar **direto na `main`**. Para algo grande ou experimental, crie uma branch (`feat/23-corte-do-predio`) e faça merge quando estiver ok.
+**Regra atual:** depende do risco da issue.
+
+| Tipo de issue | Onde trabalhar |
+|---|---|
+| Ajuste de ambiente, configuração, docs, testes, tarefas pequenas (`chore`, `docs`, `estudo`) | **Direto na `main`** |
+| Funcionalidade, bug, ou qualquer coisa que exija mais cuidado: banco/migrations, RLS, login, uploads, formulários públicos, 3D (`feature`, `fix`, label `seguranca`) | **Branch a partir da `main` + Pull Request** |
+
+Fluxo com branch:
+```bash
+git switch main
+```
+```bash
+git pull
+```
+```bash
+git switch -c feat/7-poc-3d
+```
+Depois do commit: `git push -u origin feat/7-poc-3d` e `gh pr create`. O PR descreve o que mudou e tem `Closes #N` no corpo. O merge na `main` acontece **depois** do seu ok e das verificações do PR passarem.
 
 **Depois (sprint de CI):**
 - `main` protegida: só entra via **Pull Request**.
