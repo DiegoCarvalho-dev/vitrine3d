@@ -182,6 +182,14 @@ O campo `versao` permite mudar o formato no futuro sem quebrar plantas antigas. 
 
 O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) vai para o navegador, então **o banco é quem protege os dados**, não o front-end.
 
+**Padrões adotados nas migrations** (desde a issue #13):
+- `GRANT` explícito só das operações necessárias, inclusive **por coluna** quando o visitante não pode ver tudo (ex.: `perfis.notificar_leads_email` não é concedido a `anon`).
+- Policies usam `(select auth.uid())`, que é avaliado uma vez por consulta, e não `auth.uid()` direto, que seria avaliado linha a linha.
+- `UPDATE` sempre com `USING` **e** `WITH CHECK`, para ninguém "transferir" uma linha para outro dono.
+- Uma policy de leitura por tabela, combinando os casos com `or` (várias policies permissivas pesam no desempenho).
+- Funções auxiliares (gatilhos, `SECURITY DEFINER`) ficam no schema **`privado`**, que não é exposto na API, com `set search_path = ''` e sem `EXECUTE` para os papéis da API.
+- O perfil do corretor é criado por gatilho em `auth.users` (`privado.criar_perfil_para_novo_usuario`). O nome inicial vem de `raw_user_meta_data`, que o usuário pode editar, então esse dado **nunca** é usado para decidir permissões.
+
 | Tabela | Corretor (dono) | Visitante anônimo |
 |---|---|---|
 | `perfis` | lê/edita o próprio | lê nome, whatsapp, creci, foto, marca de quem tem empreendimento publicado (via view) |
