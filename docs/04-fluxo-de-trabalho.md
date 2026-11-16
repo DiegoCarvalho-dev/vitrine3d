@@ -54,6 +54,9 @@ npm run test
 npm run test:e2e
 ```
 ```bash
+npm run test:rls   # quando a issue mexe no banco (migrations, RLS)
+```
+```bash
 npm run build
 ```
 Depois, no navegador:

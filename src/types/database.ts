@@ -39,6 +39,47 @@ export type Database = {
   };
   public: {
     Tables: {
+      comodos: {
+        Row: {
+          area_m2: number | null;
+          descricao: string | null;
+          geometria: Json;
+          id: string;
+          nome: string;
+          ordem: number;
+          tipo: Database["public"]["Enums"]["tipo_comodo"];
+          tipologia_id: string;
+        };
+        Insert: {
+          area_m2?: number | null;
+          descricao?: string | null;
+          geometria: Json;
+          id?: string;
+          nome: string;
+          ordem?: number;
+          tipo?: Database["public"]["Enums"]["tipo_comodo"];
+          tipologia_id: string;
+        };
+        Update: {
+          area_m2?: number | null;
+          descricao?: string | null;
+          geometria?: Json;
+          id?: string;
+          nome?: string;
+          ordem?: number;
+          tipo?: Database["public"]["Enums"]["tipo_comodo"];
+          tipologia_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "comodos_tipologia_id_fkey";
+            columns: ["tipologia_id"];
+            isOneToOne: false;
+            referencedRelation: "tipologias";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empreendimentos: {
         Row: {
           atualizado_em: string;
@@ -173,6 +214,122 @@ export type Database = {
         };
         Relationships: [];
       };
+      tipologias: {
+        Row: {
+          area_privativa_m2: number | null;
+          atualizado_em: string;
+          banheiros: number;
+          criado_em: string;
+          empreendimento_id: string;
+          id: string;
+          nome: string;
+          planta: Json;
+          planta_imagem_url: string | null;
+          quartos: number;
+          suites: number;
+          vagas: number;
+        };
+        Insert: {
+          area_privativa_m2?: number | null;
+          atualizado_em?: string;
+          banheiros?: number;
+          criado_em?: string;
+          empreendimento_id: string;
+          id?: string;
+          nome: string;
+          planta?: Json;
+          planta_imagem_url?: string | null;
+          quartos?: number;
+          suites?: number;
+          vagas?: number;
+        };
+        Update: {
+          area_privativa_m2?: number | null;
+          atualizado_em?: string;
+          banheiros?: number;
+          criado_em?: string;
+          empreendimento_id?: string;
+          id?: string;
+          nome?: string;
+          planta?: Json;
+          planta_imagem_url?: string | null;
+          quartos?: number;
+          suites?: number;
+          vagas?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tipologias_empreendimento_id_fkey";
+            columns: ["empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "empreendimentos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      unidades: {
+        Row: {
+          andar: number;
+          atualizado_em: string;
+          criado_em: string;
+          empreendimento_id: string;
+          exibir_preco: boolean;
+          id: string;
+          numero: string;
+          observacoes: string | null;
+          posicao_no_andar: number;
+          preco: number | null;
+          preco_publico: number | null;
+          status: Database["public"]["Enums"]["status_unidade"];
+          tipologia_id: string | null;
+        };
+        Insert: {
+          andar: number;
+          atualizado_em?: string;
+          criado_em?: string;
+          empreendimento_id: string;
+          exibir_preco?: boolean;
+          id?: string;
+          numero: string;
+          observacoes?: string | null;
+          posicao_no_andar: number;
+          preco?: number | null;
+          preco_publico?: number | null;
+          status?: Database["public"]["Enums"]["status_unidade"];
+          tipologia_id?: string | null;
+        };
+        Update: {
+          andar?: number;
+          atualizado_em?: string;
+          criado_em?: string;
+          empreendimento_id?: string;
+          exibir_preco?: boolean;
+          id?: string;
+          numero?: string;
+          observacoes?: string | null;
+          posicao_no_andar?: number;
+          preco?: number | null;
+          preco_publico?: number | null;
+          status?: Database["public"]["Enums"]["status_unidade"];
+          tipologia_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "unidades_empreendimento_id_fkey";
+            columns: ["empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "empreendimentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "unidades_tipologia_do_mesmo_empreendimento";
+            columns: ["tipologia_id", "empreendimento_id"];
+            isOneToOne: false;
+            referencedRelation: "tipologias";
+            referencedColumns: ["id", "empreendimento_id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -182,6 +339,16 @@ export type Database = {
     };
     Enums: {
       status_publicacao: "rascunho" | "publicado" | "arquivado";
+      status_unidade: "disponivel" | "reservado" | "vendido";
+      tipo_comodo:
+        | "sala"
+        | "quarto"
+        | "suite"
+        | "cozinha"
+        | "banheiro"
+        | "varanda"
+        | "lavanderia"
+        | "outro";
       tipo_empreendimento: "predio" | "casa";
     };
     CompositeTypes: {
@@ -314,6 +481,17 @@ export const Constants = {
   public: {
     Enums: {
       status_publicacao: ["rascunho", "publicado", "arquivado"],
+      status_unidade: ["disponivel", "reservado", "vendido"],
+      tipo_comodo: [
+        "sala",
+        "quarto",
+        "suite",
+        "cozinha",
+        "banheiro",
+        "varanda",
+        "lavanderia",
+        "outro",
+      ],
       tipo_empreendimento: ["predio", "casa"],
     },
   },

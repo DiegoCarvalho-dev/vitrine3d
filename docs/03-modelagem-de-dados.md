@@ -98,7 +98,8 @@ erDiagram
     text numero "902"
     int posicao_no_andar "1..unidades_por_andar"
     numeric preco
-    boolean exibir_preco "false = sob consulta"
+    boolean exibir_preco "false = sob consulta (padrão)"
+    numeric preco_publico "gerada: preco se exibir_preco, senão null"
     status_unidade status "disponivel | reservado | vendido"
     text observacoes
   }
@@ -172,9 +173,10 @@ O campo `versao` permite mudar o formato no futuro sem quebrar plantas antigas. 
 
 - `empreendimentos.slug` único, minúsculo, só `a-z0-9-`.
 - `unidades`: único por `(empreendimento_id, numero)` e por `(empreendimento_id, andar, posicao_no_andar)`.
-- `tipologias.empreendimento_id` deve ser o mesmo da `unidade` que a usa (checado na aplicação e por trigger).
+- `tipologias.empreendimento_id` deve ser o mesmo da `unidade` que a usa: garantido por **chave estrangeira composta** `(tipologia_id, empreendimento_id) → tipologias(id, empreendimento_id)`. Apagar a tipologia deixa a unidade sem tipologia (`on delete set null (tipologia_id)`).
 - `leads.consentimento_lgpd` **obrigatório = true** (check constraint).
-- `unidades.preco` **nunca vai para o visitante** quando `exibir_preco = false`: a leitura pública passa por uma **view** que devolve `null` nesse caso (o RLS filtra linhas, não colunas).
+- `unidades.preco` **nunca vai para o visitante** quando `exibir_preco = false`. Como o RLS filtra linhas e não colunas, usamos a **coluna gerada** `preco_publico` (`preco` só quando `exibir_preco = true`) e **GRANT por coluna**: `anon` lê `preco_publico`, nunca `preco` nem `observacoes`. Toda unidade nasce com `exibir_preco = false` (padrão seguro). *(Antes previsto como view `unidades_publicas`; trocado na issue #14 porque uma view comum ignora o RLS e o advisor do Supabase a marca como erro.)*
+- **Corretor logado vê só as próprias unidades.** Como o GRANT por coluna vale para o papel inteiro, se `authenticated` pudesse ler unidades publicadas de outros, um concorrente logado leria o `preco` "sob consulta" pela API. Por isso **as páginas públicas (tour) leem com um cliente anônimo, sem os cookies de login** (a criar na Sprint 4).
 - `ON DELETE CASCADE` de empreendimento para os filhos; `ON DELETE SET NULL` em referências opcionais (ex.: `leads.unidade_id`).
 - `atualizado_em` mantido por trigger.
 
@@ -195,9 +197,10 @@ O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) 
 |---|---|---|
 | `perfis` | lê/edita o próprio | lê nome, whatsapp, creci, foto, marca de quem tem empreendimento publicado (via view) |
 | `empreendimentos` | CRUD dos seus | lê se `status = 'publicado'` |
-| `tipologias`, `comodos`, `unidades`, `midias`, `hotspots` | CRUD se o empreendimento é seu | lê se o empreendimento está publicado |
+| `tipologias`, `comodos`, `midias`, `hotspots` | CRUD se o empreendimento é seu | lê se o empreendimento está publicado |
+| `unidades` | CRUD se o empreendimento é seu; **lê só as suas** | lê se o empreendimento está publicado (sem `preco` e `observacoes`) |
 | `leads` | lê/edita os seus | **só insere** (nunca lê) |
-| `unidades` (preço) | vê sempre | vê o preço só se `exibir_preco = true` (via view `unidades_publicas`) |
+| `unidades` (preço) | vê sempre | vê só `preco_publico` (null quando "sob consulta") |
 | `eventos` | lê os seus | **só insere** (nunca lê) |
 
 **Storage**: bucket `midias` público para leitura de arquivos de empreendimentos publicados. A escrita só é permitida pelo dono, no caminho `{dono_id}/{empreendimento_id}/...`.

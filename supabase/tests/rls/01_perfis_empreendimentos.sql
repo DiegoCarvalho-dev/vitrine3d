@@ -132,7 +132,12 @@ begin
     r := r || E'\n[OK] visitante NÃO edita perfil';
   end;
 
-  -- Desfaz TUDO (usuários, perfis, empreendimentos) e devolve o relatório.
-  raise exception 'RELATORIO_RLS_13:%', r;
+  -- Desfaz TUDO e devolve um RESUMO curto (a CLI corta mensagens longas, ~1000
+  -- caracteres): total de cenários, quantos OK e só a descrição dos que falharam.
+  -- FIM confirma que a mensagem não foi cortada.
+  raise exception 'RELATORIO_RLS:total=%;ok=%;falhas=%;FIM',
+    (length(r) - length(replace(r, E'\n[', ''))) / 2,
+    (length(r) - length(replace(r, '[OK]', ''))) / 4,
+    coalesce((select string_agg(l, ' | ') from regexp_split_to_table(r, E'\n') as l where l like '[FALHOU]%'), '');
 end
 $$;
