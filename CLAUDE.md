@@ -9,7 +9,9 @@ Plataforma para corretores apresentarem imóveis em 3D por link, com captação 
 
 ## Onde estamos (atualize ao fim de cada sprint)
 - **Planejamento concluído:** visão, stack, modelagem, fluxo de trabalho e pesquisa de mercado estão em `docs/` (01 a 05). Os itens da pesquisa marcados como MVP **já foram aprovados** e incorporados.
-- **Sprint atual:** Sprint 1 – Ambiente (issues #1 a #9, milestone "Sprint 1 – Ambiente"). Ainda não existe código da aplicação.
+- **Sprint 1 – Ambiente: concluída** (#1 a #7; falta só a #9, de estudo, com o usuário). Existe: Next.js 16 + TS estrito, Tailwind + shadcn/ui (tema em `src/app/globals.css`), Vitest + Playwright (desktop + iPhone 13), Supabase conectado (projeto `vitrine3d-dev`, região São Paulo, tabela de teste `saude`), prova de conceito 3D em `/lab/3d`.
+- **Fora da Sprint 1:** deploy na Vercel (#8) foi para o Backlog e volta na Sprint 4; visual de edifício real no 3D (#12) também na Sprint 4. Desenvolvimento em `localhost`; celular testa pela Wi-Fi em `http://<ip-do-pc>:3000`.
+- **Supabase CLI v3:** local por padrão; use `--remote` para o projeto na nuvem (ver `docs/03`). Alterações no banco hospedado pedem confirmação do usuário.
 - **Branches:** issues de ambiente/configuração/docs/testes vão **direto na `main`**. Funcionalidades, bugs e tudo que exige cuidado (banco, RLS, login, uploads, formulários públicos, 3D, label `seguranca`) vão em **branch a partir da `main` + PR** (`feat/<n>-descricao`, `fix/<n>-descricao`). Detalhes em `docs/04`. Proteção da `main` entra na Sprint 7.
 - **Próximo planejamento:** Sprint 2 – Banco e login (rascunho em `docs/sprints/sprint-1.md`).
 - **O usuário é júnior e está aprendendo:** explique o porquê das decisões, em linguagem simples, e mostre os comandos que ele mesmo pode rodar.

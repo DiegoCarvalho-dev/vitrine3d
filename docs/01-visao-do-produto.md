@@ -80,7 +80,7 @@ O produto **capta e qualifica** leads: identifica quem visitou, o que olhou e qu
 
 | Fase | Objetivo | Resultado |
 |---|---|---|
-| **Sprint 1** | Ambiente pronto | Repositório, projeto rodando local e na Vercel, Supabase conectado, CI |
+| **Sprint 1** | Ambiente pronto | Repositório, projeto rodando local, Supabase conectado, testes e prova de conceito 3D (deploy na Vercel passou para a Sprint 4; CI na Sprint 7) |
 | **Fase 1 – MVP** | Portfólio + demo pra corretor | Fluxo completo prédio → unidade → lead |
 | **Fase 2 – Valor** | Primeiro cliente piloto | 360°, IA, campanhas, senha, simulador |
 | **Fase 3 – Realismo** | Diferencial técnico | Vídeo → Gaussian Splatting |
