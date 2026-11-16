@@ -216,3 +216,8 @@ Quando um lead é inserido, o corretor recebe um e-mail (se `perfis.notificar_le
 - **Nunca** alterar o banco pelo painel web sem criar a migration correspondente.
 - `supabase/seed.sql` cria um **prédio demo** (10 andares, 4 unidades por andar, 2 tipologias) para desenvolvimento e para a demo do portfólio.
 - Os tipos TypeScript são gerados do banco com `supabase gen types typescript`.
+- **Supabase CLI v3** trabalha no banco **local por padrão**. Para o projeto na nuvem, use `--remote` (ex.: `supabase db push --remote`); a CLI pede confirmação antes de alterar o banco hospedado.
+- **Tabelas novas não são expostas na Data API automaticamente** (mudança do Supabase em 2026). Toda migration que cria tabela acessada pelo app precisa de: `enable row level security`, `grant` explícito **só** das operações necessárias para `anon`/`authenticated`, e as policies correspondentes.
+
+### Tabelas fora do modelo do produto
+- `saude` (Sprint 1, issue #6): health check da conexão, lida pela página `/lab/supabase`. Uma linha (`'conectado'`), leitura pública, sem escrita pela API. Pode ser removida quando a página de laboratório não for mais necessária.
