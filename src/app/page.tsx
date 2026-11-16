@@ -1,9 +1,4 @@
-import {
-  BuildingIllustration,
-  demoStatusCount,
-  STATUS_LABEL,
-  type UnitStatus,
-} from "@/components/building-illustration";
+import { BuildingIllustration } from "@/components/building-illustration";
 import {
   Card,
   CardDescription,
@@ -12,8 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ViewIn3DButton } from "@/components/view-in-3d-button";
-
-const STATUS_ORDER: UnitStatus[] = ["disponivel", "reservado", "vendido"];
+import { demoStatusCount, STATUS_LABEL, UNIT_STATUSES } from "@/lib/building";
 
 export default function Home() {
   const count = demoStatusCount();
@@ -75,7 +69,7 @@ export default function Home() {
 
           <figcaption>
             <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground tabular-nums">
-              {STATUS_ORDER.map((status) => (
+              {UNIT_STATUSES.map((status) => (
                 <li key={status} className="flex items-center gap-2">
                   <span
                     aria-hidden

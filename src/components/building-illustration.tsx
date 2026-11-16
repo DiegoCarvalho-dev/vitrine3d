@@ -1,45 +1,14 @@
 // Prédio ilustrativo em SVG, gerado a partir de dados (andares × unidades),
-// com a mesma lógica de cores por status que o prédio 3D vai usar.
+// com a mesma lógica de cores por status do prédio 3D (src/lib/building.ts).
 
-export type UnitStatus = "disponivel" | "reservado" | "vendido";
-
-export const STATUS_LABEL: Record<UnitStatus, string> = {
-  disponivel: "Disponível",
-  reservado: "Reservado",
-  vendido: "Vendido",
-};
-
-const FLOORS = 10;
-const UNITS_PER_FLOOR = 4;
-export const HIGHLIGHTED_UNIT = { floor: 9, position: 3 };
-
-// Status de exemplo, fixo (não aleatório) para a página renderizar igual sempre.
-export function demoStatus(floor: number, position: number): UnitStatus {
-  if (
-    floor === HIGHLIGHTED_UNIT.floor &&
-    position === HIGHLIGHTED_UNIT.position
-  ) {
-    return "disponivel";
-  }
-  const n = (floor * 7 + position * 3) % 10;
-  if (n < 4) return "disponivel";
-  if (n < 7) return "reservado";
-  return "vendido";
-}
-
-export function demoStatusCount(): Record<UnitStatus, number> {
-  const count: Record<UnitStatus, number> = {
-    disponivel: 0,
-    reservado: 0,
-    vendido: 0,
-  };
-  for (let floor = 1; floor <= FLOORS; floor++) {
-    for (let position = 1; position <= UNITS_PER_FLOOR; position++) {
-      count[demoStatus(floor, position)]++;
-    }
-  }
-  return count;
-}
+import {
+  DEMO_FLOORS as FLOORS,
+  DEMO_HIGHLIGHTED_UNIT as HIGHLIGHTED_UNIT,
+  DEMO_UNITS_PER_FLOOR as UNITS_PER_FLOOR,
+  demoStatus,
+  demoStatusCount,
+  type UnitStatus,
+} from "@/lib/building";
 
 // Geometria (unidades do viewBox).
 const UNIT_W = 30;
