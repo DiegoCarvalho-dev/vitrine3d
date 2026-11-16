@@ -7,6 +7,13 @@ Plataforma para corretores apresentarem imóveis em 3D por link, com captação 
 - `docs/03-modelagem-de-dados.md`: banco, RLS, formato da planta
 - `docs/04-fluxo-de-trabalho.md`: **o fluxo obrigatório de cada issue**
 
+## Onde estamos (atualize ao fim de cada sprint)
+- **Planejamento concluído:** visão, stack, modelagem, fluxo de trabalho e pesquisa de mercado estão em `docs/` (01 a 05). Os itens da pesquisa marcados como MVP **já foram aprovados** e incorporados.
+- **Sprint atual:** Sprint 1 – Ambiente (issues #1 a #9, milestone "Sprint 1 – Ambiente"). Ainda não existe código da aplicação.
+- **Branches:** por enquanto, commits direto na `main`. PRs, proteção da `main` e GitHub Actions entram na Sprint 7.
+- **Próximo planejamento:** Sprint 2 – Banco e login (rascunho em `docs/sprints/sprint-1.md`).
+- **O usuário é júnior e está aprendendo:** explique o porquê das decisões, em linguagem simples, e mostre os comandos que ele mesmo pode rodar.
+
 ## Idioma
 - Conversa, issues, commits e documentação em **português**.
 - Código (variáveis, funções, componentes) em **inglês**. Tabelas e colunas do banco em **português snake_case** (como na modelagem).
