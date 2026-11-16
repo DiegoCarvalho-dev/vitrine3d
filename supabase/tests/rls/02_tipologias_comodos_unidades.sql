@@ -139,6 +139,21 @@ begin
     r := r || E'\n[OK] visitante NÃO lê observacoes (nota interna)';
   end;
 
+  -- Canal lateral: descobrir o preço oculto filtrando/ordenando por ele, sem lê-lo.
+  begin
+    select count(*) into n from public.unidades where id = uni_oculta and preco > 400000;
+    r := r || E'\n[FALHOU] visitante filtrou por preco (canal lateral)';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] visitante NÃO filtra por preco (canal lateral)';
+  end;
+
+  begin
+    perform numero from public.unidades where empreendimento_id = emp_pub order by preco;
+    r := r || E'\n[FALHOU] visitante ordenou por preco (canal lateral)';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] visitante NÃO ordena por preco (canal lateral)';
+  end;
+
   select preco_publico into v from public.unidades where id = uni_oculta;
   r := r || format(E'\n[%s] "sob consulta": preco_publico = null para o visitante', case when v is null then 'OK' else 'FALHOU' end);
   select preco_publico into v from public.unidades where id = uni_visivel;
