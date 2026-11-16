@@ -10,7 +10,7 @@ Plataforma para corretores apresentarem imóveis em 3D por link, com captação 
 ## Onde estamos (atualize ao fim de cada sprint)
 - **Planejamento concluído:** visão, stack, modelagem, fluxo de trabalho e pesquisa de mercado estão em `docs/` (01 a 05). Os itens da pesquisa marcados como MVP **já foram aprovados** e incorporados.
 - **Sprint atual:** Sprint 1 – Ambiente (issues #1 a #9, milestone "Sprint 1 – Ambiente"). Ainda não existe código da aplicação.
-- **Branches:** por enquanto, commits direto na `main`. PRs, proteção da `main` e GitHub Actions entram na Sprint 7.
+- **Branches:** issues de ambiente/configuração/docs/testes vão **direto na `main`**. Funcionalidades, bugs e tudo que exige cuidado (banco, RLS, login, uploads, formulários públicos, 3D, label `seguranca`) vão em **branch a partir da `main` + PR** (`feat/<n>-descricao`, `fix/<n>-descricao`). Detalhes em `docs/04`. Proteção da `main` entra na Sprint 7.
 - **Próximo planejamento:** Sprint 2 – Banco e login (rascunho em `docs/sprints/sprint-1.md`).
 - **O usuário é júnior e está aprendendo:** explique o porquê das decisões, em linguagem simples, e mostre os comandos que ele mesmo pode rodar.
 
