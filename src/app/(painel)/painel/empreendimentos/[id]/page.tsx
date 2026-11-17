@@ -3,13 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { publishChecklist } from "@/lib/empreendimentos/publish";
-import { getPublicEnv } from "@/lib/env";
-import { publicImageUrl } from "@/lib/validacoes/midia";
 import {
   getMyProject,
   getMyProjectDetails,
 } from "@/lib/empreendimentos/queries";
+import { getPublicEnv } from "@/lib/env";
 import type { UpdateProjectInput } from "@/lib/validacoes/empreendimento";
+import { publicImageUrl } from "@/lib/validacoes/midia";
 
 import { CoverUpload } from "./cover-upload";
 import { DeleteProject } from "./delete-project";

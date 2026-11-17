@@ -139,12 +139,14 @@ async function removeProjectImages(folder: string) {
       return;
     }
     if (!files.length) return;
-    const { error: removeError } = await bucket.remove(
+    const { data: removed, error: removeError } = await bucket.remove(
       files.map((file) => `${folder}/${file.name}`),
     );
-    if (removeError) {
+    // Nothing removed (e.g. refused silently by a policy): stop, or the next
+    // list() would return the same files forever.
+    if (removeError || !removed?.length) {
       console.warn(
-        `[storage] Imagens órfãs em ${folder}: ${removeError.message}`,
+        `[storage] Imagens órfãs em ${folder}: ${removeError?.message ?? "nada apagado"}`,
       );
       return;
     }
@@ -220,13 +222,23 @@ export async function setProjectCover(
 
   const path = parseOwnImagePath(rawPath, userId, id.data);
   if (!path.ok) return { error: "Imagem inválida. Envie de novo." };
+  // The cover is required to publish: a live tour can't lose it.
+  if (path.path === null && project.status === "publicado") {
+    return {
+      error:
+        "A capa é obrigatória com o empreendimento publicado. Troque a foto ou volte para rascunho antes de remover.",
+    };
+  }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("empreendimentos")
     .update({ capa_url: path.path })
-    .eq("id", id.data);
-  if (error) return { error: "Não foi possível salvar a capa. Tente de novo." };
+    .eq("id", id.data)
+    .select("id");
+  // Only delete the old file when the new value was really saved.
+  if (error || !data.length)
+    return { error: "Não foi possível salvar a capa. Tente de novo." };
 
   if (project.capa_url && project.capa_url !== path.path) {
     await deleteStoredImage(project.capa_url);

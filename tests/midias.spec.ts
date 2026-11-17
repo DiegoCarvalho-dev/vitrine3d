@@ -5,6 +5,7 @@ import {
   hasSupabaseEnv,
   loggedInTest as test,
   querySql,
+  runSql,
 } from "./fixtures";
 
 // Capa do empreendimento, foto e logo do corretor (issue #30). Usa o corretor
@@ -115,6 +116,23 @@ test.describe("Imagens: capa, foto e logo", () => {
       `select capa_url from public.empreendimentos where id = '${id}'`,
     );
     expect(saved).toBe(files[0].name);
+
+    // 4) Publicado não pode ficar sem capa (status direto no banco: publicar
+    // pela tela ainda exige tipologias e unidades, das próximas issues).
+    runSql(
+      `update public.empreendimentos set status = 'publicado' where id = '${id}'`,
+    );
+    await page.reload();
+    await page
+      .getByTestId("cover-upload")
+      .getByRole("button", { name: "Remover" })
+      .click();
+    await expect(page.getByTestId("cover-error")).toContainText("obrigatória");
+    expect(filesIn(folder)).toHaveLength(1);
+    runSql(
+      `update public.empreendimentos set status = 'rascunho' where id = '${id}'`,
+    );
+    await page.reload();
 
     // 4) Remove: coluna vazia e nenhum arquivo.
     await page

@@ -21,6 +21,7 @@ export default async function PanelPage({
     getCurrentProfile(),
     listMyProjects(),
   ]);
+  const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
   const firstName = profile?.nome?.trim().split(/\s+/)[0];
   const { erro, excluido } = await searchParams;
 
@@ -88,7 +89,9 @@ export default async function PanelPage({
                 href={`/painel/empreendimentos/${project.id}`}
                 className="flex h-full flex-col gap-3 overflow-hidden rounded-lg border bg-card p-4 transition-colors hover:border-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               >
-                <ProjectCover path={project.capa_url} />
+                <ProjectCover
+                  url={publicImageUrl(supabaseUrl, project.capa_url)}
+                />
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-heading text-lg leading-snug font-semibold">
                     {project.nome}
@@ -118,11 +121,8 @@ export default async function PanelPage({
   );
 }
 
-const supabaseUrl = () => getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
-
 /** Cover on top of the card (or a neutral band while there's none). */
-function ProjectCover({ path }: { path: string | null }) {
-  const url = publicImageUrl(supabaseUrl(), path);
+function ProjectCover({ url }: { url: string | null }) {
   return (
     <div className="-mx-4 -mt-4 mb-1 aspect-video bg-muted">
       {url && (

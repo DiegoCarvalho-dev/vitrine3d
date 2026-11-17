@@ -68,23 +68,36 @@ export function ImageUpload({
     let uploaded: string | undefined;
     try {
       uploaded = await uploadImage(file, folder);
-      const result = await save(uploaded);
-      if (!result.ok) {
-        await removeImage(uploaded);
-        setPreview(null);
-        setError(result.error);
-        return;
-      }
-      toast.success(successMessage);
     } catch (caught) {
-      if (uploaded) await removeImage(uploaded).catch(() => false);
       setPreview(null);
       setError(
         caught instanceof ImageCompressionError || caught instanceof UploadError
           ? caught.message
           : "Não foi possível enviar a imagem. Tente de novo.",
       );
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    try {
+      const result = await save(uploaded);
+      if (result.ok) {
+        toast.success(successMessage);
+      } else {
+        // The server refused it: the file just uploaded would be an orphan.
+        await removeImage(uploaded);
+        setError(result.error);
+      }
+    } catch {
+      // The connection dropped mid-save: the server may already have saved
+      // it, so the file is NOT deleted here (worst case, an orphan).
+      setError(
+        "A conexão caiu. Recarregue a página para ver se a imagem foi salva.",
+      );
     } finally {
+      // Success: the server image (new imageUrl) replaces the local preview,
+      // which frees the original photo from memory.
+      setPreview(null);
       setBusy(false);
       if (inputRef.current) inputRef.current.value = ""; // allow the same file again
     }

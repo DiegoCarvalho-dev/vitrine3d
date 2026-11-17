@@ -77,11 +77,18 @@ export async function setProfileImage(
   const column = COLUMN[kind.data];
 
   const supabase = await createClient();
-  const { data: current } = await supabase
+  const { data: current, error: readError } = await supabase
     .from("perfis")
     .select("avatar_url, logo_url")
     .eq("id", userId)
     .maybeSingle();
+  if (readError) {
+    // Without the previous value we can't clean it up: don't save blindly.
+    return {
+      ok: false,
+      error: "Não foi possível salvar a imagem. Tente de novo.",
+    };
+  }
   const { data, error } = await supabase
     .from("perfis")
     .update({ [column]: path.path })
