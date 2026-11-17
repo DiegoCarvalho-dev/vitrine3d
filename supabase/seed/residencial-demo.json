@@ -1,0 +1,511 @@
+{
+  "$comentario": "Fonte única do prédio demo. Gere o supabase/seed.sql com: npm run db:seed:gerar. Todos os dados são FICTÍCIOS.",
+  "corretor": {
+    "id": "0d3e0000-0000-4000-8000-000000000001",
+    "email": "corretora.demo@exemplo.test",
+    "nome": "Corretora Demo",
+    "whatsapp": "+5511900000000",
+    "creci": "CRECI-SP 000000 (exemplo)",
+    "cor_marca": "#1b365d"
+  },
+  "empreendimento": {
+    "id": "0d3e0000-0000-4000-8000-000000000010",
+    "tipo": "predio",
+    "nome": "Residencial Demo",
+    "slug": "residencial-demo",
+    "descricao": "Empreendimento fictício para demonstração do Vitrine 3D: 10 andares, 4 apartamentos por andar, plantas de 2 e 3 quartos.",
+    "endereco": "Rua Exemplo, 100",
+    "cidade": "São Paulo",
+    "uf": "SP",
+    "latitude": -23.561,
+    "longitude": -46.656,
+    "numero_andares": 10,
+    "unidades_por_andar": 4,
+    "construtora": "Construtora Exemplo (fictícia)",
+    "registro_incorporacao": "R.1/000.000 (exemplo)",
+    "previsao_entrega": "2028-06-30",
+    "informacoes_conferidas_em": "2026-11-16",
+    "status": "publicado"
+  },
+  "tipologias": [
+    {
+      "id": "0d3e0000-0000-4000-8000-000000000101",
+      "chave": "A",
+      "nome": "Tipo A",
+      "quartos": 2,
+      "suites": 1,
+      "banheiros": 2,
+      "vagas": 1,
+      "area_privativa_m2": 80,
+      "planta": {
+        "versao": 1,
+        "portas": [
+          {
+            "de": [0, 3],
+            "ate": [0, 3.9]
+          },
+          {
+            "de": [5, 1.8],
+            "ate": [5, 2.8]
+          },
+          {
+            "de": [6.6, 3],
+            "ate": [7.4, 3]
+          },
+          {
+            "de": [1.2, 5],
+            "ate": [3.2, 5]
+          },
+          {
+            "de": [6.1, 5],
+            "ate": [6.9, 5]
+          },
+          {
+            "de": [1.2, 6],
+            "ate": [2, 6]
+          },
+          {
+            "de": [6.1, 6],
+            "ate": [6.9, 6]
+          },
+          {
+            "de": [5, 8],
+            "ate": [5, 8.8]
+          }
+        ],
+        "janelas": [
+          {
+            "de": [0.5, 1.5],
+            "ate": [4.5, 1.5],
+            "peitoril": 0,
+            "altura": 2.2
+          },
+          {
+            "de": [0.6, 9.2],
+            "ate": [2.6, 9.2],
+            "peitoril": 1,
+            "altura": 1.2
+          },
+          {
+            "de": [5.8, 9.2],
+            "ate": [7.4, 9.2],
+            "peitoril": 1,
+            "altura": 1.2
+          },
+          {
+            "de": [8, 0.6],
+            "ate": [8, 1.8],
+            "peitoril": 1.1,
+            "altura": 1
+          }
+        ]
+      },
+      "comodos": [
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010101",
+          "nome": "Varanda",
+          "tipo": "varanda",
+          "descricao": "Varanda com guarda-corpo de vidro, vista para a rua arborizada.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 0],
+              [5, 0],
+              [5, 1.5],
+              [0, 1.5]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010102",
+          "nome": "Sala de estar e jantar",
+          "tipo": "sala",
+          "descricao": "Sala integrada com porta de correr para a varanda e piso porcelanato.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 1.5],
+              [5, 1.5],
+              [5, 5],
+              [0, 5]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010103",
+          "nome": "Cozinha",
+          "tipo": "cozinha",
+          "descricao": "Cozinha americana aberta para a sala, com bancada em granito.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [5, 0],
+              [8, 0],
+              [8, 3],
+              [5, 3]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010104",
+          "nome": "Área de serviço",
+          "tipo": "lavanderia",
+          "descricao": "Espaço para máquina de lavar e tanque, com acesso pela cozinha.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [5, 3],
+              [8, 3],
+              [8, 4.2],
+              [5, 4.2]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010105",
+          "nome": "Banheiro social",
+          "tipo": "banheiro",
+          "descricao": "Banheiro com box de vidro, acesso pelo corredor.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [5, 4.2],
+              [8, 4.2],
+              [8, 5],
+              [5, 5]
+            ],
+            "pe_direito": 2.5
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010106",
+          "nome": "Circulação",
+          "tipo": "outro",
+          "descricao": "Corredor que liga a sala aos quartos e aos banheiros.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 5],
+              [8, 5],
+              [8, 6],
+              [0, 6]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010107",
+          "nome": "Quarto",
+          "tipo": "quarto",
+          "descricao": "Quarto com janela ampla, ideal para crianças ou escritório.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 6],
+              [3.2, 6],
+              [3.2, 9.2],
+              [0, 9.2]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010108",
+          "nome": "Banheiro da suíte",
+          "tipo": "banheiro",
+          "descricao": "Banheiro privativo, com acesso só pela suíte.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [3.2, 6],
+              [5, 6],
+              [5, 9.2],
+              [3.2, 9.2]
+            ],
+            "pe_direito": 2.5
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010109",
+          "nome": "Suíte",
+          "tipo": "suite",
+          "descricao": "Suíte com espaço para cama de casal e armário.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [5, 6],
+              [8, 6],
+              [8, 9.2],
+              [5, 9.2]
+            ],
+            "pe_direito": 2.7
+          }
+        }
+      ]
+    },
+    {
+      "id": "0d3e0000-0000-4000-8000-000000000102",
+      "chave": "B",
+      "nome": "Tipo B",
+      "quartos": 3,
+      "suites": 1,
+      "banheiros": 2,
+      "vagas": 2,
+      "area_privativa_m2": 100,
+      "planta": {
+        "versao": 1,
+        "portas": [
+          {
+            "de": [0, 3],
+            "ate": [0, 3.9]
+          },
+          {
+            "de": [6, 2],
+            "ate": [6, 2.9]
+          },
+          {
+            "de": [7.6, 3],
+            "ate": [8.4, 3]
+          },
+          {
+            "de": [1.5, 5],
+            "ate": [3.5, 5]
+          },
+          {
+            "de": [8.2, 5],
+            "ate": [9, 5]
+          },
+          {
+            "de": [1.1, 6],
+            "ate": [1.9, 6]
+          },
+          {
+            "de": [3.9, 6],
+            "ate": [4.7, 6]
+          },
+          {
+            "de": [8.1, 6],
+            "ate": [8.9, 6]
+          },
+          {
+            "de": [7, 8],
+            "ate": [7, 8.8]
+          }
+        ],
+        "janelas": [
+          {
+            "de": [0.8, 1.6],
+            "ate": [5.2, 1.6],
+            "peitoril": 0,
+            "altura": 2.2
+          },
+          {
+            "de": [0.6, 9.2],
+            "ate": [2.4, 9.2],
+            "peitoril": 1,
+            "altura": 1.2
+          },
+          {
+            "de": [3.4, 9.2],
+            "ate": [5.2, 9.2],
+            "peitoril": 1,
+            "altura": 1.2
+          },
+          {
+            "de": [7.6, 9.2],
+            "ate": [9.4, 9.2],
+            "peitoril": 1,
+            "altura": 1.2
+          },
+          {
+            "de": [10, 0.6],
+            "ate": [10, 1.8],
+            "peitoril": 1.1,
+            "altura": 1
+          }
+        ]
+      },
+      "comodos": [
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010201",
+          "nome": "Varanda gourmet",
+          "tipo": "varanda",
+          "descricao": "Varanda gourmet com ponto para churrasqueira elétrica.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 0],
+              [6, 0],
+              [6, 1.6],
+              [0, 1.6]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010202",
+          "nome": "Sala de estar e jantar",
+          "tipo": "sala",
+          "descricao": "Sala ampla integrada à varanda gourmet.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 1.6],
+              [6, 1.6],
+              [6, 5],
+              [0, 5]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010203",
+          "nome": "Cozinha",
+          "tipo": "cozinha",
+          "descricao": "Cozinha com espaço para mesa de apoio.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [6, 0],
+              [10, 0],
+              [10, 3],
+              [6, 3]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010204",
+          "nome": "Área de serviço",
+          "tipo": "lavanderia",
+          "descricao": "Lavanderia separada, com acesso pela cozinha.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [6, 3],
+              [10, 3],
+              [10, 4.2],
+              [6, 4.2]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010205",
+          "nome": "Banheiro social",
+          "tipo": "banheiro",
+          "descricao": "Banheiro social com bancada dupla, acesso pelo corredor.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [6, 4.2],
+              [10, 4.2],
+              [10, 5],
+              [6, 5]
+            ],
+            "pe_direito": 2.5
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010206",
+          "nome": "Circulação",
+          "tipo": "outro",
+          "descricao": "Corredor que liga a sala aos quartos e aos banheiros.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 5],
+              [10, 5],
+              [10, 6],
+              [0, 6]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010207",
+          "nome": "Quarto 2",
+          "tipo": "quarto",
+          "descricao": "Quarto com janela para o fundo, mais silencioso.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [0, 6],
+              [3, 6],
+              [3, 9.2],
+              [0, 9.2]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010208",
+          "nome": "Quarto 3",
+          "tipo": "quarto",
+          "descricao": "Quarto que também funciona como escritório.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [3, 6],
+              [5.6, 6],
+              [5.6, 9.2],
+              [3, 9.2]
+            ],
+            "pe_direito": 2.7
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010209",
+          "nome": "Banheiro da suíte",
+          "tipo": "banheiro",
+          "descricao": "Banheiro da suíte, com acesso só pela suíte.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [5.6, 6],
+              [7, 6],
+              [7, 9.2],
+              [5.6, 9.2]
+            ],
+            "pe_direito": 2.5
+          }
+        },
+        {
+          "id": "0d3e0000-0000-4000-8000-000000010210",
+          "nome": "Suíte",
+          "tipo": "suite",
+          "descricao": "Suíte master com closet.",
+          "geometria": {
+            "tipo": "poligono",
+            "pontos": [
+              [7, 6],
+              [10, 6],
+              [10, 9.2],
+              [7, 9.2]
+            ],
+            "pe_direito": 2.7
+          }
+        }
+      ]
+    }
+  ],
+  "unidades": {
+    "$comentario": "Geradas por regra. Status pela mesma fórmula de demoStatus (src/lib/building.ts), para o 3D de exemplo e o banco mostrarem as mesmas cores.",
+    "tipologia_por_posicao": {
+      "1": "B",
+      "2": "A",
+      "3": "A",
+      "4": "B"
+    },
+    "preco_base": {
+      "A": 520000,
+      "B": 690000
+    },
+    "acrescimo_por_andar": 0.012,
+    "andares_sob_consulta": [9, 10]
+  }
+}
