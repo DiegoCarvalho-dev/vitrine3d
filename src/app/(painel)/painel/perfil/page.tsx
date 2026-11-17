@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { getCurrentProfile } from "@/lib/auth/session";
-import { formatPhone } from "@/lib/validacoes/perfil";
+import { DEFAULT_BRAND_COLOR, formatPhone } from "@/lib/validacoes/perfil";
 
 import { ProfileForm } from "./profile-form";
 
@@ -27,7 +27,7 @@ export default async function ProfilePage() {
           name: profile?.nome ?? "",
           whatsapp: formatPhone(profile?.whatsapp),
           creci: profile?.creci ?? "",
-          brandColor: profile?.cor_marca ?? "#1b365d",
+          brandColor: profile?.cor_marca ?? DEFAULT_BRAND_COLOR,
           notifyLeadsByEmail: profile?.notificar_leads_email ?? true,
         }}
       />

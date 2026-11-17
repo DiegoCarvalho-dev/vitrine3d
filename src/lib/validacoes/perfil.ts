@@ -1,44 +1,63 @@
 import { z } from "zod";
 
+import { brokerNameSchema } from "./auth";
+
 // Broker profile form (/painel/perfil). Shared by the form (browser) and the
 // Server Action (server). Keys in English; the action maps them to the
 // perfis columns (nome, whatsapp, creci, cor_marca, notificar_leads_email).
 
+/** Brand color used when the broker hasn't chosen one (theme --primary). */
+export const DEFAULT_BRAND_COLOR = "#1b365d";
+/** #RRGGBB, case-insensitive (the schema stores it lowercase). */
+export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/** Area codes (DDD) in use in Brazil (Anatel). */
+const BRAZILIAN_DDDS = new Set([
+  11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 24, 27, 28, 31, 32, 33, 34, 35,
+  37, 38, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 53, 54, 55, 61, 62, 63, 64,
+  65, 66, 67, 68, 69, 71, 73, 74, 75, 77, 79, 81, 82, 83, 84, 85, 86, 87, 88,
+  89, 91, 92, 93, 94, 95, 96, 97, 98, 99,
+]);
+
 /**
  * Normalizes what the broker types into E.164 (+5511999999999).
- * Accepts "(11) 99999-9999", "11 99999 9999", "+55 11 99999-9999", "5511999999999".
- * Numbers without country code are treated as Brazilian (DDD + number).
+ * Accepts "(11) 99999-9999", "11 99999 9999", "011 99999-9999", "+55 11 99999-9999",
+ * "5511999999999". Numbers without country code are treated as Brazilian.
  * Returns null when it can't be a valid phone number.
  */
 export function toE164(raw: string): string | null {
   const hasPlus = raw.trim().startsWith("+");
-  const digits = raw.replace(/\D/g, "");
+  let digits = raw.replace(/\D/g, "");
   if (!digits) return null;
 
-  let e164: string;
   if (hasPlus) {
-    e164 = `+${digits}`;
-  } else if (digits.length === 10 || digits.length === 11) {
-    // Brazilian DDD (2 digits) + 8 (landline) or 9 (mobile) digits.
-    e164 = `+55${digits}`;
-  } else if (
-    (digits.length === 12 || digits.length === 13) &&
-    digits.startsWith("55")
-  ) {
-    e164 = `+${digits}`;
+    if (!digits.startsWith("55")) {
+      // Other countries: only the generic E.164 rule.
+      const e164 = `+${digits}`;
+      return /^\+[1-9][0-9]{7,14}$/.test(e164) ? e164 : null;
+    }
+    digits = digits.slice(2);
   } else {
-    return null;
+    // Trunk prefix used when dialing between cities: "011 99999-9999".
+    if (
+      digits.startsWith("0") &&
+      (digits.length === 11 || digits.length === 12)
+    ) {
+      digits = digits.slice(1);
+    } else if (
+      digits.startsWith("55") &&
+      (digits.length === 12 || digits.length === 13)
+    ) {
+      digits = digits.slice(2);
+    }
   }
 
-  if (e164.startsWith("+55")) {
-    const national = e164.slice(3);
-    const ddd = Number(national.slice(0, 2));
-    // DDDs go from 11 to 99; mobiles have 9 digits starting with 9.
-    if (ddd < 11 || national.length < 10 || national.length > 11) return null;
-    if (national.length === 11 && national[2] !== "9") return null;
-  }
-  // Same rule as the database check (perfis.whatsapp).
-  return /^\+[1-9][0-9]{7,14}$/.test(e164) ? e164 : null;
+  // Brazil: DDD (2 digits) + 9-digit mobile starting with 9, or 8-digit landline (2 to 5).
+  if (!BRAZILIAN_DDDS.has(Number(digits.slice(0, 2)))) return null;
+  const local = digits.slice(2);
+  const isMobile = local.length === 9 && local.startsWith("9");
+  const isLandline = local.length === 8 && /^[2-5]/.test(local);
+  return isMobile || isLandline ? `+55${digits}` : null;
 }
 
 /** "+5511999999999" → "(11) 99999-9999" (Brazil); other countries as is. */
@@ -48,14 +67,11 @@ export function formatPhone(e164: string | null | undefined): string {
   return match ? `(${match[1]}) ${match[2]}-${match[3]}` : e164;
 }
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/;
-
+// The form AND the Server Action receive the raw strings typed by the broker
+// (the action never receives the transformed output: an empty field would
+// arrive as null and fail the string checks).
 export const profileSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Informe seu nome.")
-    .max(120, "Nome longo demais."),
+  name: brokerNameSchema,
   // Empty = not informed (null). Otherwise it must become a valid E.164 number.
   whatsapp: z
     .string()
@@ -67,7 +83,8 @@ export const profileSchema = z.object({
       if (!e164) {
         ctx.addIssue({
           code: "custom",
-          message: "Número inválido. Use DDD + número, ex.: (11) 99999-9999.",
+          message:
+            "Número inválido. Use DDD + número; celular tem 9 dígitos, ex.: (11) 99999-9999.",
         });
         return z.NEVER;
       }

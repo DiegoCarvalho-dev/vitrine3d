@@ -19,10 +19,12 @@ export async function updateProfile(input: unknown): Promise<ProfileResult> {
 
   const parsed = profileSchema.safeParse(input);
   if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Confira os dados do perfil.",
-    };
+    // Our schema messages are in Portuguese; type errors (null, wrong type,
+    // missing field) only happen with a forged request: generic message.
+    const issue = parsed.error.issues[0];
+    const friendly =
+      issue && issue.code !== "invalid_type" ? issue.message : null;
+    return { ok: false, error: friendly ?? "Confira os dados do perfil." };
   }
 
   const { name, whatsapp, creci, brandColor, notifyLeadsByEmail } = parsed.data;

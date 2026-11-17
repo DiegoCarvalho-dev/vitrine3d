@@ -4,9 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { describedBy, FormField } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   signInSchema,
   signUpSchema,
@@ -55,30 +55,34 @@ export function AuthForm({ mode }: { mode: Mode }) {
       className="flex flex-col gap-4"
     >
       {isSignUp && (
-        <Field id="name" label="Seu nome" error={fieldError("name")}>
+        <FormField id="name" label="Seu nome" error={fieldError("name")}>
           <Input
             id="name"
             autoComplete="name"
             aria-invalid={Boolean(fieldError("name"))}
-            aria-describedby={fieldError("name") ? "name-error" : undefined}
+            aria-describedby={describedBy("name", {
+              error: fieldError("name"),
+            })}
             {...form.register("name")}
           />
-        </Field>
+        </FormField>
       )}
 
-      <Field id="email" label="E-mail" error={fieldError("email")}>
+      <FormField id="email" label="E-mail" error={fieldError("email")}>
         <Input
           id="email"
           type="email"
           inputMode="email"
           autoComplete="email"
           aria-invalid={Boolean(fieldError("email"))}
-          aria-describedby={fieldError("email") ? "email-error" : undefined}
+          aria-describedby={describedBy("email", {
+            error: fieldError("email"),
+          })}
           {...form.register("email")}
         />
-      </Field>
+      </FormField>
 
-      <Field
+      <FormField
         id="password"
         label="Senha"
         hint={isSignUp ? "Pelo menos 8 caracteres." : undefined}
@@ -89,16 +93,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
           type="password"
           autoComplete={isSignUp ? "new-password" : "current-password"}
           aria-invalid={Boolean(fieldError("password"))}
-          aria-describedby={
-            fieldError("password")
-              ? "password-error"
-              : isSignUp
-                ? "password-hint"
-                : undefined
-          }
+          aria-describedby={describedBy("password", {
+            error: fieldError("password"),
+            hint: isSignUp ? "Pelo menos 8 caracteres." : undefined,
+          })}
           {...form.register("password")}
         />
-      </Field>
+      </FormField>
 
       {result?.error && (
         <p
@@ -132,35 +133,5 @@ export function AuthForm({ mode }: { mode: Mode }) {
             : "Entrar"}
       </Button>
     </form>
-  );
-}
-
-function Field({
-  id,
-  label,
-  hint,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {error ? (
-        <p id={`${id}-error`} className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : hint ? (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
-          {hint}
-        </p>
-      ) : null}
-    </div>
   );
 }

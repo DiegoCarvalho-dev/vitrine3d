@@ -10,6 +10,13 @@ const email = z
   .max(254, "E-mail longo demais.")
   .pipe(z.email("Informe um e-mail válido."));
 
+/** Broker name: same rules on sign-up and on the profile (perfis.nome, up to 120). */
+export const brokerNameSchema = z
+  .string()
+  .trim()
+  .min(2, "Informe seu nome.")
+  .max(120, "Nome longo demais.");
+
 export const signInSchema = z.object({
   email,
   // On sign-in we don't enforce the password rules (an old password may predate them).
@@ -21,11 +28,7 @@ export const signInSchema = z.object({
 export type SignInInput = z.infer<typeof signInSchema>;
 
 export const signUpSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Informe seu nome.")
-    .max(120, "Nome longo demais."),
+  name: brokerNameSchema,
   email,
   // 72 = bcrypt limit used by Supabase Auth.
   password: z

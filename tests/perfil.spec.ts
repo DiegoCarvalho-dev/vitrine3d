@@ -51,6 +51,35 @@ test.describe("Perfil do corretor", () => {
     );
   });
 
+  test("salva com WhatsApp e CRECI em branco (perfil de quem acabou de criar a conta)", async ({
+    page,
+  }, testInfo) => {
+    await signUpAndOpenProfile(page, `${testInfo.project.name}-vazios`);
+
+    await expect(page.getByLabel("WhatsApp")).toHaveValue("");
+    await expect(page.getByLabel("CRECI")).toHaveValue("");
+    await page.getByLabel("Nome").fill("Corretor Sem Creci");
+    await page.getByRole("button", { name: "Salvar perfil" }).click();
+
+    await expect(page.getByText("Perfil salvo.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Nome")).toHaveValue("Corretor Sem Creci");
+    await expect(page.getByLabel("WhatsApp")).toHaveValue("");
+  });
+
+  test("o seletor de cor e o campo de texto ficam iguais", async ({
+    page,
+  }, testInfo) => {
+    await signUpAndOpenProfile(page, `${testInfo.project.name}-cor`);
+
+    await page.getByLabel("Escolher a cor").fill("#aa3322");
+    await expect(page.locator("#brandColor")).toHaveValue("#aa3322");
+    await expect(page.getByTestId("brand-preview")).toHaveCSS(
+      "background-color",
+      "rgb(170, 51, 34)",
+    );
+  });
+
   test("WhatsApp inválido mostra o erro no campo e não salva", async ({
     page,
   }, testInfo) => {

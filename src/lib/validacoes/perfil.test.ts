@@ -16,6 +16,8 @@ describe("toE164 (WhatsApp)", () => {
     ["5511999999999", "+5511999999999"],
     ["(21) 3333-4444", "+552133334444"], // fixo, 8 dígitos
     ["+1 415 555 2671", "+14155552671"], // outro país, com +
+    ["011 98888-7777", "+5511988887777"], // com o 0 da operadora
+    ["(48) 3333-4444", "+554833334444"], // fixo de outro DDD
   ])("%s → %s", (typed, expected) => {
     expect(toE164(typed)).toBe(expected);
   });
@@ -24,6 +26,10 @@ describe("toE164 (WhatsApp)", () => {
     ["99999-9999"], // sem DDD
     ["(01) 99999-9999"], // DDD inexistente
     ["(11) 89999-9999"], // celular de 9 dígitos que não começa com 9
+    ["(20) 99999-9999"], // DDD que não existe
+    ["(23) 99999-9999"], // DDD que não existe
+    ["(11) 9999-8888"], // celular no formato antigo (sem o 9 na frente)
+    ["(11) 1234-5678"], // fixo não começa com 0 ou 1
     ["abc"],
     ["123"],
   ])("recusa %s", (typed) => {
@@ -92,15 +98,22 @@ describe("profileSchema", () => {
     ).toBe(false);
   });
 
-  it("aplicar o esquema duas vezes dá o mesmo resultado (servidor revalida)", () => {
-    const once = profileSchema.parse(valid);
-    expect(
-      profileSchema.parse({
-        ...once,
-        whatsapp: once.whatsapp ?? "",
-        creci: once.creci ?? "",
-      }),
-    ).toEqual(once);
+  it("salvar de novo o que foi exibido depois de salvar dá o mesmo resultado", () => {
+    const saved = profileSchema.parse(valid);
+    // Depois de salvar, o formulário mostra "(11) 99999-9999" e o CRECI como texto.
+    const shown = {
+      ...valid,
+      whatsapp: formatPhone(saved.whatsapp),
+      creci: saved.creci ?? "",
+      brandColor: saved.brandColor,
+    };
+    expect(profileSchema.parse(shown)).toEqual(saved);
+  });
+
+  it("o servidor recusa null (só recebe o texto digitado, nunca a saída transformada)", () => {
+    const result = profileSchema.safeParse({ ...valid, creci: null });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].code).toBe("invalid_type");
   });
 });
 
