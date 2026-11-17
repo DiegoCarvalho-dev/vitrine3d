@@ -49,6 +49,8 @@ describe("createProjectSchema", () => {
     ["201", "andares acima de 200"],
     ["2.5", "andar quebrado"],
     ["dez", "texto"],
+    ["1e2", "notação científica"],
+    ["0x10", "hexadecimal"],
   ])("recusa andares = %s (%s)", (floors) => {
     expect(createProjectSchema.safeParse({ ...building, floors }).success).toBe(
       false,

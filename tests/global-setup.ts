@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 
 import { chromium, type FullConfig } from "@playwright/test";
 
@@ -12,6 +12,12 @@ import { chromium, type FullConfig } from "@playwright/test";
 // (sem passar pelo limite) e cada um faz um único login. Só os testes que
 // existem para provar o CADASTRO continuam cadastrando de verdade.
 // Os usuários usam e-mails e2e-...@exemplo.test: o global-teardown apaga.
+
+/** Os testes que precisam do Supabase são pulados sem as chaves. */
+export const hasSupabaseEnv =
+  existsSync(".env.local") ||
+  (!!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
 export const SESSION_PASSWORD = "senha-de-teste-123";
 export const sessionEmail = (project: string) =>
@@ -48,20 +54,24 @@ $$;`;
     { encoding: "utf8" },
   );
   if (result.error || result.status !== 0) {
-    throw new Error(
-      `[setup] Não consegui criar os usuários de teste (Supabase CLI instalada e ligada?).\n${result.stderr ?? ""}`,
+    // Como no teardown: avisa e segue. Os testes com login são pulados
+    // (tests/fixtures.ts), os demais rodam normalmente.
+    console.warn(
+      "[setup] Não consegui criar os usuários de teste (Supabase CLI instalada e ligada ao projeto?). Os testes com login serão pulados.",
     );
+    return false;
   }
+  return true;
 }
 
 export default async function globalSetup(config: FullConfig) {
-  // Sem as chaves do Supabase, os testes com login são pulados.
-  if (!existsSync(".env.local") && !process.env.NEXT_PUBLIC_SUPABASE_URL)
-    return;
+  // Sessões antigas saem: sem sessão nova, os testes com login são pulados.
+  rmSync("tests/.auth", { recursive: true, force: true });
+  if (!hasSupabaseEnv) return;
   const projects = config.projects.map((p) => p.name);
   const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:3000";
 
-  createSessionUsers(projects);
+  if (!createSessionUsers(projects)) return;
   mkdirSync("tests/.auth", { recursive: true });
 
   const browser = await chromium.launch();

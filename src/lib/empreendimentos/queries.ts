@@ -35,7 +35,10 @@ export type MyProjectListItem = Awaited<
 /** One of MY projects, or null (also for other brokers' ids: callers show 404). */
 export const getMyProject = cache(async (id: string) => {
   const userId = await requireUserId();
-  if (!/^[0-9a-f-]{36}$/.test(id)) return null;
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  )
+    return null;
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("empreendimentos")

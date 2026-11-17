@@ -2,21 +2,22 @@ import { existsSync } from "node:fs";
 
 import { test as base } from "@playwright/test";
 
-import { sessionFile } from "./global-setup";
+import { hasSupabaseEnv, sessionFile } from "./global-setup";
 
-/** Os testes que precisam do Supabase são pulados sem .env.local. */
-export const hasSupabaseEnv =
-  existsSync(".env.local") ||
-  (!!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+export { hasSupabaseEnv };
 
 /**
  * Teste que já começa LOGADO com o corretor de sessão do projeto
- * (desktop ou celular), criado no tests/global-setup.ts.
+ * (desktop ou celular), criado no tests/global-setup.ts. Sem a sessão
+ * (sem chaves ou sem a CLI do Supabase), o teste é pulado.
  */
 export const loggedInTest = base.extend({
-  // O Playwright exige o objeto de fixtures no 1º parâmetro, mesmo vazio.
   storageState: async ({}, provide, testInfo) => {
-    await provide(sessionFile(testInfo.project.name));
+    const file = sessionFile(testInfo.project.name);
+    testInfo.skip(
+      !existsSync(file),
+      "Sem sessão de teste (veja o aviso do setup).",
+    );
+    await provide(file);
   },
 });

@@ -9,6 +9,7 @@ const dateFormat = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
   month: "short",
   year: "numeric",
+  timeZone: "America/Sao_Paulo", // server runs in UTC (Vercel)
 });
 
 export default async function PanelPage({

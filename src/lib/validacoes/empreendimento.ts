@@ -43,6 +43,8 @@ const wholeNumber = (label: string, min: number, max: number) =>
   z
     .string()
     .min(1, `Informe ${label}.`)
+    // Only digits: Number() would also accept "1e2", "0x10" and "0b11".
+    .regex(/^\d+$/, `Use só números em ${label}.`)
     .pipe(z.coerce.number({ message: `Informe ${label}.` }))
     .pipe(
       z

@@ -47,8 +47,14 @@ export function CreateProjectForm() {
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
       // Once the broker edits the link by hand (dirty), the name stops
       // overwriting it. setValue below doesn't mark the field as dirty.
-      if (!form.getFieldState("slug").isDirty) {
-        form.setValue("slug", slugify(event.target.value).slice(0, 80), {
+      // isTouched stays true even if the broker clears the link afterwards.
+      const slugState = form.getFieldState("slug");
+      if (!slugState.isDirty && !slugState.isTouched) {
+        // Cutting at 80 can leave a trailing hyphen, which the DB rejects.
+        const generated = slugify(event.target.value)
+          .slice(0, 80)
+          .replace(/-+$/, "");
+        form.setValue("slug", generated, {
           shouldValidate: false,
         });
       }
@@ -108,6 +114,11 @@ export function CreateProjectForm() {
             </label>
           ))}
         </div>
+        {errors.type?.message && (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {errors.type.message}
+          </p>
+        )}
       </fieldset>
 
       <FormField
