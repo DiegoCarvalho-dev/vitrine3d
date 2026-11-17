@@ -34,14 +34,17 @@ test.describe("Lab: prédio 3D", () => {
     const status = page.getByTestId("selected-unit");
     await expect(status).toContainText("Toque ou clique");
 
-    // O centro da tela cai numa unidade do meio do prédio.
-    if (isMobile) {
-      await canvas.tap();
-    } else {
-      await canvas.click();
-    }
-
-    await expect(status).toHaveText(UNIT_TEXT);
+    // O centro da tela cai numa unidade do meio do prédio. Com a máquina
+    // ocupada (vários navegadores em paralelo), o primeiro toque pode chegar
+    // antes de a cena montar e enquadrar a câmera: repete até acertar (15 s).
+    await expect(async () => {
+      if (isMobile) {
+        await canvas.tap();
+      } else {
+        await canvas.click();
+      }
+      await expect(status).toHaveText(UNIT_TEXT, { timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
   });
 
   test("arrastar para girar não seleciona unidade", async ({
