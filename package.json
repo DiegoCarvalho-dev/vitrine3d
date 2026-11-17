@@ -18,7 +18,9 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "db:types": "supabase gen types typescript --remote > src/types/database.ts && prettier --write src/types/database.ts",
-    "test:rls": "node supabase/tests/rls/rodar.mjs"
+    "test:rls": "node supabase/tests/rls/rodar.mjs",
+    "db:seed:gerar": "node scripts/seed/gerar-seed.mjs",
+    "db:seed": "supabase db push --remote --include-seed"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
