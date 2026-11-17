@@ -6,6 +6,8 @@ const BASE_URL = `http://localhost:${PORT}`;
 // Testes de navegador (e2e): abrem o site de verdade, em desktop e celular.
 export default defineConfig({
   testDir: "./tests",
+  // Apaga os usuários criados pelo teste de cadastro (tests/auth.spec.ts).
+  globalTeardown: "./tests/global-teardown.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI, // no CI, um test.only esquecido falha o build
   retries: process.env.CI ? 2 : 0,
