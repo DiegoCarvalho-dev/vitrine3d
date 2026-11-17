@@ -1,15 +1,29 @@
+import Link from "next/link";
+
+import { ProjectStatusBadge } from "@/components/project-status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { getCurrentProfile } from "@/lib/auth/session";
+import { listMyProjects } from "@/lib/empreendimentos/queries";
+
+const dateFormat = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  timeZone: "America/Sao_Paulo", // server runs in UTC (Vercel)
+});
 
 export default async function PanelPage({
   searchParams,
 }: PageProps<"/painel">) {
-  // Same cached call as the layout: one check, one query per request.
-  const profile = await getCurrentProfile();
+  const [profile, projects] = await Promise.all([
+    getCurrentProfile(),
+    listMyProjects(),
+  ]);
   const firstName = profile?.nome?.trim().split(/\s+/)[0];
   const { erro } = await searchParams;
 
   return (
-    <section className="max-w-xl">
+    <section>
       {erro === "sair" && (
         <p
           role="alert"
@@ -19,13 +33,76 @@ export default async function PanelPage({
           navegador.
         </p>
       )}
-      <h1 className="font-heading text-3xl font-bold tracking-tight font-stretch-semi-expanded">
-        {firstName ? `Olá, ${firstName}` : "Olá"}
-      </h1>
-      <p className="mt-3 text-muted-foreground">
-        Este é o seu painel. Em breve você vai cadastrar seus empreendimentos
-        aqui, com as unidades, as plantas e o tour 3D.
-      </p>
+
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-3xl font-bold tracking-tight font-stretch-semi-expanded">
+            {firstName ? `Olá, ${firstName}` : "Olá"}
+          </h1>
+          <p className="mt-1 text-muted-foreground">Seus empreendimentos</p>
+        </div>
+        {projects.length > 0 && (
+          <Link
+            href="/painel/empreendimentos/novo"
+            className={buttonVariants()}
+          >
+            Novo empreendimento
+          </Link>
+        )}
+      </div>
+
+      {projects.length === 0 ? (
+        <div className="mt-8 rounded-lg border border-dashed p-8 text-center">
+          <h2 className="font-heading text-lg font-semibold">
+            Cadastre seu primeiro empreendimento
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+            Com o nome, a cidade e o tamanho do prédio já dá para começar.
+            Depois você completa com fotos, plantas e unidades.
+          </p>
+          <Link
+            href="/painel/empreendimentos/novo"
+            className={buttonVariants({ size: "lg", className: "mt-6" })}
+          >
+            Novo empreendimento
+          </Link>
+        </div>
+      ) : (
+        <ul
+          className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="project-list"
+        >
+          {projects.map((project) => (
+            <li key={project.id}>
+              <Link
+                href={`/painel/empreendimentos/${project.id}`}
+                className="flex h-full flex-col gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="font-heading text-lg leading-snug font-semibold">
+                    {project.nome}
+                  </h2>
+                  <ProjectStatusBadge status={project.status} />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {[project.cidade, project.uf].filter(Boolean).join(" / ")}
+                </p>
+                <p className="mt-auto flex justify-between text-sm text-muted-foreground tabular-nums">
+                  <span>
+                    {project.tipo === "casa"
+                      ? "Casa"
+                      : `${project.unitCount} ${project.unitCount === 1 ? "unidade" : "unidades"}`}
+                  </span>
+                  <span>
+                    Atualizado em{" "}
+                    {dateFormat.format(new Date(project.atualizado_em))}
+                  </span>
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

@@ -7,6 +7,8 @@ const BASE_URL = `http://localhost:${PORT}`;
 export default defineConfig({
   testDir: "./tests",
   // Apaga os usuários criados pelo teste de cadastro (tests/auth.spec.ts).
+  // Cria um corretor já logado por projeto (tests/global-setup.ts).
+  globalSetup: "./tests/global-setup.ts",
   globalTeardown: "./tests/global-teardown.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI, // no CI, um test.only esquecido falha o build
