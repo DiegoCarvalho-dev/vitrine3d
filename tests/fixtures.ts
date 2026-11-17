@@ -65,3 +65,16 @@ export async function createBuilding(page: Page, name: string) {
   expect(id).toMatch(/^[0-9a-f-]{36}$/);
   return id;
 }
+
+/** Consulta só de leitura no banco de DESENVOLVIMENTO (para conferir o efeito da tela). */
+export function querySql<Row>(sql: string): Row[] {
+  const result = spawnSync(
+    "supabase",
+    ["db", "query", "--remote", "--read-only", "--output-format", "json", sql],
+    { encoding: "utf8" },
+  );
+  if (result.error || result.status !== 0) {
+    throw new Error(`Falha na consulta de teste: ${result.stderr ?? ""}`);
+  }
+  return (JSON.parse(result.stdout) as { rows: Row[] }).rows;
+}
