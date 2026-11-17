@@ -86,7 +86,7 @@ begin
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
       -- Liberadas de propósito (usadas dentro das policies):
-      and (ns.nspname, p.proname) not in (('privado', 'comodo_do_empreendimento'), ('privado', 'pode_gravar_midia'))
+      and (ns.nspname, p.proname) not in (('privado', 'comodo_do_empreendimento'), ('privado', 'pode_gravar_midia'), ('privado', 'empreendimento_tem_leads'))
   loop
     r := r || format(E'\n[FALHOU] função %s executável pela API (faltou revoke execute)', t);
   end loop;

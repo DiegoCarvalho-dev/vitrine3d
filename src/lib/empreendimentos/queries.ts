@@ -5,6 +5,15 @@ import { cache } from "react";
 import { requireUserId } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
+import type { PublishFacts } from "./publish";
+
+/** Strict UUID check: anything else is "not found", never a DB error. */
+export function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 // Panel queries. ALWAYS filter by the owner: for a logged-in broker the RLS
 // also returns OTHER brokers' published projects (that's what the public tour
 // needs), so the panel must not rely on RLS alone to show "my" projects.
@@ -35,10 +44,7 @@ export type MyProjectListItem = Awaited<
 /** One of MY projects, or null (also for other brokers' ids: callers show 404). */
 export const getMyProject = cache(async (id: string) => {
   const userId = await requireUserId();
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-  )
-    return null;
+  if (!isUuid(id)) return null;
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("empreendimentos")
@@ -51,4 +57,42 @@ export const getMyProject = cache(async (id: string) => {
       `Não foi possível carregar o empreendimento: ${error.message}`,
     );
   return data;
+});
+
+/**
+ * One of MY projects plus what the edit page needs: the publish checklist
+ * facts and how many leads it has (with leads it can only be archived).
+ */
+export const getMyProjectDetails = cache(async (id: string) => {
+  const project = await getMyProject(id);
+  if (!project) return null;
+  const supabase = await createClient();
+  const [typologies, units, leads] = await Promise.all([
+    supabase
+      .from("tipologias")
+      .select("id, comodos(count)")
+      .eq("empreendimento_id", id),
+    supabase
+      .from("unidades")
+      .select("id", { count: "exact", head: true })
+      .eq("empreendimento_id", id),
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("empreendimento_id", id),
+  ]);
+  const error = typologies.error ?? units.error ?? leads.error;
+  if (error)
+    throw new Error(
+      `Não foi possível carregar o empreendimento: ${error.message}`,
+    );
+
+  const facts: PublishFacts = {
+    hasCover: Boolean(project.capa_url),
+    typologiesWithRooms: (typologies.data ?? []).filter(
+      (t) => (t.comodos[0]?.count ?? 0) > 0,
+    ).length,
+    units: units.count ?? 0,
+  };
+  return { project, facts, leadCount: leads.count ?? 0 };
 });

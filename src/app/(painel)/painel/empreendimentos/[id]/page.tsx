@@ -2,8 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ProjectStatusBadge } from "@/components/project-status-badge";
-import { getMyProject } from "@/lib/empreendimentos/queries";
+import { publishChecklist } from "@/lib/empreendimentos/publish";
+import {
+  getMyProject,
+  getMyProjectDetails,
+} from "@/lib/empreendimentos/queries";
+import type { UpdateProjectInput } from "@/lib/validacoes/empreendimento";
+
+import { DeleteProject } from "./delete-project";
+import { ProjectEditForm } from "./project-edit-form";
+import { PublishPanel } from "./publish-panel";
 
 export async function generateMetadata({
   params,
@@ -15,44 +23,102 @@ export async function generateMetadata({
   };
 }
 
-// Edit page shell. Issue #29 adds the full form (data, purchase safety,
-// publish/archive/delete); #30 the cover; #31-#33 typologies, rooms and units.
 export default async function ProjectPage({
   params,
 }: PageProps<"/painel/empreendimentos/[id]">) {
-  const project = await getMyProject((await params).id);
+  const details = await getMyProjectDetails((await params).id);
   // Someone else's (or a non-existent) project: 404, never "forbidden", so we
   // don't confirm that the id exists.
-  if (!project) notFound();
+  if (!details) notFound();
+  const { project, facts, leadCount } = details;
+
+  const defaultValues: UpdateProjectInput = {
+    type: project.tipo,
+    name: project.nome,
+    slug: project.slug,
+    description: project.descricao ?? "",
+    address: project.endereco ?? "",
+    city: project.cidade ?? "",
+    state: (project.uf ?? "SP") as UpdateProjectInput["state"],
+    floors: project.numero_andares?.toString() ?? "",
+    unitsPerFloor: project.unidades_por_andar?.toString() ?? "",
+    builder: project.construtora ?? "",
+    incorporationRegistry: project.registro_incorporacao ?? "",
+    deliveryForecast: project.previsao_entrega ?? "",
+    checkedAt: project.informacoes_conferidas_em ?? "",
+  };
 
   return (
-    <section className="max-w-3xl">
-      <Link
-        href="/painel"
-        className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-      >
-        ← Meus empreendimentos
-      </Link>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <h1 className="font-heading text-3xl font-bold tracking-tight font-stretch-semi-expanded">
+    <section className="flex max-w-3xl flex-col gap-10">
+      <div>
+        <Link
+          href="/painel"
+          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+        >
+          ← Meus empreendimentos
+        </Link>
+        <h1 className="mt-3 font-heading text-3xl font-bold tracking-tight font-stretch-semi-expanded">
           {project.nome}
         </h1>
-        <ProjectStatusBadge status={project.status} />
+        <p className="mt-1 text-sm text-muted-foreground">
+          Link:{" "}
+          <span className="font-medium text-foreground">/e/{project.slug}</span>
+        </p>
       </div>
-      <p className="mt-2 text-muted-foreground">
-        {[project.cidade, project.uf].filter(Boolean).join(" / ")}
-        {project.tipo === "predio" &&
-          ` · ${project.numero_andares} andares, ${project.unidades_por_andar} unidades por andar`}
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Link:{" "}
-        <span className="font-medium text-foreground">/e/{project.slug}</span>
-      </p>
 
-      <div className="mt-8 rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-        Em breve aqui: dados completos, segurança da compra, capa, tipologias,
-        plantas e unidades.
-      </div>
+      <PublishPanel
+        projectId={project.id}
+        status={project.status}
+        checklist={publishChecklist(facts)}
+      />
+
+      <ProjectEditForm
+        // Remount after a save elsewhere changes the data (e.g. another tab).
+        key={project.atualizado_em}
+        projectId={project.id}
+        defaultValues={defaultValues}
+        unitCount={facts.units}
+      />
+
+      <section
+        aria-labelledby="typologies-title"
+        className="flex flex-col gap-2"
+      >
+        <h2
+          id="typologies-title"
+          className="font-heading text-xl font-semibold"
+        >
+          Tipologias
+        </h2>
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          Em breve: as plantas (tipologias) e os cômodos de cada uma.
+        </p>
+      </section>
+
+      <section aria-labelledby="units-title" className="flex flex-col gap-2">
+        <h2 id="units-title" className="font-heading text-xl font-semibold">
+          Unidades
+        </h2>
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          {facts.units > 0
+            ? `${facts.units} unidades geradas. Em breve: preço e status de cada uma.`
+            : "Em breve: a grade de unidades do prédio, com preço e status."}
+        </p>
+      </section>
+
+      <section
+        aria-labelledby="danger-title"
+        className="flex flex-col gap-3 rounded-lg border border-destructive/30 p-4 sm:p-5"
+      >
+        <h2 id="danger-title" className="font-heading text-lg font-semibold">
+          Excluir
+        </h2>
+        <DeleteProject
+          projectId={project.id}
+          projectName={project.nome}
+          leadCount={leadCount}
+        />
+      </section>
     </section>
   );
 }

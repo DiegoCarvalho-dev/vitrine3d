@@ -1,6 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
-import { test as base } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 
 import { hasSupabaseEnv, sessionFile } from "./global-setup";
 
@@ -21,3 +22,46 @@ export const loggedInTest = base.extend({
     await provide(file);
   },
 });
+
+/**
+ * Roda SQL no projeto ligado à CLI (o de DESENVOLVIMENTO), sem passar pelo
+ * RLS. Só para montar cenários que a tela ainda não permite (ex.: um lead).
+ */
+export function runSql(sql: string) {
+  const result = spawnSync(
+    "supabase",
+    ["db", "query", "--remote", "--yes", sql],
+    {
+      encoding: "utf8",
+    },
+  );
+  if (result.error || result.status !== 0) {
+    throw new Error(`Falha ao rodar SQL de teste: ${result.stderr ?? ""}`);
+  }
+}
+
+/**
+ * Cria um prédio pela tela e devolve o id (da URL de edição).
+ * Digita o nome até o link aparecer: prova que o formulário já está ativo.
+ */
+export async function createBuilding(page: Page, name: string) {
+  await page.goto("/painel");
+  await page.getByRole("link", { name: "Novo empreendimento" }).click();
+  await expect(page).toHaveURL(/\/novo$/);
+  await expect(async () => {
+    await page.getByLabel("Nome do empreendimento").fill(name);
+    await expect(page.getByTestId("slug-preview")).toBeVisible({
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 15_000 });
+  await page.getByLabel("Cidade").fill("Campinas");
+  await page.getByLabel("Andares", { exact: true }).fill("6");
+  await page.getByLabel("Unidades por andar", { exact: true }).fill("4");
+  await page.getByRole("button", { name: "Criar empreendimento" }).click();
+  await expect(page).toHaveURL(/\/painel\/empreendimentos\/[0-9a-f-]{36}$/, {
+    timeout: 20_000,
+  });
+  const id = page.url().split("/").pop() ?? "";
+  expect(id).toMatch(/^[0-9a-f-]{36}$/);
+  return id;
+}

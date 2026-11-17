@@ -10,6 +10,7 @@ declare
   emp_arq uuid;
   emp_c_rasc uuid;
   emp_c_arq uuid;
+  emp_sem_leads uuid;
   tip uuid;
   com uuid;
   uni uuid;
@@ -94,6 +95,23 @@ begin
   r := r || format(E'\n[%s] ... e as unidades dele', case when n = 0 then 'OK' else 'FALHOU' end);
   select count(*) into n from public.perfis where id = a;
   r := r || format(E'\n[%s] sem nada publicado, o perfil de A também some para o visitante', case when n = 0 then 'OK' else 'FALHOU' end);
+
+  -- ===== Excluir empreendimento: só sem leads (issue #29) =====
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  delete from public.empreendimentos where id = emp_pub;
+  get diagnostics n = row_count;
+  r := r || format(E'
+[%s] dono NÃO apaga empreendimento com leads (%s linhas)', case when n = 0 then 'OK' else 'FALHOU' end, n);
+  select count(*) into n from public.leads where empreendimento_id = emp_pub;
+  r := r || format(E'
+[%s] ... e o lead continua lá', case when n = 1 then 'OK' else 'FALHOU' end);
+  insert into public.empreendimentos (dono_id, nome, slug, numero_andares, unidades_por_andar)
+  values (a, 'Sem leads', 'teste-sem-leads-' || left(a::text, 8), 3, 2) returning id into emp_sem_leads;
+  delete from public.empreendimentos where id = emp_sem_leads;
+  get diagnostics n = row_count;
+  r := r || format(E'
+[%s] dono apaga empreendimento sem leads', case when n = 1 then 'OK' else 'FALHOU' end);
 
   -- ===== Excluir a conta de A apaga tudo dela em cascata =====
   perform set_config('role', 'none', true);  -- volta ao papel da sessão (como o Supabase Auth)

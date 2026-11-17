@@ -20,10 +20,18 @@ export default async function PanelPage({
     listMyProjects(),
   ]);
   const firstName = profile?.nome?.trim().split(/\s+/)[0];
-  const { erro } = await searchParams;
+  const { erro, excluido } = await searchParams;
 
   return (
     <section>
+      {excluido === "1" && (
+        <p
+          role="status"
+          className="mb-6 rounded-md border bg-muted px-3 py-2 text-sm"
+        >
+          Empreendimento excluído.
+        </p>
+      )}
       {erro === "sair" && (
         <p
           role="alert"
