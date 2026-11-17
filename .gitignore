@@ -35,3 +35,6 @@ npm-debug.log*
 # sistema operacional
 .DS_Store
 Thumbs.db
+
+# sessões dos testes e2e (tests/global-setup.ts)
+/tests/.auth/
