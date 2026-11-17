@@ -25,6 +25,11 @@ Ao fim de uma sprint (ou quando o usuário pedir o planejamento da próxima):
 2. Use o rascunho de sprints em `docs/sprints/sprint-1.md` e o escopo do MVP em `docs/01` como base. Nada fora do escopo sem perguntar.
 3. Crie `docs/sprints/sprint-N.md` (primeira linha `# Sprint N – Nome`, uma linha `**Objetivo:** ...` e a tabela de issues) e um arquivo por issue em `docs/sprints/sprint-N/NN-nome.md`, no mesmo formato da Sprint 1 (frontmatter `title`/`labels`, Contexto, O que fazer, Arquivos envolvidos, Critérios de aceite, Como testar).
 4. Issues pequenas: no máximo 1 a 2 dias de trabalho cada. Se mexer em auth, RLS, uploads, formulários públicos ou env, inclua a label `seguranca`.
+   Toda issue leva **uma** label de modelo recomendado (o usuário troca com `/model` antes de começar):
+   - `modelo:opus`: banco/migrations, RLS, auth, segurança, 3D, arquitetura, bugs difíceis ou qualquer issue com `seguranca`.
+   - `modelo:sonnet`: funcionalidade comum (telas, formulários, CRUD, testes) seguindo padrões que já existem.
+   - `modelo:haiku`: docs, textos, configuração e ajustes pequenos e mecânicos.
+   Na dúvida, suba um nível. Ao terminar uma issue, se a próxima pede outro modelo, **pare e avise** o usuário para trocar com `/model` antes de seguir.
 5. **Mostre o plano ao usuário e espere a aprovação.** Só então faça o commit e rode `bash scripts/criar-sprint.sh N`.
 
 ## Idioma

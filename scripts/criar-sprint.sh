@@ -25,6 +25,9 @@ while IFS='|' read -r nome cor desc; do
   fi
 done <<'LABELS'
 tipo:feature|1D76DB|Nova funcionalidade
+modelo:opus|5319E7|Modelo recomendado: complexa (banco, RLS, segurança, 3D, arquitetura)
+modelo:sonnet|8A63D2|Modelo recomendado: funcionalidade comum (telas, formulários, CRUD)
+modelo:haiku|D4C5F9|Modelo recomendado: simples (docs, textos, ajustes pequenos)
 tipo:bug|D73A4A|Algo não funciona
 tipo:chore|C5DEF5|Configuração, infraestrutura, manutenção
 tipo:docs|0075CA|Documentação
