@@ -50,6 +50,16 @@ describe("isOwnStoragePath", () => {
 });
 
 describe("publicImageUrl", () => {
+  it("devolve null para caminho inválido ou URL externa", () => {
+    expect(
+      publicImageUrl(
+        "https://abc.supabase.co",
+        "https://site-malicioso.com/x.webp",
+      ),
+    ).toBeNull();
+    expect(publicImageUrl("https://abc.supabase.co", null)).toBeNull();
+  });
+
   it("monta a URL pública do bucket", () => {
     expect(
       publicImageUrl("https://abc.supabase.co/", `${USER}/perfil/${FILE}.webp`),

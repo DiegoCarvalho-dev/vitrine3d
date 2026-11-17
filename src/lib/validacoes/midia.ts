@@ -39,7 +39,16 @@ export function isOwnStoragePath(
   return match[1] === userId && (folder === undefined || match[2] === folder);
 }
 
-/** Public URL of a stored image (the bucket is public; names are random UUIDs). */
-export function publicImageUrl(supabaseUrl: string, path: string): string {
+/**
+ * Public URL of a stored image (the bucket is public; names are random UUIDs).
+ * Returns null for anything that isn't a valid bucket path (e.g. a legacy
+ * full URL), so a bad value never becomes a link to another endpoint.
+ * (Same format as supabase.storage.from(bucket).getPublicUrl(path).)
+ */
+export function publicImageUrl(
+  supabaseUrl: string,
+  path: string | null | undefined,
+): string | null {
+  if (!path || !STORAGE_PATH.test(path)) return null;
   return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${MEDIA_BUCKET}/${path}`;
 }

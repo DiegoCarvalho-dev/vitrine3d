@@ -89,6 +89,37 @@ begin
   end;
 
   begin
+    insert into storage.objects (bucket_id, name) values ('midias', a || '/perfil/------------------------------------.webp');
+    r := r || E'\n[FALHOU] aceitou nome de arquivo que não é UUID (36 hífens)';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] nome de arquivo precisa ser UUID completo (36 hífens recusado)';
+  end;
+
+  -- Colunas de imagem só aceitam caminho na pasta do próprio dono.
+  update public.perfis set avatar_url = a || '/perfil/' || arquivo where id = a;
+  r := r || E'\n[OK] A salva a própria foto (caminho válido)';
+  begin
+    update public.perfis set avatar_url = b || '/perfil/' || arquivo where id = a;
+    r := r || E'\n[FALHOU] A salvou como foto um arquivo da pasta de B';
+  exception when check_violation then
+    r := r || E'\n[OK] foto com caminho de outro corretor é recusada';
+  end;
+  begin
+    update public.perfis set logo_url = 'https://site-malicioso.com/logo.png' where id = a;
+    r := r || E'\n[FALHOU] aceitou URL externa como logo';
+  exception when check_violation then
+    r := r || E'\n[OK] logo com URL externa é recusado';
+  end;
+  update public.empreendimentos set capa_url = a || '/' || emp_a || '/' || arquivo where id = emp_a;
+  r := r || E'\n[OK] A salva a capa na pasta do próprio empreendimento';
+  begin
+    update public.empreendimentos set capa_url = a || '/perfil/' || arquivo where id = emp_a;
+    r := r || E'\n[FALHOU] capa aceitou imagem de outra pasta';
+  exception when check_violation then
+    r := r || E'\n[OK] capa só aceita imagem da pasta DESTE empreendimento';
+  end;
+
+  begin
     update storage.objects set name = b || '/perfil/' || arquivo where name = a || '/perfil/' || arquivo;
     r := r || E'\n[FALHOU] A moveu o arquivo para a pasta de B';
   exception when insufficient_privilege then

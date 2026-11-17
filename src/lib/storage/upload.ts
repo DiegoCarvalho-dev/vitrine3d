@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { MEDIA_BUCKET, type MediaFolder } from "@/lib/validacoes/midia";
 
-import { compressToWebp } from "./compress";
+import { compressImage } from "./compress";
 
 export class UploadError extends Error {}
 
@@ -22,13 +22,13 @@ export async function uploadImage(
   const userId = data?.claims?.sub;
   if (!userId) throw new UploadError("Sua sessão expirou. Entre de novo.");
 
-  const webp = await compressToWebp(file);
-  const path = `${userId}/${folder}/${crypto.randomUUID()}.webp`;
+  const { blob, extension } = await compressImage(file);
+  const path = `${userId}/${folder}/${crypto.randomUUID()}.${extension}`;
 
   const { error } = await supabase.storage
     .from(MEDIA_BUCKET)
-    .upload(path, webp, {
-      contentType: "image/webp",
+    .upload(path, blob, {
+      contentType: blob.type,
       cacheControl: "31536000", // file names never repeat: safe to cache for a year
       upsert: false,
     });
@@ -37,8 +37,19 @@ export async function uploadImage(
   return path;
 }
 
-/** Deletes an image of the user (e.g. after replacing it). Errors are ignored. */
-export async function removeImage(path: string): Promise<void> {
+/**
+ * Deletes an image of the user (e.g. after replacing it).
+ * Returns false when nothing was removed (network error, expired session or
+ * someone else's file), so the caller can log it; an orphan never breaks the flow.
+ */
+export async function removeImage(path: string): Promise<boolean> {
   const supabase = createClient();
-  await supabase.storage.from(MEDIA_BUCKET).remove([path]);
+  const { data, error } = await supabase.storage
+    .from(MEDIA_BUCKET)
+    .remove([path]);
+  if (error || !data?.length) {
+    console.warn(`[storage] Não foi possível apagar ${path}`);
+    return false;
+  }
+  return true;
 }
