@@ -61,4 +61,4 @@ Next.js · TypeScript · Tailwind CSS · shadcn/ui · React Three Fiber (Three.j
 
 ## Status
 
-🚧 Sprint 2: banco de dados (concluído, com RLS testado) e login do corretor.
+🚧 Sprint 3: painel do corretor (cadastro de empreendimentos, plantas e unidades). Sprints 1 e 2 concluídas: ambiente, banco com RLS testado, login e perfil.
