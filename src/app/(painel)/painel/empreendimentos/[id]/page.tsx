@@ -3,12 +3,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { publishChecklist } from "@/lib/empreendimentos/publish";
+import { getPublicEnv } from "@/lib/env";
+import { publicImageUrl } from "@/lib/validacoes/midia";
 import {
   getMyProject,
   getMyProjectDetails,
 } from "@/lib/empreendimentos/queries";
 import type { UpdateProjectInput } from "@/lib/validacoes/empreendimento";
 
+import { CoverUpload } from "./cover-upload";
 import { DeleteProject } from "./delete-project";
 import { ProjectEditForm } from "./project-edit-form";
 import { PublishPanel } from "./publish-panel";
@@ -71,6 +74,14 @@ export default async function ProjectPage({
         projectId={project.id}
         status={project.status}
         checklist={publishChecklist(facts)}
+      />
+
+      <CoverUpload
+        projectId={project.id}
+        imageUrl={publicImageUrl(
+          getPublicEnv().NEXT_PUBLIC_SUPABASE_URL,
+          project.capa_url,
+        )}
       />
 
       <ProjectEditForm

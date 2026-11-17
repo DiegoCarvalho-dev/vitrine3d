@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { fitWithin, isAcceptedImage } from "../storage/compress";
-import { isOwnStoragePath, publicImageUrl, storagePathSchema } from "./midia";
+import {
+  isOwnStoragePath,
+  parseOwnImagePath,
+  publicImageUrl,
+  storagePathSchema,
+} from "./midia";
 
 const USER = "0d3e0000-0000-4000-8000-000000000001";
 const OTHER = "0d3e0000-0000-4000-8000-000000000002";
@@ -94,5 +99,50 @@ describe("isAcceptedImage", () => {
     for (const type of ["image/svg+xml", "image/gif", "application/pdf"]) {
       expect(isAcceptedImage({ type })).toBe(false);
     }
+  });
+});
+
+describe("parseOwnImagePath (o que a Server Action aceita salvar)", () => {
+  const me = "11111111-1111-4111-8111-111111111111";
+  const other = "22222222-2222-4222-8222-222222222222";
+  const project = "33333333-3333-4333-8333-333333333333";
+  const otherProject = "44444444-4444-4444-8444-444444444444";
+  const file = "55555555-5555-4555-8555-555555555555.webp";
+
+  it("null remove a imagem", () => {
+    expect(parseOwnImagePath(null, me, project)).toEqual({
+      ok: true,
+      path: null,
+    });
+  });
+
+  it("aceita a capa na pasta do próprio empreendimento", () => {
+    expect(parseOwnImagePath(`${me}/${project}/${file}`, me, project)).toEqual({
+      ok: true,
+      path: `${me}/${project}/${file}`,
+    });
+  });
+
+  it.each([
+    [
+      "pasta de outro corretor (requisição forjada)",
+      `${other}/${project}/${file}`,
+    ],
+    ["outro empreendimento meu", `${me}/${otherProject}/${file}`],
+    ["pasta do perfil usada como capa", `${me}/perfil/${file}`],
+    ["URL externa", "https://site-malicioso.com/x.webp"],
+    ["texto vazio", ""],
+    ["número", 42],
+  ])("recusa %s", (_, raw) => {
+    expect(parseOwnImagePath(raw, me, project)).toEqual({ ok: false });
+  });
+
+  it("foto e logo só na pasta perfil", () => {
+    expect(parseOwnImagePath(`${me}/perfil/${file}`, me, "perfil").ok).toBe(
+      true,
+    );
+    expect(parseOwnImagePath(`${me}/${project}/${file}`, me, "perfil").ok).toBe(
+      false,
+    );
   });
 });

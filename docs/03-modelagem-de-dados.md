@@ -215,6 +215,7 @@ O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) 
 - As imagens são comprimidas no navegador para WebP (ou JPEG, no Safari anterior ao 17), lado maior até 1920 px, antes do envio (`src/lib/storage/compress.ts`).
 - `capa_url`, `avatar_url` e `logo_url` têm CHECK no banco: só caminho do bucket, na pasta do próprio dono (a capa, na pasta **daquele** empreendimento).
 - Apagar arquivos direto por SQL é bloqueado pelo Supabase (`protect_objects_delete`): use a API do Storage.
+- Upload (issue #30): o navegador comprime e envia; a Server Action (`setProjectCover`, `setProfileImage`) confere o caminho com `parseOwnImagePath` (pasta do dono; a capa, na pasta daquele empreendimento), grava a coluna e apaga o arquivo anterior. Se salvar falhar, o arquivo recém-enviado é apagado. Excluir um empreendimento apaga a pasta dele no Storage.
 
 **Escrita do visitante** (`leads` e `eventos`, issue #15): só `INSERT`, só nas colunas de dados (nunca `status`, datas ou `id`), só em empreendimento publicado e **sem nenhum `SELECT`** (nem o próprio lead volta). Os inserts públicos usam o cliente **anônimo** (sem cookies de login), como as demais leituras públicas. O corretor lê os seus, muda só o `status` do lead e pode apagá-lo (pedido de exclusão LGPD); eventos são imutáveis.
 

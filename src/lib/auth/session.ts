@@ -30,7 +30,9 @@ export const getCurrentProfile = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("perfis")
-    .select("id, nome, whatsapp, creci, cor_marca, notificar_leads_email")
+    .select(
+      "id, nome, whatsapp, creci, cor_marca, notificar_leads_email, avatar_url, logo_url",
+    )
     .eq("id", userId)
     .maybeSingle();
   if (error)

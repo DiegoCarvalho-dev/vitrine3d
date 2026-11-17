@@ -4,6 +4,8 @@ import { ProjectStatusBadge } from "@/components/project-status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { listMyProjects } from "@/lib/empreendimentos/queries";
+import { getPublicEnv } from "@/lib/env";
+import { publicImageUrl } from "@/lib/validacoes/midia";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
@@ -84,8 +86,9 @@ export default async function PanelPage({
             <li key={project.id}>
               <Link
                 href={`/painel/empreendimentos/${project.id}`}
-                className="flex h-full flex-col gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                className="flex h-full flex-col gap-3 overflow-hidden rounded-lg border bg-card p-4 transition-colors hover:border-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               >
+                <ProjectCover path={project.capa_url} />
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-heading text-lg leading-snug font-semibold">
                     {project.nome}
@@ -112,5 +115,27 @@ export default async function PanelPage({
         </ul>
       )}
     </section>
+  );
+}
+
+const supabaseUrl = () => getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
+
+/** Cover on top of the card (or a neutral band while there's none). */
+function ProjectCover({ path }: { path: string | null }) {
+  const url = publicImageUrl(supabaseUrl(), path);
+  return (
+    <div className="-mx-4 -mt-4 mb-1 aspect-video bg-muted">
+      {url && (
+        // Plain <img>: already compressed (WebP, up to 1920 px).
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt=""
+          loading="lazy"
+          className="size-full object-cover"
+          data-testid="project-cover"
+        />
+      )}
+    </div>
   );
 }

@@ -52,3 +52,22 @@ export function publicImageUrl(
   if (!path || !STORAGE_PATH.test(path)) return null;
   return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${MEDIA_BUCKET}/${path}`;
 }
+
+/**
+ * Validates an image path sent by the browser before saving it in the
+ * database: null (remove) or a bucket path inside the user's own folder
+ * (`folder` = "perfil" or the project id). Anything else is refused, so a
+ * forged request can't point a column at someone else's file.
+ */
+export function parseOwnImagePath(
+  raw: unknown,
+  userId: string,
+  folder: MediaFolder,
+): { ok: true; path: string | null } | { ok: false } {
+  if (raw === null) return { ok: true, path: null };
+  const parsed = storagePathSchema.safeParse(raw);
+  if (!parsed.success || !isOwnStoragePath(parsed.data, userId, folder)) {
+    return { ok: false };
+  }
+  return { ok: true, path: parsed.data };
+}

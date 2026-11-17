@@ -9,6 +9,7 @@ import {
   getMyProject,
   getMyProjectDetails,
 } from "@/lib/empreendimentos/queries";
+import { deleteStoredImage } from "@/lib/storage/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   deleteConfirmationSchema,
@@ -16,7 +17,7 @@ import {
   projectStatusSchema,
   updateProjectSchema,
 } from "@/lib/validacoes/empreendimento";
-import { MEDIA_BUCKET } from "@/lib/validacoes/midia";
+import { MEDIA_BUCKET, parseOwnImagePath } from "@/lib/validacoes/midia";
 
 // Every action: session user (requireUserId) + Zod + ownership check
 // (getMyProject filters by dono_id). The RLS checks the owner again.
@@ -199,4 +200,37 @@ export async function deleteProject(
 
   revalidatePath("/painel");
   redirect("/painel?excluido=1");
+}
+
+/**
+ * Saves (or removes, with null) the project cover. The path must be inside
+ * THIS project's folder of the logged-in broker (a forged path pointing at
+ * someone else's file is refused here and by the DB CHECK). The previous
+ * file is deleted from Storage, so replacing leaves no orphan.
+ */
+export async function setProjectCover(
+  rawId: unknown,
+  rawPath: unknown,
+): Promise<ActionResult> {
+  const userId = await requireUserId();
+  const id = projectIdSchema.safeParse(rawId);
+  if (!id.success) return NOT_FOUND;
+  const project = await getMyProject(id.data);
+  if (!project) return NOT_FOUND;
+
+  const path = parseOwnImagePath(rawPath, userId, id.data);
+  if (!path.ok) return { error: "Imagem inválida. Envie de novo." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("empreendimentos")
+    .update({ capa_url: path.path })
+    .eq("id", id.data);
+  if (error) return { error: "Não foi possível salvar a capa. Tente de novo." };
+
+  if (project.capa_url && project.capa_url !== path.path) {
+    await deleteStoredImage(project.capa_url);
+  }
+  refresh(id.data);
+  return { ok: true };
 }

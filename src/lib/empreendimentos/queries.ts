@@ -24,7 +24,7 @@ export async function listMyProjects() {
   const { data, error } = await supabase
     .from("empreendimentos")
     .select(
-      "id, tipo, nome, slug, cidade, uf, status, atualizado_em, unidades(count)",
+      "id, tipo, nome, slug, cidade, uf, status, capa_url, atualizado_em, unidades(count)",
     )
     .eq("dono_id", userId)
     .order("atualizado_em", { ascending: false });
