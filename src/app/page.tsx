@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { BuildingIllustration } from "@/components/building-illustration";
 import {
   Card,
@@ -14,10 +16,16 @@ export default function Home() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-8 sm:py-10">
-      <header>
+      <header className="flex items-center justify-between gap-4">
         <span className="font-heading text-lg font-bold tracking-tight font-stretch-semi-expanded">
           Vitrine 3D
         </span>
+        <Link
+          href="/entrar"
+          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Entrar
+        </Link>
       </header>
 
       <main className="grid flex-1 items-center gap-12 py-10 md:grid-cols-[1.1fr_1fr] lg:gap-20">

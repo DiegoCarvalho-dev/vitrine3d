@@ -58,7 +58,7 @@ for (const file of files) {
   const result = spawnSync(
     "supabase",
     ["db", "query", "--remote", "--yes", "-f", join(dir, file)],
-    { encoding: "utf8", shell: process.platform === "win32" },
+    { encoding: "utf8" }, // sem shell: argumentos chegam inteiros à CLI
   );
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   const match = output.match(SUMMARY);
