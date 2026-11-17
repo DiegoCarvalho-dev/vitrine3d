@@ -52,9 +52,10 @@ test.describe("Empreendimentos no painel", () => {
     await page.waitForTimeout(1_500);
     expect(await page.locator("[data-sonner-toast]").count()).toBe(0);
     await expect(page.getByText("Rascunho")).toBeVisible();
+    await expect(page.getByLabel("Andares", { exact: true })).toHaveValue("8");
     await expect(
-      page.getByText("8 andares, 4 unidades por andar"),
-    ).toBeVisible();
+      page.getByLabel("Unidades por andar", { exact: true }),
+    ).toHaveValue("4");
 
     await page.getByRole("link", { name: "← Meus empreendimentos" }).click();
     const card = page

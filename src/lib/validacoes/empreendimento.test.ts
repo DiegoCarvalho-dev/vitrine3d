@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { slugify } from "../slugify";
-import { createProjectSchema, SLUG_PATTERN } from "./empreendimento";
+import {
+  createProjectSchema,
+  SLUG_PATTERN,
+  updateProjectSchema,
+} from "./empreendimento";
 
 const building = {
   type: "predio" as const,
@@ -84,4 +88,42 @@ describe("slugify gera links válidos para o banco", () => {
   ])("%s", (name) => {
     expect(slugify(name)).toMatch(SLUG_PATTERN);
   });
+});
+
+describe("updateProjectSchema", () => {
+  const edit = {
+    ...building,
+    description: "",
+    address: "",
+    builder: "",
+    incorporationRegistry: "",
+    deliveryForecast: "",
+    checkedAt: "",
+  };
+
+  it("campos opcionais vazios viram null", () => {
+    const parsed = updateProjectSchema.parse(edit);
+    expect(parsed.description).toBeNull();
+    expect(parsed.builder).toBeNull();
+    expect(parsed.deliveryForecast).toBeNull();
+  });
+
+  it("aceita datas do campo de data (AAAA-MM-DD)", () => {
+    const parsed = updateProjectSchema.parse({
+      ...edit,
+      deliveryForecast: "2028-06-30",
+      checkedAt: "2026-11-10",
+    });
+    expect(parsed.deliveryForecast).toBe("2028-06-30");
+    expect(parsed.checkedAt).toBe("2026-11-10");
+  });
+
+  it.each([["2028-02-30"], ["30/06/2028"], ["2028-13-01"], ["amanhã"]])(
+    "recusa a data %s",
+    (deliveryForecast) => {
+      expect(
+        updateProjectSchema.safeParse({ ...edit, deliveryForecast }).success,
+      ).toBe(false);
+    },
+  );
 });
