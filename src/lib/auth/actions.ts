@@ -10,6 +10,15 @@ import { signInSchema, signUpSchema } from "@/lib/validacoes/auth";
 
 export type AuthResult = { error?: string; info?: string };
 
+const TRY_AGAIN =
+  "Não foi possível concluir agora. Tente de novo em instantes.";
+const TOO_MANY =
+  "Muitas tentativas seguidas. Aguarde um pouco e tente de novo.";
+
+type AuthError = { code?: string; status?: number };
+const isRateLimited = (error: AuthError) =>
+  error.status === 429 || Boolean(error.code?.startsWith("over_"));
+
 export async function signIn(input: unknown): Promise<AuthResult> {
   const parsed = signInSchema.safeParse(input);
   if (!parsed.success) return { error: "Confira o e-mail e a senha." };
@@ -19,7 +28,16 @@ export async function signIn(input: unknown): Promise<AuthResult> {
   if (error) {
     // Same message for "wrong password" and "no such e-mail": doesn't reveal
     // which e-mails have an account.
-    return { error: "E-mail ou senha incorretos." };
+    if (error.code === "invalid_credentials")
+      return { error: "E-mail ou senha incorretos." };
+    // Only reachable with the RIGHT password, so it reveals nothing.
+    if (error.code === "email_not_confirmed") {
+      return {
+        error: "Confirme seu e-mail antes de entrar (use o link que enviamos).",
+      };
+    }
+    if (isRateLimited(error)) return { error: TOO_MANY };
+    return { error: TRY_AGAIN };
   }
   redirect("/painel");
 }
@@ -44,10 +62,14 @@ export async function signUp(input: unknown): Promise<AuthResult> {
           "Essa senha é fraca demais. Use uma senha mais longa e menos óbvia.",
       };
     }
-    return {
-      error:
-        "Não foi possível criar a conta com esse e-mail. Se você já tem conta, entre.",
-    };
+    if (isRateLimited(error)) return { error: TOO_MANY };
+    if (error.code === "user_already_exists" || error.code === "email_exists") {
+      return {
+        error:
+          "Não foi possível criar a conta com esse e-mail. Se você já tem conta, entre.",
+      };
+    }
+    return { error: TRY_AGAIN };
   }
   if (!data.session) {
     // Projects with e-mail confirmation turned on: no session until the link is clicked.
@@ -60,6 +82,9 @@ export async function signUp(input: unknown): Promise<AuthResult> {
 
 export async function signOut(): Promise<void> {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  // If Auth failed, the session may still be valid: say so instead of
+  // pretending the user is logged out (shared devices!).
+  if (error) redirect("/painel?erro=sair");
   redirect("/entrar");
 }

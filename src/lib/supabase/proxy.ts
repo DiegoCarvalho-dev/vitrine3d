@@ -59,10 +59,20 @@ export async function updateSession(request: NextRequest) {
     url.pathname = path;
     url.search = "";
     const response = NextResponse.redirect(url);
-    // Keep the refreshed session cookies on the redirect.
+    // Keep the refreshed session cookies on the redirect, and the headers
+    // @supabase/ssr set with them (Cache-Control: no-store), so no shared cache
+    // ever stores one user's session cookies.
     supabaseResponse.cookies
       .getAll()
       .forEach((cookie) => response.cookies.set(cookie));
+    supabaseResponse.headers.forEach((value, key) => {
+      if (
+        key.toLowerCase() !== "set-cookie" &&
+        key.toLowerCase() !== "location"
+      ) {
+        response.headers.set(key, value);
+      }
+    });
     return response;
   };
 

@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
-
-import { signOut } from "../../(auth)/actions";
+import { signOut } from "@/lib/auth/actions";
+import { getCurrentProfile } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Painel | Vitrine 3D",
@@ -18,17 +16,8 @@ export default async function PanelLayout({
   children: React.ReactNode;
 }) {
   // Second line of defense: even if the proxy is skipped, the panel only
-  // renders for a verified user (getClaims checks the JWT; never getSession).
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const userId = data?.claims?.sub;
-  if (!userId) redirect("/entrar");
-
-  const { data: profile } = await supabase
-    .from("perfis")
-    .select("nome")
-    .eq("id", userId)
-    .maybeSingle();
+  // renders for a verified user (redirects to /entrar otherwise).
+  const profile = await getCurrentProfile();
   const displayName = profile?.nome || "corretor(a)";
 
   return (

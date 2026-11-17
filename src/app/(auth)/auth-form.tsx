@@ -14,7 +14,7 @@ import {
   type SignUpInput,
 } from "@/lib/validacoes/auth";
 
-import { signIn, signUp, type AuthResult } from "./actions";
+import { signIn, signUp, type AuthResult } from "@/lib/auth/actions";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -35,9 +35,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   async function onSubmit(values: SignUpInput | SignInInput) {
     setResult(null);
-    // On success the action redirects to /painel (this promise doesn't return).
-    const response = isSignUp ? await signUp(values) : await signIn(values);
-    if (response) setResult(response);
+    try {
+      // On success the action redirects to /painel (the router navigates).
+      const response = isSignUp ? await signUp(values) : await signIn(values);
+      if (response) setResult(response);
+    } catch {
+      // Network drop, server error or a new deploy: never fail silently.
+      setResult({
+        error:
+          "Não foi possível conectar. Verifique a internet e tente de novo.",
+      });
+    }
   }
 
   return (
