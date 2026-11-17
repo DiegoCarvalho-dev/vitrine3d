@@ -113,6 +113,17 @@ begin
   r := r || format(E'
 [%s] dono apaga empreendimento sem leads', case when n = 1 then 'OK' else 'FALHOU' end);
 
+  -- Mesmo sem o filtro do RLS (ex.: lead chegando na mesma hora), o trigger barra.
+  perform set_config('role', 'none', true);
+  begin
+    delete from public.empreendimentos where id = emp_pub;
+    r := r || E'
+[FALHOU] DELETE direto apagou empreendimento com leads';
+  exception when raise_exception then
+    r := r || E'
+[OK] trigger barra apagar empreendimento com leads (corrida)';
+  end;
+
   -- ===== Excluir a conta de A apaga tudo dela em cascata =====
   perform set_config('role', 'none', true);  -- volta ao papel da sessão (como o Supabase Auth)
   delete from auth.users where id = a;

@@ -39,7 +39,8 @@ export default async function ProjectPage({
     description: project.descricao ?? "",
     address: project.endereco ?? "",
     city: project.cidade ?? "",
-    state: (project.uf ?? "SP") as UpdateProjectInput["state"],
+    // Never preselect a UF the broker didn't choose: empty forces a choice.
+    state: (project.uf ?? "") as UpdateProjectInput["state"],
     floors: project.numero_andares?.toString() ?? "",
     unitsPerFloor: project.unidades_por_andar?.toString() ?? "",
     builder: project.construtora ?? "",
@@ -73,8 +74,6 @@ export default async function ProjectPage({
       />
 
       <ProjectEditForm
-        // Remount after a save elsewhere changes the data (e.g. another tab).
-        key={project.atualizado_em}
         projectId={project.id}
         defaultValues={defaultValues}
         unitCount={facts.units}

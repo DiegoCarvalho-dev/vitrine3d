@@ -88,6 +88,7 @@ export const getMyProjectDetails = cache(async (id: string) => {
     );
 
   const facts: PublishFacts = {
+    isBuilding: project.tipo === "predio",
     hasCover: Boolean(project.capa_url),
     typologiesWithRooms: (typologies.data ?? []).filter(
       (t) => (t.comodos[0]?.count ?? 0) > 0,

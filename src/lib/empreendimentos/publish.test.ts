@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { canPublish, publishChecklist } from "./publish";
 
-const complete = { hasCover: true, typologiesWithRooms: 1, units: 40 };
+const complete = {
+  isBuilding: true,
+  hasCover: true,
+  typologiesWithRooms: 1,
+  units: 40,
+};
 
 describe("publishChecklist", () => {
   it("com tudo pronto, pode publicar", () => {
@@ -11,7 +16,12 @@ describe("publishChecklist", () => {
   });
 
   it("empreendimento recém-criado: lista os 3 itens que faltam", () => {
-    const facts = { hasCover: false, typologiesWithRooms: 0, units: 0 };
+    const facts = {
+      isBuilding: true,
+      hasCover: false,
+      typologiesWithRooms: 0,
+      units: 0,
+    };
     expect(canPublish(facts)).toBe(false);
     expect(
       publishChecklist(facts)
@@ -38,5 +48,13 @@ describe("publishChecklist", () => {
         .filter((i) => !i.done)
         .map((i) => i.label),
     ).toEqual([missing]);
+  });
+
+  it("casa não tem grade de unidades: não exige unidades geradas", () => {
+    const house = { ...complete, isBuilding: false, units: 0 };
+    expect(canPublish(house)).toBe(true);
+    expect(publishChecklist(house).map((i) => i.label)).not.toContain(
+      "Unidades geradas",
+    );
   });
 });

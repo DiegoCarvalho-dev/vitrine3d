@@ -8,22 +8,25 @@ import { canPublish, publishChecklist } from "@/lib/empreendimentos/publish";
 import {
   getMyProject,
   getMyProjectDetails,
-  isUuid,
 } from "@/lib/empreendimentos/queries";
 import { createClient } from "@/lib/supabase/server";
 import {
+  deleteConfirmationSchema,
+  projectIdSchema,
   projectStatusSchema,
   updateProjectSchema,
 } from "@/lib/validacoes/empreendimento";
 import { MEDIA_BUCKET } from "@/lib/validacoes/midia";
 
-// Every action: session user (requireUserId) + ownership check (getMyProject
-// filters by dono_id) + Zod. The RLS checks the owner again in the database.
+// Every action: session user (requireUserId) + Zod + ownership check
+// (getMyProject filters by dono_id). The RLS checks the owner again.
 
 export type ActionResult =
   { ok: true } | { ok?: false; error: string; field?: string };
 
 const NOT_FOUND = { error: "Empreendimento não encontrado." } as const;
+const LEADS_ARRIVED =
+  "Chegou um contato de cliente neste empreendimento. Ele não pode mais ser excluído; arquive.";
 
 function refresh(id: string) {
   revalidatePath("/painel");
@@ -31,12 +34,13 @@ function refresh(id: string) {
 }
 
 export async function updateProject(
-  id: string,
+  rawId: unknown,
   input: unknown,
 ): Promise<ActionResult> {
   await requireUserId();
-  if (typeof id !== "string" || !isUuid(id)) return NOT_FOUND;
-  const project = await getMyProject(id);
+  const id = projectIdSchema.safeParse(rawId);
+  if (!id.success) return NOT_FOUND;
+  const project = await getMyProject(id.data);
   if (!project) return NOT_FOUND;
 
   // The type (building/house) can't change here: it comes from the database.
@@ -70,7 +74,7 @@ export async function updateProject(
       previsao_entrega: data.deliveryForecast,
       informacoes_conferidas_em: data.checkedAt,
     })
-    .eq("id", id);
+    .eq("id", id.data);
 
   if (error) {
     if (error.code === "23505") {
@@ -81,60 +85,92 @@ export async function updateProject(
     }
     return { error: "Não foi possível salvar agora. Tente de novo." };
   }
-  refresh(id);
+  refresh(id.data);
   return { ok: true };
 }
 
 export async function setProjectStatus(
-  id: string,
-  status: unknown,
+  rawId: unknown,
+  rawStatus: unknown,
 ): Promise<ActionResult> {
   await requireUserId();
-  if (typeof id !== "string" || !isUuid(id)) return NOT_FOUND;
-  const parsedStatus = projectStatusSchema.safeParse(status);
-  if (!parsedStatus.success) return { error: "Status inválido." };
+  const id = projectIdSchema.safeParse(rawId);
+  if (!id.success) return NOT_FOUND;
+  const status = projectStatusSchema.safeParse(rawStatus);
+  if (!status.success) return { error: "Status inválido." };
 
-  const details = await getMyProjectDetails(id);
-  if (!details) return NOT_FOUND;
-
-  // Checked again here: the page could be stale or the request forged.
-  if (parsedStatus.data === "publicado" && !canPublish(details.facts)) {
-    const missing = publishChecklist(details.facts)
-      .filter((item) => !item.done)
-      .map((item) => item.label.toLowerCase());
-    return { error: `Para publicar, falta: ${missing.join(", ")}.` };
+  if (status.data === "publicado") {
+    // Checked again here: the page could be stale or the request forged.
+    const details = await getMyProjectDetails(id.data);
+    if (!details) return NOT_FOUND;
+    if (!canPublish(details.facts)) {
+      const missing = publishChecklist(details.facts)
+        .filter((item) => !item.done)
+        .map((item) => item.label.toLowerCase());
+      return { error: `Para publicar, falta: ${missing.join(", ")}.` };
+    }
+  } else if (!(await getMyProject(id.data))) {
+    return NOT_FOUND; // archive / back to draft only need ownership
   }
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("empreendimentos")
-    .update({ status: parsedStatus.data })
-    .eq("id", id);
+    .update({ status: status.data })
+    .eq("id", id.data);
   if (error)
     return { error: "Não foi possível mudar o status. Tente de novo." };
 
-  refresh(id);
+  refresh(id.data);
   return { ok: true };
 }
 
+/** Removes every image in the project's Storage folder (best effort). */
+async function removeProjectImages(folder: string) {
+  const supabase = await createClient();
+  const bucket = supabase.storage.from(MEDIA_BUCKET);
+  const PAGE = 1000;
+  for (;;) {
+    // Always page 0: each round deletes what it listed.
+    const { data: files, error } = await bucket.list(folder, { limit: PAGE });
+    if (error) {
+      console.warn(`[storage] Não listei ${folder}: ${error.message}`);
+      return;
+    }
+    if (!files.length) return;
+    const { error: removeError } = await bucket.remove(
+      files.map((file) => `${folder}/${file.name}`),
+    );
+    if (removeError) {
+      console.warn(
+        `[storage] Imagens órfãs em ${folder}: ${removeError.message}`,
+      );
+      return;
+    }
+    if (files.length < PAGE) return;
+  }
+}
+
 /**
- * Deletes a project WITHOUT leads (the database refuses otherwise: policy
- * "dono apaga os sem leads"). The broker must type the project name.
- * Typologies, units and media rows go in cascade; the image files are
- * removed from Storage right after.
+ * Deletes a project WITHOUT leads (the database refuses otherwise: DELETE
+ * policy + trigger). The broker must type the project name. Typologies,
+ * units and media rows go in cascade; the image files are removed from
+ * Storage right after.
  */
 export async function deleteProject(
-  id: string,
-  confirmation: unknown,
+  rawId: unknown,
+  rawConfirmation: unknown,
 ): Promise<ActionResult> {
   const userId = await requireUserId();
-  if (typeof id !== "string" || !isUuid(id)) return NOT_FOUND;
-  const details = await getMyProjectDetails(id);
+  const id = projectIdSchema.safeParse(rawId);
+  if (!id.success) return NOT_FOUND;
+  const details = await getMyProjectDetails(id.data);
   if (!details) return NOT_FOUND;
 
+  const confirmation = deleteConfirmationSchema.safeParse(rawConfirmation);
   if (
-    typeof confirmation !== "string" ||
-    confirmation.trim() !== details.project.nome.trim()
+    !confirmation.success ||
+    confirmation.data.trim() !== details.project.nome.trim()
   ) {
     return {
       field: "confirmation",
@@ -152,31 +188,14 @@ export async function deleteProject(
   const { data, error } = await supabase
     .from("empreendimentos")
     .delete()
-    .eq("id", id)
+    .eq("id", id.data)
     .select("id");
+  // P0001 = the trigger saw a lead that arrived during the deletion.
+  if (error?.code === "P0001") return { error: LEADS_ARRIVED };
   if (error) return { error: "Não foi possível excluir agora. Tente de novo." };
-  if (!data.length) {
-    // A lead arrived between the check and the delete: the DB kept it.
-    return {
-      error:
-        "Chegou um contato de cliente neste empreendimento. Ele não pode mais ser excluído; arquive.",
-    };
-  }
+  if (!data.length) return { error: LEADS_ARRIVED }; // the policy kept it
 
-  // Best effort: an orphan image never blocks the deletion.
-  const folder = `${userId}/${id}`;
-  const { data: files } = await supabase.storage
-    .from(MEDIA_BUCKET)
-    .list(folder, { limit: 1000 });
-  if (files?.length) {
-    const { error: removeError } = await supabase.storage
-      .from(MEDIA_BUCKET)
-      .remove(files.map((file) => `${folder}/${file.name}`));
-    if (removeError)
-      console.warn(
-        `[storage] Imagens órfãs em ${folder}: ${removeError.message}`,
-      );
-  }
+  await removeProjectImages(`${userId}/${id.data}`);
 
   revalidatePath("/painel");
   redirect("/painel?excluido=1");

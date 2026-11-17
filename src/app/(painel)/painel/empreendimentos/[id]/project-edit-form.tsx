@@ -49,7 +49,17 @@ export function ProjectEditForm({
       const result = await updateProject(projectId, form.getValues());
       if (result.ok) {
         toast.success("Alterações salvas.");
-        form.reset(form.getValues()); // the saved values become the new baseline
+        // The saved values (trimmed, like the server stores them) become the
+        // new baseline for "unsaved changes".
+        const values = form.getValues();
+        form.reset(
+          Object.fromEntries(
+            Object.entries(values).map(([key, value]) => [
+              key,
+              typeof value === "string" ? value.trim() : value,
+            ]),
+          ) as UpdateProjectInput,
+        );
       } else if (result.field && result.field in defaultValues) {
         form.setError(
           result.field as Field,
@@ -145,6 +155,9 @@ export function ProjectEditForm({
               aria-invalid={Boolean(errors.state)}
               {...form.register("state")}
             >
+              <option value="" disabled>
+                UF
+              </option>
               {BRAZILIAN_STATES.map((uf) => (
                 <option key={uf} value={uf}>
                   {uf}

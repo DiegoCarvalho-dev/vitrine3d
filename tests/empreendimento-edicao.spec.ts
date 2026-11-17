@@ -74,10 +74,15 @@ test.describe("Editar, publicar e excluir empreendimento", () => {
     await expect(checklist).toContainText("Pelo menos 1 tipologia com cômodos");
     await expect(checklist).toContainText("Unidades geradas");
 
+    // Texto ainda não salvo não pode sumir ao mudar o status.
+    await page.getByLabel("Descrição").fill("Rascunho não salvo");
     await panel.getByRole("button", { name: "Arquivar" }).click();
     await expect(panel.getByText("Arquivado", { exact: true })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByLabel("Descrição")).toHaveValue(
+      "Rascunho não salvo",
+    );
     await panel.getByRole("button", { name: "Desarquivar" }).click();
     await expect(panel.getByText("Rascunho", { exact: true })).toBeVisible({
       timeout: 15_000,

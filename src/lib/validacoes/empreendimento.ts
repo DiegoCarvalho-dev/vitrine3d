@@ -172,3 +172,14 @@ export const PROJECT_STATUS_LABEL = {
   publicado: "Publicado",
   arquivado: "Arquivado",
 } as const;
+
+/** A project id from the URL or a form (strict UUID). */
+export const projectIdSchema = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    "Empreendimento não encontrado.",
+  );
+
+/** What the broker types to confirm a deletion (compared with the name). */
+export const deleteConfirmationSchema = z.string().max(200);
