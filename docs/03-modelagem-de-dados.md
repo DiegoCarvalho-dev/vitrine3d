@@ -206,7 +206,13 @@ O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) 
 | `unidades` (preço) | vê sempre | vê só `preco_publico` (null quando "sob consulta") |
 | `eventos` | lê os seus | **só insere** (nunca lê) |
 
-**Storage**: bucket `midias` público para leitura de arquivos de empreendimentos publicados. A escrita só é permitida pelo dono, no caminho `{dono_id}/{empreendimento_id}/...`.
+**Storage** (issue #27): bucket `midias`, **público para download pela URL** (o tour e a prévia do WhatsApp precisam), com limite de **2 MB** e só **WebP, JPEG e PNG** (SVG é recusado: pode conter script).
+- Caminho = regra de acesso: `{id-do-corretor}/{id-de-um-empreendimento-dele | perfil}/{uuid}.webp|.jpg|.png`, conferido por `privado.pode_gravar_midia` nas policies de `storage.objects`. Só o dono envia, substitui, apaga e lista os próprios arquivos; visitante não lista nada pela API.
+- Nomes de arquivo são **UUIDs aleatórios**: imagens de empreendimentos em rascunho não são adivinháveis, mesmo com o bucket público.
+- O banco guarda o **caminho** (`capa_url`, `avatar_url`, `logo_url`), nunca a URL completa; a URL pública é montada por `publicImageUrl()` (`src/lib/validacoes/midia.ts`), e todo caminho recebido do navegador passa por `isOwnStoragePath()` no servidor.
+- As imagens são comprimidas no navegador para WebP (lado maior até 1920 px) antes do envio (`src/lib/storage/compress.ts`).
+- Apagar arquivos direto por SQL é bloqueado pelo Supabase (`protect_objects_delete`): use a API do Storage.
+- Pendência para o plano pago: proteção contra senhas vazadas (HaveIBeenPwned) do Supabase Auth só existe no plano Pro.
 
 **Escrita do visitante** (`leads` e `eventos`, issue #15): só `INSERT`, só nas colunas de dados (nunca `status`, datas ou `id`), só em empreendimento publicado e **sem nenhum `SELECT`** (nem o próprio lead volta). Os inserts públicos usam o cliente **anônimo** (sem cookies de login), como as demais leituras públicas. O corretor lê os seus, muda só o `status` do lead e pode apagá-lo (pedido de exclusão LGPD); eventos são imutáveis.
 
