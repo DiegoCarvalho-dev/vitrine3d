@@ -36,6 +36,12 @@ export default async function PanelLayout({
           >
             {displayName}
           </span>
+          <Link
+            href="/painel/perfil"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Meu perfil
+          </Link>
           <form action={signOut}>
             <Button type="submit" variant="outline" size="sm">
               Sair
