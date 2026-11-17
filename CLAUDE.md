@@ -29,7 +29,7 @@ Ao fim de uma sprint (ou quando o usuário pedir o planejamento da próxima):
    - `modelo:opus`: banco/migrations, RLS, auth, segurança, 3D, arquitetura, bugs difíceis ou qualquer issue com `seguranca`.
    - `modelo:sonnet`: funcionalidade comum (telas, formulários, CRUD, testes) seguindo padrões que já existem.
    - `modelo:haiku`: docs, textos, configuração e ajustes pequenos e mecânicos.
-   Na dúvida, suba um nível. Ao terminar uma issue, se a próxima pede outro modelo, **pare e avise** o usuário para trocar com `/model` antes de seguir.
+   Na dúvida, suba um nível. A label é só referência: não pare o trabalho se o modelo em uso for outro.
 5. **Mostre o plano ao usuário e espere a aprovação.** Só então faça o commit e rode `bash scripts/criar-sprint.sh N`.
 
 ## Idioma
