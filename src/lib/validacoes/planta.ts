@@ -1,54 +1,57 @@
 import { z } from "zod";
 
-// Formato da planta (docs/03-modelagem-de-dados.md, "Formato da planta").
-// Tudo em METROS, com origem (0,0) no canto inferior esquerdo da unidade.
-// Validado aqui antes de salvar em comodos.geometria e tipologias.planta.
+// Floor plan format (docs/03-modelagem-de-dados.md, "Formato da planta").
+// Everything in METERS, origin (0,0) at the bottom-left corner of the unit.
+// Validated here before saving to comodos.geometria and tipologias.planta.
+// (Identifiers in English per CLAUDE.md; JSON keys mirror the DB columns.)
 
-const coordenada = z
+const coordinate = z
   .number()
   .finite()
   .min(0, "Coordenada negativa: a origem (0,0) é o canto inferior esquerdo.")
   .max(100, "Coordenada acima de 100 m.");
 
-export const pontoSchema = z.tuple([coordenada, coordenada]);
-export type Ponto = z.infer<typeof pontoSchema>;
+export const pointSchema = z.tuple([coordinate, coordinate]);
+export type Point = z.infer<typeof pointSchema>;
 
-/** Área de um polígono simples (fórmula do cadarço), em m². */
-export function areaDoPoligono(pontos: readonly Ponto[]): number {
-  let soma = 0;
-  for (let i = 0; i < pontos.length; i++) {
-    const [x1, y1] = pontos[i];
-    const [x2, y2] = pontos[(i + 1) % pontos.length];
-    soma += x1 * y2 - x2 * y1;
+/** Area of a simple polygon (shoelace formula), in m². */
+export function polygonArea(
+  points: readonly (readonly [number, number])[],
+): number {
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    sum += x1 * y2 - x2 * y1;
   }
-  return Math.abs(soma) / 2;
+  return Math.abs(sum) / 2;
 }
 
-// comodos.geometria
-export const geometriaComodoSchema = z
+/** comodos.geometria */
+export const roomGeometrySchema = z
   .object({
     tipo: z.literal("poligono"),
     pontos: z
-      .array(pontoSchema)
+      .array(pointSchema)
       .min(3, "Um cômodo precisa de pelo menos 3 pontos.")
       .max(64),
     pe_direito: z.number().min(2.2).max(6).default(2.7),
   })
-  .refine((g) => areaDoPoligono(g.pontos) > 0.5, {
+  .refine((g) => polygonArea(g.pontos) > 0.5, {
     message: "O cômodo precisa ter área (mais de 0,5 m²).",
     path: ["pontos"],
   });
-export type GeometriaComodo = z.infer<typeof geometriaComodoSchema>;
+export type RoomGeometry = z.infer<typeof roomGeometrySchema>;
 
-// tipologias.planta (elementos extras além dos cômodos)
-const segmentoSchema = z.object({ de: pontoSchema, ate: pontoSchema });
+const segmentSchema = z.object({ de: pointSchema, ate: pointSchema });
 
-export const plantaSchema = z.object({
+/** tipologias.planta (extra elements besides the rooms) */
+export const floorPlanSchema = z.object({
   versao: z.literal(1),
-  portas: z.array(segmentoSchema).max(200).default([]),
+  portas: z.array(segmentSchema).max(200).default([]),
   janelas: z
     .array(
-      segmentoSchema.extend({
+      segmentSchema.extend({
         peitoril: z.number().min(0).max(3),
         altura: z.number().min(0.2).max(3),
       }),
@@ -56,4 +59,4 @@ export const plantaSchema = z.object({
     .max(200)
     .default([]),
 });
-export type Planta = z.infer<typeof plantaSchema>;
+export type FloorPlan = z.infer<typeof floorPlanSchema>;

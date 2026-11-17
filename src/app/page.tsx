@@ -55,7 +55,7 @@ export default function Home() {
                   </span>
                 </CardTitle>
                 <CardDescription className="tabular-nums">
-                  9º andar, 2 quartos, 65 m²
+                  9º andar, 2 quartos, 80 m²
                 </CardDescription>
               </CardHeader>
               <CardFooter className="justify-between gap-2">

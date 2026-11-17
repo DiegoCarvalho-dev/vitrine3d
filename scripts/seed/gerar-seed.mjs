@@ -1,82 +1,134 @@
-// Gera supabase/seed.sql a partir de supabase/seed/residencial-demo.json.
-// Uso: npm run db:seed:gerar      (depois: npm run db:seed para aplicar no dev)
+// Generates supabase/seed.sql from supabase/seed/residencial-demo.json.
+// Command: npm run db:seed:gerar  (scripts/seed/cli.mjs). Then: npm run db:seed.
 //
-// O seed é REPETÍVEL: IDs fixos + "on conflict do update". Rodar duas vezes não
-// duplica nada. Todos os dados são fictícios.
-import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+// The seed is REPEATABLE: fixed IDs + "on conflict do update", and demo rows
+// removed from the JSON are deleted. All data is fictitious.
+//
+// The helpers come from the app itself (no copies): Node 22.18+ runs .ts files
+// directly (type stripping), and vitest imports this module too.
+import { readFileSync } from "node:fs";
 
-const RAIZ = new URL("../../", import.meta.url);
-const ARQUIVO_JSON = new URL("supabase/seed/residencial-demo.json", RAIZ);
-const ARQUIVO_SQL = new URL("supabase/seed.sql", RAIZ);
+import { demoStatus, unitNumber } from "../../src/lib/building.ts";
+import {
+  floorPlanSchema,
+  polygonArea,
+  roomGeometrySchema,
+} from "../../src/lib/validacoes/planta.ts";
 
-/** Texto SQL com aspas escapadas. */
-const q = (valor) =>
-  valor === null || valor === undefined
+export const SEED_JSON_URL = new URL(
+  "../../supabase/seed/residencial-demo.json",
+  import.meta.url,
+);
+export const SEED_SQL_URL = new URL("../../supabase/seed.sql", import.meta.url);
+
+/** SQL text literal with escaped quotes. */
+const q = (value) =>
+  value === null || value === undefined
     ? "null"
-    : `'${String(valor).replace(/'/g, "''")}'`;
+    : `'${String(value).replace(/'/g, "''")}'`;
 const qJson = (obj) => `${q(JSON.stringify(obj))}::jsonb`;
 
-/** Área de um polígono (fórmula do cadarço), igual a areaDoPoligono em src/lib/validacoes/planta.ts. */
-export function areaDoPoligono(pontos) {
-  let soma = 0;
-  for (let i = 0; i < pontos.length; i++) {
-    const [x1, y1] = pontos[i];
-    const [x2, y2] = pontos[(i + 1) % pontos.length];
-    soma += x1 * y2 - x2 * y1;
+export function readSeedData() {
+  return JSON.parse(readFileSync(SEED_JSON_URL, "utf8"));
+}
+
+/**
+ * Validates the JSON before generating anything: geometries and floor plans
+ * with the app's Zod schemas, and the unit rules. Throws with every problem found.
+ */
+export function validateSeedData(data) {
+  const problems = [];
+  const keys = new Set(data.tipologias.map((t) => t.chave));
+
+  for (const t of data.tipologias) {
+    const plan = floorPlanSchema.safeParse(t.planta);
+    if (!plan.success)
+      problems.push(
+        `${t.nome}: planta inválida (${plan.error.issues[0].message})`,
+      );
+    for (const room of t.comodos) {
+      const geometry = roomGeometrySchema.safeParse(room.geometria);
+      if (!geometry.success) {
+        problems.push(
+          `${t.nome} / ${room.nome}: geometria inválida (${geometry.error.issues[0].message})`,
+        );
+      }
+    }
   }
-  return Math.abs(soma) / 2;
+
+  const rules = data.unidades;
+  for (
+    let position = 1;
+    position <= data.empreendimento.unidades_por_andar;
+    position++
+  ) {
+    const key = rules.tipologia_por_posicao[String(position)];
+    if (!keys.has(key))
+      problems.push(
+        `unidades: posição ${position} sem tipologia válida (${key})`,
+      );
+    else if (!Number.isFinite(rules.preco_base[key]))
+      problems.push(`unidades: preço base da tipologia ${key} inválido`);
+  }
+  if (!Number.isFinite(rules.acrescimo_por_andar))
+    problems.push("unidades: acrescimo_por_andar inválido");
+
+  if (problems.length) {
+    throw new Error(`Dados do seed inválidos:\n- ${problems.join("\n- ")}`);
+  }
 }
 
-/** Mesma fórmula de demoStatus em src/lib/building.ts (o 3D de exemplo e o banco batem). */
-export function statusDaUnidade(andar, posicao) {
-  if (andar === 9 && posicao === 3) return "disponivel";
-  const n = (andar * 7 + posicao * 3) % 10;
-  if (n < 4) return "disponivel";
-  if (n < 7) return "reservado";
-  return "vendido";
-}
-
-/** As unidades do prédio, calculadas pelas regras do JSON. */
-export function gerarUnidades(dados) {
-  const { numero_andares, unidades_por_andar } = dados.empreendimento;
-  const regras = dados.unidades;
-  const tipologiaPorChave = Object.fromEntries(
-    dados.tipologias.map((t) => [t.chave, t]),
+/** The building's units, computed from the JSON rules. */
+export function generateUnits(data) {
+  const { numero_andares, unidades_por_andar } = data.empreendimento;
+  const rules = data.unidades;
+  const typologyByKey = Object.fromEntries(
+    data.tipologias.map((t) => [t.chave, t]),
   );
-  const unidades = [];
-  for (let andar = 1; andar <= numero_andares; andar++) {
-    for (let posicao = 1; posicao <= unidades_por_andar; posicao++) {
-      const chave = regras.tipologia_por_posicao[String(posicao)];
-      const base = regras.preco_base[chave];
-      const preco =
+  const units = [];
+  for (let floor = 1; floor <= numero_andares; floor++) {
+    for (let position = 1; position <= unidades_por_andar; position++) {
+      const key = rules.tipologia_por_posicao[String(position)];
+      const base = rules.preco_base[key];
+      const price =
         Math.round(
-          (base * (1 + regras.acrescimo_por_andar * (andar - 1))) / 1000,
+          (base * (1 + rules.acrescimo_por_andar * (floor - 1))) / 1000,
         ) * 1000;
-      unidades.push({
-        andar,
-        posicao,
-        numero: `${andar}${String(posicao).padStart(2, "0")}`,
-        tipologia_id: tipologiaPorChave[chave].id,
-        preco,
-        exibir_preco: !regras.andares_sob_consulta.includes(andar),
-        status: statusDaUnidade(andar, posicao),
+      units.push({
+        andar: floor,
+        posicao: position,
+        numero: unitNumber(floor, position),
+        tipologia_id: typologyByKey[key].id,
+        preco: price,
+        exibir_preco: !rules.andares_sob_consulta.includes(floor),
+        status: demoStatus(floor, position),
       });
     }
   }
-  return unidades;
+  return units;
 }
 
-export function gerarSeedSql(dados) {
-  const { corretor: c, empreendimento: e } = dados;
-  const linhas = [];
-  const add = (texto = "") => linhas.push(texto);
+export function generateSeedSql(data) {
+  validateSeedData(data);
+
+  const { corretor: c, empreendimento: e } = data;
+  const units = generateUnits(data);
+  const typologyIds = data.tipologias.map((t) => q(t.id)).join(", ");
+  const roomIds = data.tipologias
+    .flatMap((t) => t.comodos.map((r) => q(r.id)))
+    .join(", ");
+  const unitNumbers = units.map((u) => q(u.numero)).join(", ");
+
+  const lines = [];
+  const add = (text = "") => lines.push(text);
 
   add(
     "-- GERADO por scripts/seed/gerar-seed.mjs a partir de supabase/seed/residencial-demo.json.",
   );
   add("-- NÃO EDITE À MÃO: altere o JSON e rode `npm run db:seed:gerar`.");
-  add("-- Prédio demo FICTÍCIO. Repetível: IDs fixos + on conflict do update.");
+  add(
+    "-- Prédio demo FICTÍCIO. Repetível: IDs fixos + on conflict do update; o que saiu do JSON é apagado.",
+  );
   add();
 
   add(
@@ -91,7 +143,9 @@ export function gerarSeedSql(dados) {
   add(
     `values ('00000000-0000-0000-0000-000000000000', ${q(c.id)}, 'authenticated', 'authenticated', ${q(c.email)}, now(), ${qJson({ provider: "email", providers: ["email"] })}, ${qJson({ nome: c.nome })}, now(), now(), '', '', '', '')`,
   );
-  add("on conflict (id) do nothing;");
+  add(
+    "on conflict (id) do update set email = excluded.email, raw_user_meta_data = excluded.raw_user_meta_data, updated_at = now();",
+  );
   add();
 
   add("-- O gatilho do cadastro já cria o perfil; aqui completamos os dados.");
@@ -104,7 +158,7 @@ export function gerarSeedSql(dados) {
   );
   add();
 
-  const colunasEmp = [
+  const projectColumns = [
     "id",
     "dono_id",
     "tipo",
@@ -124,7 +178,7 @@ export function gerarSeedSql(dados) {
     "informacoes_conferidas_em",
     "status",
   ];
-  const valoresEmp = [
+  const projectValues = [
     q(e.id),
     q(c.id),
     q(e.tipo),
@@ -144,11 +198,11 @@ export function gerarSeedSql(dados) {
     q(e.informacoes_conferidas_em),
     q(e.status),
   ];
-  add("insert into public.empreendimentos (" + colunasEmp.join(", ") + ")");
-  add("values (" + valoresEmp.join(", ") + ")");
+  add("insert into public.empreendimentos (" + projectColumns.join(", ") + ")");
+  add("values (" + projectValues.join(", ") + ")");
   add(
     "on conflict (id) do update set " +
-      colunasEmp
+      projectColumns
         .filter((col) => col !== "id")
         .map((col) => `${col} = excluded.${col}`)
         .join(", ") +
@@ -161,7 +215,7 @@ export function gerarSeedSql(dados) {
   );
   add("values");
   add(
-    dados.tipologias
+    data.tipologias
       .map(
         (t) =>
           `  (${q(t.id)}, ${q(e.id)}, ${q(t.nome)}, ${t.quartos}, ${t.suites}, ${t.banheiros}, ${t.vagas}, ${t.area_privativa_m2}, ${qJson(t.planta)})`,
@@ -178,18 +232,18 @@ export function gerarSeedSql(dados) {
   );
   add("values");
   add(
-    dados.tipologias
+    data.tipologias
       .flatMap((t) =>
-        t.comodos.map((cm, i) => {
+        t.comodos.map((room, i) => {
           const area =
-            Math.round(areaDoPoligono(cm.geometria.pontos) * 100) / 100;
-          return `  (${q(cm.id)}, ${q(t.id)}, ${q(cm.nome)}, ${q(cm.tipo)}, ${q(cm.descricao)}, ${area}, ${qJson(cm.geometria)}, ${i + 1})`;
+            Math.round(polygonArea(room.geometria.pontos) * 100) / 100;
+          return `  (${q(room.id)}, ${q(t.id)}, ${q(room.nome)}, ${q(room.tipo)}, ${q(room.descricao)}, ${area}, ${qJson(room.geometria)}, ${i + 1})`;
         }),
       )
       .join(",\n"),
   );
   add(
-    "on conflict (id) do update set nome = excluded.nome, tipo = excluded.tipo, descricao = excluded.descricao, area_m2 = excluded.area_m2, geometria = excluded.geometria, ordem = excluded.ordem;",
+    "on conflict (id) do update set tipologia_id = excluded.tipologia_id, nome = excluded.nome, tipo = excluded.tipo, descricao = excluded.descricao, area_m2 = excluded.area_m2, geometria = excluded.geometria, ordem = excluded.ordem;",
   );
   add();
 
@@ -198,7 +252,7 @@ export function gerarSeedSql(dados) {
   );
   add("values");
   add(
-    gerarUnidades(dados)
+    units
       .map(
         (u) =>
           `  (${q(e.id)}, ${q(u.tipologia_id)}, ${u.andar}, ${q(u.numero)}, ${u.posicao}, ${u.preco}, ${u.exibir_preco}, ${q(u.status)})`,
@@ -208,16 +262,18 @@ export function gerarSeedSql(dados) {
   add(
     "on conflict (empreendimento_id, numero) do update set tipologia_id = excluded.tipologia_id, andar = excluded.andar, posicao_no_andar = excluded.posicao_no_andar, preco = excluded.preco, exibir_preco = excluded.exibir_preco, status = excluded.status;",
   );
+  add();
 
-  return linhas.join("\n") + "\n";
-}
+  add("-- Remove do prédio demo o que saiu do JSON (só linhas do demo).");
+  add(
+    `delete from public.comodos where tipologia_id in (${typologyIds}) and id not in (${roomIds});`,
+  );
+  add(
+    `delete from public.unidades where empreendimento_id = ${q(e.id)} and numero not in (${unitNumbers});`,
+  );
+  add(
+    `delete from public.tipologias where empreendimento_id = ${q(e.id)} and id not in (${typologyIds});`,
+  );
 
-export function lerDados() {
-  return JSON.parse(readFileSync(ARQUIVO_JSON, "utf8"));
-}
-
-// Rodando direto (npm run db:seed:gerar): escreve o supabase/seed.sql.
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  writeFileSync(ARQUIVO_SQL, gerarSeedSql(lerDados()));
-  console.log("supabase/seed.sql gerado.");
+  return lines.join("\n") + "\n";
 }

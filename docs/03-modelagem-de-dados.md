@@ -234,7 +234,7 @@ Quando um lead é inserido, o corretor recebe um e-mail (se `perfis.notificar_le
 - `supabase/seed.sql` cria um **prédio demo** (10 andares, 4 unidades por andar, 2 tipologias) para desenvolvimento e para a demo do portfólio. Todos os dados são fictícios.
   - **Fonte única:** `supabase/seed/residencial-demo.json` (corretora, empreendimento, tipologias e cômodos). As 40 unidades são geradas por regra (tipologia por posição, preço por andar, 9º e 10º andares "sob consulta", status pela mesma fórmula do 3D de exemplo).
   - **Gerar:** `npm run db:seed:gerar` (escreve o `seed.sql`; não edite o SQL à mão). Um teste unitário falha se o `seed.sql` estiver desatualizado em relação ao JSON, e outro valida todas as geometrias com o esquema Zod (`src/lib/validacoes/planta.ts`).
-  - **Aplicar no dev:** `npm run db:seed` (`supabase db push --remote --include-seed`). É repetível: IDs fixos e `on conflict do update`.
+  - **Aplicar no dev:** `npm run db:seed` (`supabase db query --remote -f supabase/seed.sql`, pede confirmação). É repetível: IDs fixos, `on conflict do update` e o que saiu do JSON é apagado. *Não use `db push --include-seed` para reaplicar: a CLI v3 roda o seed só na primeira vez e, quando ele muda, apenas atualiza o hash.*
   - A corretora demo não tem senha (não faz login). Os campos de token de `auth.users` vão como `''`, porque o Auth do Supabase não lida bem com `null` neles.
 - Os tipos TypeScript são gerados do banco com `supabase gen types typescript`.
 - **Supabase CLI v3** trabalha no banco **local por padrão**. Para o projeto na nuvem, use `--remote` (ex.: `supabase db push --remote`); a CLI pede confirmação antes de alterar o banco hospedado.

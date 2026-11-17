@@ -19,8 +19,8 @@
     "test:e2e:ui": "playwright test --ui",
     "db:types": "supabase gen types typescript --remote > src/types/database.ts && prettier --write src/types/database.ts",
     "test:rls": "node supabase/tests/rls/rodar.mjs",
-    "db:seed:gerar": "node scripts/seed/gerar-seed.mjs",
-    "db:seed": "supabase db push --remote --include-seed"
+    "db:seed:gerar": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed/cli.mjs",
+    "db:seed": "supabase db query --remote -f supabase/seed.sql"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
