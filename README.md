@@ -35,6 +35,17 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
+## Deploy
+
+**No ar:** https://vitrine3d-jade.vercel.app
+
+O site roda na **Vercel** (plano gratuito), ligada a este repositório no GitHub:
+
+- cada push na `main` publica o site;
+- cada PR ganha um link de prévia próprio, para testar antes do merge;
+- as funções rodam em São Paulo (`gru1`, em `vercel.json`), perto do banco;
+- na Vercel só existem as duas variáveis **públicas** do `.env.example`. Nenhuma chave secreta.
+
 ## Testes
 
 | Comando | O que testa |

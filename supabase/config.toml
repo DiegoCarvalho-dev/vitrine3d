@@ -164,11 +164,18 @@ enabled = false
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://localhost:3000"
+# Site no ar (Vercel, issue #8). Este arquivo espelha o projeto vitrine3d-dev,
+# que atende o localhost E a Vercel; por isso os dois estão aqui. Um projeto de
+# produção separado (no futuro) terá a própria configuração, sem localhost.
+site_url = "https://vitrine3d-jade.vercel.app"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = []
+# Só o desenvolvimento local. As prévias dos PRs na Vercel ficam de fora de
+# propósito: um curinga (*.vercel.app) poderia casar com um site de terceiros e
+# mandar para lá um link de "redefinir senha" (revisão de segurança da #8).
+# Se um dia o login usar links por e-mail nas prévias, liste os endereços exatos.
+additional_redirect_urls = ["http://localhost:3000/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
