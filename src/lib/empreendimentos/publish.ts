@@ -8,6 +8,8 @@ export type PublishFacts = {
   /** Typologies that have at least one room (the floor plan the 3D shows). */
   typologiesWithRooms: number;
   units: number;
+  /** Buildings: units match floors × units per floor (none missing/extra). */
+  unitGridComplete: boolean;
 };
 
 export type PublishRequirement = { label: string; done: boolean };
@@ -20,7 +22,12 @@ export function publishChecklist(facts: PublishFacts): PublishRequirement[] {
       done: facts.typologiesWithRooms > 0,
     },
     ...(facts.isBuilding
-      ? [{ label: "Unidades geradas", done: facts.units > 0 }]
+      ? [
+          {
+            label: "Unidades geradas",
+            done: facts.units > 0 && facts.unitGridComplete,
+          },
+        ]
       : []),
   ];
 }

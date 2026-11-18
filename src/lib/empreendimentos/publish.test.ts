@@ -7,6 +7,7 @@ const complete = {
   hasCover: true,
   typologiesWithRooms: 1,
   units: 40,
+  unitGridComplete: true,
 };
 
 describe("publishChecklist", () => {
@@ -21,6 +22,7 @@ describe("publishChecklist", () => {
       hasCover: false,
       typologiesWithRooms: 0,
       units: 0,
+      unitGridComplete: false,
     };
     expect(canPublish(facts)).toBe(false);
     expect(
@@ -41,6 +43,7 @@ describe("publishChecklist", () => {
       "Pelo menos 1 tipologia com cômodos",
     ],
     [{ ...complete, units: 0 }, "Unidades geradas"],
+    [{ ...complete, unitGridComplete: false }, "Unidades geradas"],
   ])("falta só um item: %j", (facts, missing) => {
     expect(canPublish(facts)).toBe(false);
     expect(

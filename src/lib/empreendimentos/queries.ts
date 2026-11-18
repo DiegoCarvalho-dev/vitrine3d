@@ -5,6 +5,8 @@ import { cache } from "react";
 import { requireUserId } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
+import { planGrid } from "@/lib/validacoes/unidade";
+
 import type { PublishFacts } from "./publish";
 
 /** Strict UUID check: anything else is "not found", never a DB error. */
@@ -74,8 +76,12 @@ export const getMyProjectDetails = cache(async (id: string) => {
       .eq("empreendimento_id", id),
     supabase
       .from("unidades")
-      .select("id", { count: "exact", head: true })
-      .eq("empreendimento_id", id),
+      .select(
+        "id, andar, numero, posicao_no_andar, tipologia_id, preco, exibir_preco, status",
+      )
+      .eq("empreendimento_id", id)
+      .order("andar", { ascending: false })
+      .order("posicao_no_andar"),
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })
@@ -93,9 +99,26 @@ export const getMyProjectDetails = cache(async (id: string) => {
     typologiesWithRooms: (typologies.data ?? []).filter(
       (t) => (t.comodos[0]?.count ?? 0) > 0,
     ).length,
-    units: units.count ?? 0,
+    units: units.data?.length ?? 0,
+    // The grid must match the building size (nothing missing, nothing left
+    // over after the size was reduced) before publishing.
+    unitGridComplete:
+      project.tipo !== "predio" ||
+      (() => {
+        const plan = planGrid(
+          project.numero_andares ?? 0,
+          project.unidades_por_andar ?? 0,
+          units.data ?? [],
+        );
+        return plan.toCreate.length === 0 && plan.outside.length === 0;
+      })(),
   };
-  return { project, facts, leadCount: leads.count ?? 0 };
+  return {
+    project,
+    facts,
+    units: units.data ?? [],
+    leadCount: leads.count ?? 0,
+  };
 });
 
 /** Typologies of one of MY projects, with how many rooms and units use each. */
