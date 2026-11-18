@@ -16,7 +16,8 @@ Plataforma para corretores apresentarem imóveis em 3D por link, com captação 
 - **Fora da Sprint 1:** deploy na Vercel (#8) foi para o Backlog e volta na Sprint 4; visual de edifício real no 3D (#12) também na Sprint 4. Desenvolvimento em `localhost`; celular testa pela Wi-Fi em `http://<ip-do-pc>:3000`.
 - **Supabase CLI v3:** local por padrão; use `--remote` para o projeto na nuvem (ver `docs/03`). Alterações no banco hospedado pedem confirmação do usuário.
 - **Branches:** issues de ambiente/configuração/docs/testes vão **direto na `main`**. Funcionalidades, bugs e tudo que exige cuidado (banco, RLS, login, uploads, formulários públicos, 3D, label `seguranca`) vão em **branch a partir da `main` + PR** (`feat/<n>-descricao`, `fix/<n>-descricao`). Detalhes em `docs/04`. Proteção da `main` entra na Sprint 7.
-- **Rascunho das próximas sprints:** fim de `docs/sprints/sprint-3.md`.
+- **Sprints 4 (Tour do prédio) e 5 (Tour da unidade): aprovadas e criadas no GitHub** (`docs/sprints/sprint-4.md` e `sprint-5.md`). Sprints 6 a 8 só com objetivo (roteiro no fim de `docs/sprints/sprint-5.md`); polimento visual do painel fica na Sprint 8.
+- **Testes e2e:** rodam contra o site compilado (`build` + `start`); durante a issue, só os specs da parte mexida; a suíte inteira uma vez antes do merge (`docs/04`).
 - **O usuário é júnior e está aprendendo:** explique o porquê das decisões, em linguagem simples, e mostre os comandos que ele mesmo pode rodar.
 
 ## Como planejar uma nova sprint
@@ -31,6 +32,7 @@ Ao fim de uma sprint (ou quando o usuário pedir o planejamento da próxima):
    - `modelo:haiku`: docs, textos, configuração e ajustes pequenos e mecânicos.
    Na dúvida, suba um nível. A label é só referência: não pare o trabalho se o modelo em uso for outro.
 5. **Mostre o plano ao usuário e espere a aprovação.** Só então faça o commit e rode `bash scripts/criar-sprint.sh N`.
+6. **Planejamento em ondas:** mantenha sempre a sprint atual e a próxima **detalhadas** (issues no GitHub); as seguintes só como milestone com o objetivo e um roteiro curto. Ao fechar uma sprint, revise a próxima com o que foi aprendido e detalhe a seguinte. Assim o trabalho não para e as issues não envelhecem.
 
 ## Idioma
 - Conversa, issues, commits e documentação em **português**.
