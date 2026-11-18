@@ -19,6 +19,13 @@ import { PublishPanel } from "./publish-panel";
 import { TypologiesSection } from "./tipologias/typologies-section";
 import { UnitsSection } from "./unidades/units-section";
 
+const SECTIONS = [
+  ["capa", "Capa"],
+  ["dados", "Dados"],
+  ["tipologias", "Tipologias"],
+  ["unidades", "Unidades"],
+] as const;
+
 export async function generateMetadata({
   params,
 }: PageProps<"/painel/empreendimentos/[id]">): Promise<Metadata> {
@@ -59,6 +66,13 @@ export default async function ProjectPage({
     deliveryForecast: project.previsao_entrega ?? "",
     checkedAt: project.informacoes_conferidas_em ?? "",
   };
+  // One rule for both the "Unidades" shortcut and the section itself.
+  const unitGrid =
+    project.tipo === "predio" &&
+    project.numero_andares &&
+    project.unidades_por_andar
+      ? { floors: project.numero_andares, perFloor: project.unidades_por_andar }
+      : null;
 
   return (
     <section className="flex max-w-3xl flex-col gap-10">
@@ -76,6 +90,23 @@ export default async function ProjectPage({
           Link:{" "}
           <span className="font-medium text-foreground">/e/{project.slug}</span>
         </p>
+        {/* The page is long: shortcuts to each step of the setup. */}
+        <nav aria-label="Seções do empreendimento" className="mt-4">
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {SECTIONS.filter(
+              ([anchor]) => anchor !== "unidades" || unitGrid !== null,
+            ).map(([anchor, label]) => (
+              <li key={anchor}>
+                <a
+                  href={`#${anchor}`}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
 
       <PublishPanel
@@ -84,33 +115,39 @@ export default async function ProjectPage({
         checklist={publishChecklist(facts)}
       />
 
-      <CoverUpload
-        projectId={project.id}
-        imageUrl={publicImageUrl(
-          getPublicEnv().NEXT_PUBLIC_SUPABASE_URL,
-          project.capa_url,
-        )}
-      />
-
-      <ProjectEditForm
-        projectId={project.id}
-        defaultValues={defaultValues}
-        unitCount={facts.units}
-      />
-
-      <TypologiesSection projectId={project.id} typologies={typologies} />
-
-      {project.tipo === "predio" &&
-      project.numero_andares &&
-      project.unidades_por_andar ? (
-        <UnitsSection
+      <div id="capa" className="scroll-mt-6">
+        <CoverUpload
           projectId={project.id}
-          floors={project.numero_andares}
-          unitsPerFloor={project.unidades_por_andar}
-          units={details.units}
-          typologies={typologies.map(({ id, nome }) => ({ id, nome }))}
-          gridComplete={facts.unitGridComplete}
+          imageUrl={publicImageUrl(
+            getPublicEnv().NEXT_PUBLIC_SUPABASE_URL,
+            project.capa_url,
+          )}
         />
+      </div>
+
+      <div id="dados" className="scroll-mt-6">
+        <ProjectEditForm
+          projectId={project.id}
+          defaultValues={defaultValues}
+          unitCount={facts.units}
+        />
+      </div>
+
+      <div id="tipologias" className="scroll-mt-6">
+        <TypologiesSection projectId={project.id} typologies={typologies} />
+      </div>
+
+      {unitGrid ? (
+        <div id="unidades" className="scroll-mt-6">
+          <UnitsSection
+            projectId={project.id}
+            floors={unitGrid.floors}
+            unitsPerFloor={unitGrid.perFloor}
+            units={details.units}
+            typologies={typologies.map(({ id, nome }) => ({ id, nome }))}
+            gridComplete={facts.unitGridComplete}
+          />
+        </div>
       ) : null}
 
       <section

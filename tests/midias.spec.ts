@@ -1,6 +1,7 @@
-import { expect, type Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 
 import {
+  bigPhoto,
   createBuilding,
   hasSupabaseEnv,
   loggedInTest as test,
@@ -13,38 +14,6 @@ import {
 // direto no banco de desenvolvimento.
 
 const MAX_BYTES = 2 * 1024 * 1024;
-
-/**
- * Gera no navegador uma "foto" PNG grande (3000x2000, degradê com granulado),
- * parecida com a de um celular: vários MB antes da compressão.
- */
-async function bigPhoto(page: Page, hue: number) {
-  const base64 = await page.evaluate((h) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 3000;
-    canvas.height = 2000;
-    const ctx = canvas.getContext("2d")!;
-    const gradient = ctx.createLinearGradient(0, 0, 3000, 2000);
-    gradient.addColorStop(0, `hsl(${h} 60% 70%)`);
-    gradient.addColorStop(1, `hsl(${h + 60} 50% 30%)`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 3000, 2000);
-    const pixels = ctx.getImageData(0, 0, 3000, 2000);
-    for (let i = 0; i < pixels.data.length; i += 4) {
-      const grain = (Math.random() - 0.5) * 24;
-      pixels.data[i] += grain;
-      pixels.data[i + 1] += grain;
-      pixels.data[i + 2] += grain;
-    }
-    ctx.putImageData(pixels, 0, 0);
-    return canvas.toDataURL("image/png").split(",")[1];
-  }, hue);
-  return {
-    name: `foto-${hue}.png`,
-    mimeType: "image/png",
-    buffer: Buffer.from(base64, "base64"),
-  };
-}
 
 type StoredFile = { name: string; size: number };
 const filesIn = (folder: string) =>
