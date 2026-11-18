@@ -49,6 +49,21 @@ describe("planGrid", () => {
   });
 });
 
+describe("térreo e duplicados", () => {
+  it("unidade no térreo (andar 0) não está fora da grade", () => {
+    const { outside } = planGrid(2, 2, [{ andar: 0, posicao_no_andar: 1 }]);
+    expect(outside).toHaveLength(0);
+  });
+
+  it("ids repetidos contam uma vez", () => {
+    const parsed = bulkUnitsSchema.parse({
+      unitIds: [ID, ID],
+      changes: { status: "vendido" },
+    });
+    expect(parsed.unitIds).toEqual([ID]);
+  });
+});
+
 describe("preço em reais", () => {
   it.each([
     ["R$ 450.000,00", 450000],
@@ -93,7 +108,7 @@ describe("bulkUnitsSchema", () => {
     [{ unitIds: ["x"], changes: { status: "vendido" } }],
     [{ unitIds: [ID], changes: {} }],
     [{ unitIds: [ID], changes: { price: "caro" } }],
-    [{ unitIds: Array(501).fill(ID), changes: { status: "vendido" } }],
+    [{ unitIds: ["x", ID], changes: { status: "vendido" } }],
   ])("recusa %#", (input) => {
     expect(bulkUnitsSchema.safeParse(input).success).toBe(false);
   });

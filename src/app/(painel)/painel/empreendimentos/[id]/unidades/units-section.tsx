@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   formatMoney,
+  isOutsideGrid,
   parseMoney,
   UNIT_STATUS,
   type UnitStatus,
@@ -70,9 +71,8 @@ export function UnitsSection({
       map.set(unit.andar, [...(map.get(unit.andar) ?? []), unit]);
     return [...map.entries()].sort((a, b) => b[0] - a[0]);
   }, [units]);
-  const outsideCount = units.filter(
-    (u) =>
-      u.andar < 1 || u.andar > floors || u.posicao_no_andar > unitsPerFloor,
+  const outsideCount = units.filter((u) =>
+    isOutsideGrid(u, floors, unitsPerFloor),
   ).length;
   const count = { disponivel: 0, reservado: 0, vendido: 0 };
   for (const unit of units) count[unit.status]++;
@@ -80,12 +80,14 @@ export function UnitsSection({
   function call(
     action: () => Promise<{ ok?: boolean; error?: string; message?: string }>,
     onSuccess?: () => void,
+    onError?: () => void,
   ) {
     startTransition(async () => {
       try {
         const result = await action();
         if (!result.ok) {
           toast.error(result.error);
+          onError?.();
           return;
         }
         if (result.message) toast.success(result.message);
@@ -94,12 +96,22 @@ export function UnitsSection({
         toast.error(
           "Não foi possível conectar. Verifique a internet e tente de novo.",
         );
+        onError?.();
       }
     });
   }
 
-  const save = (unitIds: string[], changes: Changes, onSuccess?: () => void) =>
-    call(() => updateUnits(projectId, { unitIds, changes }), onSuccess);
+  const save = (
+    unitIds: string[],
+    changes: Changes,
+    onSuccess?: () => void,
+    onError?: () => void,
+  ) =>
+    call(
+      () => updateUnits(projectId, { unitIds, changes }),
+      onSuccess,
+      onError,
+    );
 
   function toggle(ids: string[], on?: boolean) {
     setSelected((current) => {
@@ -115,7 +127,9 @@ export function UnitsSection({
 
   const column = (position: number) =>
     units.filter((u) => u.posicao_no_andar === position).map((u) => u.id);
-  const selectedIds = [...selected];
+  // Only units that still exist (e.g. after "Remover as que estão fora").
+  const existingIds = new Set(units.map((u) => u.id));
+  const selectedIds = [...selected].filter((id) => existingIds.has(id));
 
   function applyBulk(changes: Changes) {
     if (!selectedIds.length) return;
@@ -210,7 +224,8 @@ export function UnitsSection({
           >
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium tabular-nums" aria-live="polite">
-                {selected.size} selecionada{selected.size === 1 ? "" : "s"}
+                {selectedIds.length} selecionada
+                {selectedIds.length === 1 ? "" : "s"}
               </span>
               <span className="text-muted-foreground">
                 · Selecionar finais:
@@ -273,7 +288,9 @@ export function UnitsSection({
               </label>
               <Button
                 size="sm"
-                disabled={pending || !selected.size || bulkTypology === KEEP}
+                disabled={
+                  pending || !selectedIds.length || bulkTypology === KEEP
+                }
                 onClick={() =>
                   applyBulk({
                     typologyId: bulkTypology === NONE ? null : bulkTypology,
@@ -295,7 +312,7 @@ export function UnitsSection({
               </label>
               <Button
                 size="sm"
-                disabled={pending || !selected.size || !bulkPrice.trim()}
+                disabled={pending || !selectedIds.length || !bulkPrice.trim()}
                 onClick={() => applyBulk({ price: bulkPrice })}
               >
                 Aplicar preço
@@ -320,7 +337,7 @@ export function UnitsSection({
               </label>
               <Button
                 size="sm"
-                disabled={pending || !selected.size || !bulkStatus}
+                disabled={pending || !selectedIds.length || !bulkStatus}
                 onClick={() => bulkStatus && applyBulk({ status: bulkStatus })}
               >
                 Aplicar status
@@ -330,7 +347,7 @@ export function UnitsSection({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={pending || !selected.size}
+                disabled={pending || !selectedIds.length}
                 onClick={() => applyBulk({ showPrice: true })}
               >
                 Mostrar preço
@@ -338,7 +355,7 @@ export function UnitsSection({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={pending || !selected.size}
+                disabled={pending || !selectedIds.length}
                 onClick={() => applyBulk({ showPrice: false })}
               >
                 Sob consulta
@@ -388,7 +405,9 @@ export function UnitsSection({
                       typologies={typologies}
                       typologyName={typologyName}
                       disabled={pending}
-                      save={(changes) => save([unit.id], changes)}
+                      save={(changes, onError) =>
+                        save([unit.id], changes, undefined, onError)
+                      }
                     />
                   ))}
                 </tbody>
@@ -416,7 +435,7 @@ function UnitRowView({
   typologies: { id: string; nome: string }[];
   typologyName: Map<string, string>;
   disabled: boolean;
-  save: (changes: Changes) => void;
+  save: (changes: Changes, onError?: () => void) => void;
 }) {
   const [price, setPrice] = useState(formatMoney(unit.preco));
   const label = `Unidade ${unit.numero}`;
@@ -472,7 +491,8 @@ function UnitRowView({
             }
             if (parsed === unit.preco) return;
             setPrice(formatMoney(parsed));
-            save({ price });
+            // Not saved: show the stored price again.
+            save({ price }, () => setPrice(formatMoney(unit.preco)));
           }}
         />
       </td>

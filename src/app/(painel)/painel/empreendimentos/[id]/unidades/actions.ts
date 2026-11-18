@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { requireUserId } from "@/lib/auth/session";
 import { getMyProject } from "@/lib/empreendimentos/queries";
+import { chunks, fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { projectIdSchema } from "@/lib/validacoes/empreendimento";
 import {
   bulkUnitsSchema,
-  MAX_UNITS_PER_REQUEST,
   planGrid,
+  UNITS_CHUNK,
 } from "@/lib/validacoes/unidade";
 
 // Units of a project (issue #33). Every action: session user + Zod + the
@@ -55,10 +56,14 @@ export async function generateUnits(
   }
 
   const supabase = await createClient();
-  const { data: existing, error } = await supabase
-    .from("unidades")
-    .select("andar, posicao_no_andar")
-    .eq("empreendimento_id", project.id);
+  const { data: existing, error } = await fetchAll((from, to) =>
+    supabase
+      .from("unidades")
+      .select("id, andar, posicao_no_andar")
+      .eq("empreendimento_id", project.id)
+      .order("id")
+      .range(from, to),
+  );
   if (error) return { error: "Não foi possível gerar agora. Tente de novo." };
 
   const { toCreate, outside } = planGrid(
@@ -66,12 +71,12 @@ export async function generateUnits(
     project.unidades_por_andar,
     existing,
   );
-  for (let i = 0; i < toCreate.length; i += MAX_UNITS_PER_REQUEST) {
+  for (let i = 0; i < toCreate.length; i += UNITS_CHUNK) {
     const { error: insertError } = await supabase
       .from("unidades")
       .insert(
         toCreate
-          .slice(i, i + MAX_UNITS_PER_REQUEST)
+          .slice(i, i + UNITS_CHUNK)
           .map((unit) => ({ ...unit, empreendimento_id: project.id })),
       );
     // 23505: created in another tab meanwhile; generating again fills the rest.
@@ -103,10 +108,14 @@ export async function removeUnitsOutsideGrid(
   if (!project || project.tipo !== "predio") return NOT_FOUND;
 
   const supabase = await createClient();
-  const { data: existing, error } = await supabase
-    .from("unidades")
-    .select("id, andar, posicao_no_andar, leads(count)")
-    .eq("empreendimento_id", project.id);
+  const { data: existing, error } = await fetchAll((from, to) =>
+    supabase
+      .from("unidades")
+      .select("id, andar, posicao_no_andar, leads(count)")
+      .eq("empreendimento_id", project.id)
+      .order("id")
+      .range(from, to),
+  );
   if (error) return { error: "Não foi possível remover agora. Tente de novo." };
 
   const { outside } = planGrid(
@@ -116,15 +125,15 @@ export async function removeUnitsOutsideGrid(
   );
   const removable = outside.filter((u) => (u.leads[0]?.count ?? 0) === 0);
   const kept = outside.length - removable.length;
-  if (removable.length) {
+  for (const part of chunks(
+    removable.map((u) => u.id),
+    UNITS_CHUNK,
+  )) {
     const { error: deleteError } = await supabase
       .from("unidades")
       .delete()
       .eq("empreendimento_id", project.id)
-      .in(
-        "id",
-        removable.map((u) => u.id),
-      );
+      .in("id", part);
     if (deleteError)
       return { error: "Não foi possível remover agora. Tente de novo." };
   }
@@ -134,7 +143,7 @@ export async function removeUnitsOutsideGrid(
     message:
       `${plural(removable.length, "unidade removida", "unidades removidas")}.` +
       (kept
-        ? ` ${plural(kept, "unidade tem", "unidades têm")} contatos de clientes e ficou: mude o número dela ou ajuste o tamanho do prédio.`
+        ? ` ${plural(kept, "unidade tem", "unidades têm")} contatos de clientes e não foi apagada, para manter a ligação com eles. Para publicar, volte o tamanho do prédio para incluí-la.`
         : ""),
   };
 }
@@ -159,13 +168,20 @@ export async function updateUnits(
   const { unitIds, changes } = parsed.data;
   const supabase = await createClient();
 
-  // Every unit and the typology must belong to THIS project.
-  const { count } = await supabase
-    .from("unidades")
-    .select("id", { count: "exact", head: true })
-    .eq("empreendimento_id", project.id)
-    .in("id", unitIds);
-  if (count !== new Set(unitIds).size)
+  // Every unit and the typology must belong to THIS project. Chunks keep
+  // each request's URL short (ids go in the query string).
+  const parts = chunks(unitIds, UNITS_CHUNK);
+  let found = 0;
+  for (const part of parts) {
+    const { count, error } = await supabase
+      .from("unidades")
+      .select("id", { count: "exact", head: true })
+      .eq("empreendimento_id", project.id)
+      .in("id", part);
+    if (error) return { error: "Não foi possível salvar. Tente de novo." };
+    found += count ?? 0;
+  }
+  if (found !== unitIds.length)
     return { error: "Alguma unidade não é deste empreendimento." };
   if (changes.typologyId) {
     const { data: typology } = await supabase
@@ -188,12 +204,14 @@ export async function updateUnits(
   if (changes.showPrice !== undefined) patch.exibir_preco = changes.showPrice;
   if (changes.status !== undefined) patch.status = changes.status;
 
-  const { error } = await supabase
-    .from("unidades")
-    .update(patch)
-    .eq("empreendimento_id", project.id)
-    .in("id", unitIds);
-  if (error) return { error: "Não foi possível salvar. Tente de novo." };
+  for (const part of parts) {
+    const { error } = await supabase
+      .from("unidades")
+      .update(patch)
+      .eq("empreendimento_id", project.id)
+      .in("id", part);
+    if (error) return { error: "Não foi possível salvar. Tente de novo." };
+  }
   refresh(project.id);
   return {
     ok: true,

@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { requireUserId } from "@/lib/auth/session";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 
 import { planGrid } from "@/lib/validacoes/unidade";
@@ -74,14 +75,17 @@ export const getMyProjectDetails = cache(async (id: string) => {
       .from("tipologias")
       .select("id, comodos(count)")
       .eq("empreendimento_id", id),
-    supabase
-      .from("unidades")
-      .select(
-        "id, andar, numero, posicao_no_andar, tipologia_id, preco, exibir_preco, status",
-      )
-      .eq("empreendimento_id", id)
-      .order("andar", { ascending: false })
-      .order("posicao_no_andar"),
+    fetchAll((from, to) =>
+      supabase
+        .from("unidades")
+        .select(
+          "id, andar, numero, posicao_no_andar, tipologia_id, preco, exibir_preco, status",
+        )
+        .eq("empreendimento_id", id)
+        .order("andar", { ascending: false })
+        .order("posicao_no_andar")
+        .range(from, to),
+    ),
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })

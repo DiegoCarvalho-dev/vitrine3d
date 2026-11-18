@@ -22,6 +22,14 @@ export { unitNumber };
 type Slot = { andar: number; posicao_no_andar: number };
 
 /**
+ * A unit beyond the building size (after it was reduced). Floor 0 (térreo)
+ * is allowed: the grid starts at floor 1, but a ground-floor unit is valid.
+ */
+export function isOutsideGrid(unit: Slot, floors: number, perFloor: number) {
+  return unit.andar > floors || unit.posicao_no_andar > perFloor;
+}
+
+/**
  * What "Gerar unidades" does for a building of `floors` × `perFloor`:
  * the missing slots to create (existing ones are never duplicated) and the
  * existing units that fall OUTSIDE the size (after the size was reduced).
@@ -50,9 +58,7 @@ export function planGrid<T extends Slot>(
       }
     }
   }
-  const outside = existing.filter(
-    (u) => u.andar < 1 || u.andar > floors || u.posicao_no_andar > perFloor,
-  );
+  const outside = existing.filter((u) => isOutsideGrid(u, floors, perFloor));
   return { toCreate, outside };
 }
 
@@ -78,8 +84,10 @@ const uuid = z
   .string()
   .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
-/** Most units sent in one request (a 50-floor × 10 building = 500). */
-export const MAX_UNITS_PER_REQUEST = 500;
+/** Most units in one request: the largest building the DB allows (200 × 50). */
+export const MAX_UNITS_PER_REQUEST = 10_000;
+/** The server works in chunks of this size (keeps each API URL short). */
+export const UNITS_CHUNK = 200;
 
 /** Bulk edit: apply the same changes to several units of one project. */
 export const bulkUnitsSchema = z.object({
@@ -89,7 +97,8 @@ export const bulkUnitsSchema = z.object({
     .max(
       MAX_UNITS_PER_REQUEST,
       `No máximo ${MAX_UNITS_PER_REQUEST} unidades por vez.`,
-    ),
+    )
+    .transform((ids) => [...new Set(ids)]), // duplicates count once
   changes: z
     .object({
       typologyId: uuid.nullable().optional(),

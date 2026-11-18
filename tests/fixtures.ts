@@ -47,7 +47,8 @@ export function runSql(sql: string) {
 export async function createBuilding(page: Page, name: string) {
   await page.goto("/painel");
   await page.getByRole("link", { name: "Novo empreendimento" }).click();
-  await expect(page).toHaveURL(/\/novo$/);
+  // 30 s: in dev the page may be compiling for the first time.
+  await expect(page).toHaveURL(/\/novo$/, { timeout: 30_000 });
   await expect(async () => {
     await page.getByLabel("Nome do empreendimento").fill(name);
     await expect(page.getByTestId("slug-preview")).toBeVisible({
