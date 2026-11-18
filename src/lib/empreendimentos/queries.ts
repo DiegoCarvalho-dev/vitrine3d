@@ -121,3 +121,39 @@ export async function listMyTypologies(projectId: string) {
   }));
 }
 export type MyTypology = Awaited<ReturnType<typeof listMyTypologies>>[number];
+
+/** A typology of one of MY projects (null for anything else: callers show 404). */
+export const getMyTypology = cache(
+  async (projectId: string, typologyId: string) => {
+    if (!isUuid(typologyId)) return null;
+    const project = await getMyProject(projectId);
+    if (!project) return null;
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("tipologias")
+      .select("id, nome, area_privativa_m2")
+      .eq("id", typologyId)
+      .eq("empreendimento_id", project.id)
+      .maybeSingle();
+    if (error)
+      throw new Error(
+        `Não foi possível carregar a tipologia: ${error.message}`,
+      );
+    return data ? { project, typology: data } : null;
+  },
+);
+
+/** Rooms of a typology (caller already checked ownership), in display order. */
+export async function listRooms(typologyId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("comodos")
+    .select("id, nome, tipo, descricao, area_m2, geometria, ordem")
+    .eq("tipologia_id", typologyId)
+    .order("ordem")
+    .order("nome");
+  if (error)
+    throw new Error(`Não foi possível carregar os cômodos: ${error.message}`);
+  return data;
+}
+export type RoomRow = Awaited<ReturnType<typeof listRooms>>[number];
