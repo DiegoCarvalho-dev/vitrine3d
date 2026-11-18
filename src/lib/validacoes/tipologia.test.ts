@@ -19,6 +19,8 @@ describe("parseDecimal", () => {
     ["65.5", 65.5],
     ["1.234,56", 1234.56],
     [" 3,25 ", 3.25],
+    ["1.200", 1200],
+    ["12.500.000", 12500000],
   ])("%s → %d", (text, value) => {
     expect(parseDecimal(text)).toBe(value);
   });

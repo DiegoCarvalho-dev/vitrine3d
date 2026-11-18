@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { countField } from "./numero";
+
 // Project (empreendimento) forms. Same rules as the database
 // (supabase/migrations/20261116215353_perfis_empreendimentos.sql).
 
@@ -39,20 +41,8 @@ export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const projectTypeSchema = z.enum(["predio", "casa"]);
 export type ProjectType = z.infer<typeof projectTypeSchema>;
 
-const wholeNumber = (label: string, min: number, max: number) =>
-  z
-    .string()
-    .min(1, `Informe ${label}.`)
-    // Only digits: Number() would also accept "1e2", "0x10" and "0b11".
-    .regex(/^\d+$/, `Use só números em ${label}.`)
-    .pipe(z.coerce.number({ message: `Informe ${label}.` }))
-    .pipe(
-      z
-        .number()
-        .int(`Use um número inteiro em ${label}.`)
-        .min(min, `${label[0].toUpperCase()}${label.slice(1)}: mínimo ${min}.`)
-        .max(max, `${label[0].toUpperCase()}${label.slice(1)}: máximo ${max}.`),
-    );
+// Shared with the other forms (src/lib/validacoes/numero.ts).
+const wholeNumber = countField;
 
 const baseFields = {
   type: projectTypeSchema,

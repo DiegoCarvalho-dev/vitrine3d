@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -65,7 +64,14 @@ export function TypologiesSection({
   typologies: TypologyItem[];
 }) {
   // Which dialog is open: "new", a typology to edit, or one to delete.
-  const [editing, setEditing] = useState<TypologyItem | "new" | null>(null);
+  const [editing, setEditingState] = useState<TypologyItem | "new" | null>(
+    null,
+  );
+  const [openCount, setOpenCount] = useState(0);
+  const setEditing = (value: TypologyItem | "new" | null) => {
+    if (value !== null) setOpenCount((n) => n + 1);
+    setEditingState(value);
+  };
   const [deleting, setDeleting] = useState<TypologyItem | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -122,15 +128,10 @@ export function TypologiesSection({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`/painel/empreendimentos/${projectId}/tipologias/${t.id}`}
-                  className={buttonVariants({ size: "sm" })}
-                >
-                  Cômodos
-                </Link>
                 <Button
                   size="sm"
                   variant="outline"
+                  disabled={pending}
                   onClick={() => setEditing(t)}
                 >
                   Editar
@@ -151,6 +152,7 @@ export function TypologiesSection({
                 <Button
                   size="sm"
                   variant="ghost"
+                  disabled={pending}
                   onClick={() => setDeleting(t)}
                 >
                   Excluir
@@ -161,15 +163,21 @@ export function TypologiesSection({
         </ul>
       )}
 
-      <TypologyFormDialog
-        projectId={projectId}
-        typologyId={editing && editing !== "new" ? editing.id : undefined}
-        defaultValues={
-          editing && editing !== "new" ? toInput(editing) : EMPTY_TYPOLOGY
-        }
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
-      />
+      {editing !== null && (
+        <TypologyFormDialog
+          // A fresh form every time it opens: no leftover text or errors.
+          key={
+            editing === "new"
+              ? `new-${openCount}`
+              : `${editing.id}-${openCount}`
+          }
+          projectId={projectId}
+          typologyId={editing === "new" ? undefined : editing.id}
+          defaultValues={editing === "new" ? EMPTY_TYPOLOGY : toInput(editing)}
+          open
+          onOpenChange={(open) => !open && setEditing(null)}
+        />
+      )}
 
       <Dialog
         open={deleting !== null}

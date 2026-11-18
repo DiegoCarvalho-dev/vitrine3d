@@ -148,19 +148,27 @@ export async function duplicateTypology(
   if (source.error || names.error || rooms.error)
     return { error: "Não foi possível duplicar agora. Tente de novo." };
 
-  const { data: copy, error } = await supabase
-    .from("tipologias")
-    .insert({
-      empreendimento_id: loaded.project.id,
-      nome: copyName(
-        loaded.typology.nome,
-        names.data.map((t) => t.nome),
-      ),
-      ...source.data,
-    })
-    .select("id")
-    .single();
-  if (error)
+  // planta_imagem_url is NOT copied: two typologies sharing one file would
+  // break when either is deleted. (Hotspots arrive in Sprint 6.)
+  const taken = names.data.map((t) => t.nome);
+  let copy: { id: string } | null = null;
+  for (let attempt = 0; attempt < 3 && !copy; attempt++) {
+    const name = copyName(loaded.typology.nome, taken);
+    const { data, error } = await supabase
+      .from("tipologias")
+      .insert({
+        empreendimento_id: loaded.project.id,
+        nome: name,
+        ...source.data,
+      })
+      .select("id")
+      .single();
+    if (data) copy = data;
+    else if (error?.code === "23505")
+      taken.push(name); // created meanwhile: next suffix
+    else break;
+  }
+  if (!copy)
     return { error: "Não foi possível duplicar agora. Tente de novo." };
 
   if (rooms.data.length) {

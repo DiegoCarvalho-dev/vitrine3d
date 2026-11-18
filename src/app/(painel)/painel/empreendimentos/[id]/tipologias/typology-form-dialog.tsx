@@ -57,7 +57,7 @@ export function TypologyFormDialog({
   const [formError, setFormError] = useState<string>();
   const form = useForm<TypologyInput, unknown, TypologyData>({
     resolver: zodResolver(typologySchema),
-    values: defaultValues, // resets when another typology is opened
+    defaultValues, // the dialog is remounted on each open
   });
   const { errors, isSubmitting } = form.formState;
   const editing = Boolean(typologyId);

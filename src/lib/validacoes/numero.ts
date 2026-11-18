@@ -6,10 +6,14 @@ import { z } from "zod";
 export function parseDecimal(text: string): number | null {
   const clean = text.trim().replace(/\s/g, "");
   if (!clean) return null;
-  // With a comma, dots are thousands separators; without, a dot is the decimal.
+  // With a comma, dots are thousands separators ("1.234,56"). Without a
+  // comma, "1.200" / "12.500.000" (groups of 3) are thousands too, as written
+  // in Brazil; otherwise a single dot is the decimal ("65.5").
   const normalized = clean.includes(",")
     ? clean.replace(/\./g, "").replace(",", ".")
-    : clean;
+    : /^\d{1,3}(\.\d{3})+$/.test(clean)
+      ? clean.replace(/\./g, "")
+      : clean;
   if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
   const value = Number(normalized);
   return Number.isFinite(value) ? value : null;
@@ -21,39 +25,15 @@ export function formatDecimal(value: number | null | undefined): string {
   return String(value).replace(".", ",");
 }
 
-/** Required decimal from a text field, within [min, max]. */
-export const decimalField = (label: string, min: number, max: number) =>
-  z
+/** Whole number from a text field: only digits ("1e2", "0x10" are refused). */
+export const countField = (label: string, min: number, max: number) => {
+  const cap = `${label[0].toUpperCase()}${label.slice(1)}`;
+  return z
     .string()
     .trim()
     .min(1, `Informe ${label}.`)
-    .transform((text, ctx) => {
-      const value = parseDecimal(text);
-      if (value === null) {
-        ctx.addIssue({
-          code: "custom",
-          message: `Use só números em ${label} (ex.: 3,5).`,
-        });
-        return z.NEVER;
-      }
-      if (value < min || value > max) {
-        ctx.addIssue({
-          code: "custom",
-          message: `${label[0].toUpperCase()}${label.slice(1)}: entre ${formatDecimal(min)} e ${formatDecimal(max)}.`,
-        });
-        return z.NEVER;
-      }
-      return value;
-    });
-
-/** Whole number from a text field (only digits), within [min, max]. */
-export const countField = (label: string, min: number, max: number) =>
-  z
-    .string()
-    .trim()
     .regex(/^\d+$/, `Use só números inteiros em ${label}.`)
     .transform(Number)
-    .refine(
-      (n) => n >= min && n <= max,
-      `${label[0].toUpperCase()}${label.slice(1)}: de ${min} a ${max}.`,
-    );
+    .refine((v) => v >= min, `${cap}: mínimo ${min}.`)
+    .refine((v) => v <= max, `${cap}: máximo ${max}.`);
+};
