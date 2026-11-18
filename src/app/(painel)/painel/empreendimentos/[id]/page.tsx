@@ -6,6 +6,7 @@ import { publishChecklist } from "@/lib/empreendimentos/publish";
 import {
   getMyProject,
   getMyProjectDetails,
+  listMyTypologies,
 } from "@/lib/empreendimentos/queries";
 import { getPublicEnv } from "@/lib/env";
 import type { UpdateProjectInput } from "@/lib/validacoes/empreendimento";
@@ -15,6 +16,7 @@ import { CoverUpload } from "./cover-upload";
 import { DeleteProject } from "./delete-project";
 import { ProjectEditForm } from "./project-edit-form";
 import { PublishPanel } from "./publish-panel";
+import { TypologiesSection } from "./tipologias/typologies-section";
 
 export async function generateMetadata({
   params,
@@ -29,7 +31,12 @@ export async function generateMetadata({
 export default async function ProjectPage({
   params,
 }: PageProps<"/painel/empreendimentos/[id]">) {
-  const details = await getMyProjectDetails((await params).id);
+  const { id } = await params;
+  // In parallel: both check ownership (cached getMyProject).
+  const [details, typologies] = await Promise.all([
+    getMyProjectDetails(id),
+    listMyTypologies(id),
+  ]);
   // Someone else's (or a non-existent) project: 404, never "forbidden", so we
   // don't confirm that the id exists.
   if (!details) notFound();
@@ -90,20 +97,7 @@ export default async function ProjectPage({
         unitCount={facts.units}
       />
 
-      <section
-        aria-labelledby="typologies-title"
-        className="flex flex-col gap-2"
-      >
-        <h2
-          id="typologies-title"
-          className="font-heading text-xl font-semibold"
-        >
-          Tipologias
-        </h2>
-        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-          Em breve: as plantas (tipologias) e os cômodos de cada uma.
-        </p>
-      </section>
+      <TypologiesSection projectId={project.id} typologies={typologies} />
 
       <section aria-labelledby="units-title" className="flex flex-col gap-2">
         <h2 id="units-title" className="font-heading text-xl font-semibold">
