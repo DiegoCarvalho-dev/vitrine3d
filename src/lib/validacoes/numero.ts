@@ -19,6 +19,18 @@ export function parseDecimal(text: string): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Small measures in meters ("2,75", "2.75", "2.750"): a dot is ALWAYS the
+ * decimal here (nobody types a 2,750 m ceiling); no thousands separators.
+ */
+export function parseMeters(text: string): number | null {
+  const normalized = text.trim().replace(/\s/g, "").replace(",", ".");
+  if (!normalized) return null;
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : null;
+}
+
 /** Formats for an input field with a comma ("65,5"); empty for null. */
 export function formatDecimal(value: number | null | undefined): string {
   if (value === null || value === undefined) return "";

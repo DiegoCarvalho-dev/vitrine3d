@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -128,6 +129,12 @@ export function TypologiesSection({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/painel/empreendimentos/${projectId}/tipologias/${t.id}`}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  Cômodos
+                </Link>
                 <Button
                   size="sm"
                   variant="outline"
