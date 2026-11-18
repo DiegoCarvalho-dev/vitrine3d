@@ -142,5 +142,16 @@ test.describe("Cômodos e prévia da planta", () => {
         timeout: 15_000,
       },
     );
+
+    // Excluir pede confirmação.
+    await page
+      .getByTestId("room-item")
+      .filter({ hasText: "Sala" })
+      .getByRole("button", { name: "Excluir" })
+      .click();
+    await page.getByRole("button", { name: "Excluir cômodo" }).click();
+    await expect(page.getByTestId("room-item")).toHaveCount(1, {
+      timeout: 15_000,
+    });
   });
 });

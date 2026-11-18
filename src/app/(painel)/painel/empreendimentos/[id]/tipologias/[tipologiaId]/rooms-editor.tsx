@@ -13,6 +13,14 @@ import {
 import { describedBy, FormField } from "@/components/form-field";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -20,6 +28,7 @@ import {
   polygonToRect,
   type Rect,
   rectToPolygon,
+  roundArea,
 } from "@/lib/planta/geometry";
 import {
   ROOM_TYPES,
@@ -28,7 +37,7 @@ import {
   roomFormSchema,
   type RoomType,
 } from "@/lib/validacoes/comodo";
-import { formatDecimal, parseDecimal } from "@/lib/validacoes/numero";
+import { formatDecimal, parseMeters } from "@/lib/validacoes/numero";
 
 import { createRoom, deleteRoom, moveRoom, updateRoom } from "./actions";
 
@@ -72,7 +81,7 @@ function draftRect(values: Partial<RoomFormInput>): Rect | null {
     values.y,
     values.width,
     values.depth,
-  ].map((v) => parseDecimal(v ?? ""));
+  ].map((v) => parseMeters(v ?? ""));
   if (x === null || y === null || width === null || depth === null) return null;
   if (width < 0.5 || depth < 0.5 || x + width > 100 || y + depth > 100)
     return null;
@@ -102,6 +111,7 @@ export function RoomsEditor({
   );
   const [formKey, setFormKey] = useState(0);
   const [pending, startTransition] = useTransition();
+  const [deleting, setDeleting] = useState<EditorRoom | null>(null);
 
   function open(room: EditorRoom | "new") {
     setSelected(room);
@@ -109,17 +119,24 @@ export function RoomsEditor({
   }
 
   const editingRoom = selected && selected !== "new" ? selected : null;
-  const totalArea = rooms.reduce((sum, room) => sum + room.area, 0);
+  // Rounded like the stored areas, so 0.1 + 0.2 doesn't "pass" 0.3.
+  const totalArea =
+    Math.round(rooms.reduce((sum, room) => sum + room.area, 0) * 100) / 100;
 
   function run(
     action: () => Promise<{ ok?: boolean; error?: string }>,
     success?: string,
+    onSuccess?: () => void,
   ) {
     startTransition(async () => {
       try {
         const result = await action();
-        if (!result.ok) toast.error(result.error);
-        else if (success) toast.success(success);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        if (success) toast.success(success);
+        onSuccess?.();
       } catch {
         toast.error(
           "Não foi possível conectar. Verifique a internet e tente de novo.",
@@ -237,13 +254,7 @@ export function RoomsEditor({
                   size="sm"
                   variant="ghost"
                   disabled={pending}
-                  onClick={() => {
-                    if (editingRoom?.id === room.id) setSelected(null);
-                    run(
-                      () => deleteRoom(projectId, typologyId, room.id),
-                      `“${room.name}” excluído.`,
-                    );
-                  }}
+                  onClick={() => setDeleting(room)}
                 >
                   Excluir
                 </Button>
@@ -252,6 +263,48 @@ export function RoomsEditor({
           </ol>
         )}
       </section>
+
+      <Dialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir “{deleting?.name}”?</DialogTitle>
+            <DialogDescription>
+              O cômodo sai da planta. Pontos de interesse ligados a ele também
+              são apagados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleting(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => {
+                const target = deleting;
+                if (!target) return;
+                setDeleting(null);
+                run(
+                  () => deleteRoom(projectId, typologyId, target.id),
+                  `“${target.name}” excluído.`,
+                  // Close the form only if the deleted room was open in it.
+                  () =>
+                    setSelected((current) =>
+                      current && current !== "new" && current.id === target.id
+                        ? null
+                        : current,
+                    ),
+                );
+              }}
+            >
+              Excluir cômodo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -292,7 +345,7 @@ function RoomForm({
     try {
       const input = form.getValues(); // raw text: validated again on the server
       const result = room
-        ? await updateRoom(projectId, typologyId, room.id, input, specialShape)
+        ? await updateRoom(projectId, typologyId, room.id, input)
         : await createRoom(projectId, typologyId, input);
       if (result.ok) {
         toast.success(room ? "Cômodo salvo." : "Cômodo criado.");
@@ -409,7 +462,7 @@ function RoomForm({
               >
                 {overlap
                   ? `Fica em cima de “${overlap.name}”. Ajuste a posição ou o tamanho.`
-                  : `Área: ${formatDecimal(Math.round(rect.width * rect.depth * 100) / 100)} m²`}
+                  : `Área: ${formatDecimal(roundArea(rectToPolygon(rect)))} m²`}
               </p>
             )}
           </>

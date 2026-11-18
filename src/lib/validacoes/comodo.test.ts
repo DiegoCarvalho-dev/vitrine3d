@@ -35,6 +35,14 @@ describe("roomFormSchema", () => {
     );
   });
 
+  it.each([
+    ["2.750", 2.75],
+    ["2,75", 2.75],
+    ["1.250", 1.25],
+  ])("em metros, ponto é sempre decimal: %s → %d", (text, value) => {
+    expect(roomFormSchema.parse({ ...sala, width: text }).width).toBe(value);
+  });
+
   it("não deixa passar de 100 m", () => {
     const result = roomFormSchema.safeParse({ ...sala, x: "98", width: "5" });
     expect(result.success).toBe(false);

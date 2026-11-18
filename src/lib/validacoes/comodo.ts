@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { rectToPolygon } from "@/lib/planta/geometry";
 
-import { parseDecimal } from "./numero";
+import { parseMeters } from "./numero";
 import { roomGeometrySchema } from "./planta";
 
 // Room (cômodo) form, issue #32. Until the visual editor (Sprint 8) a room is
@@ -34,7 +34,7 @@ const meters = (label: string, min: number, max: number) =>
     .trim()
     .min(1, `Informe ${label}.`)
     .transform((text, ctx) => {
-      const value = parseDecimal(text);
+      const value = parseMeters(text);
       if (value === null) {
         ctx.addIssue({
           code: "custom",

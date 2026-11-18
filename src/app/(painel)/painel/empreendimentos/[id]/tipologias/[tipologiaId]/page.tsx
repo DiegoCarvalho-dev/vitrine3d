@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getMyTypology, listRooms } from "@/lib/empreendimentos/queries";
-import { polygonArea, roomGeometrySchema } from "@/lib/validacoes/planta";
+import { roundArea } from "@/lib/planta/geometry";
+import { roomGeometrySchema } from "@/lib/validacoes/planta";
 
 import { type EditorRoom, RoomsEditor } from "./rooms-editor";
 
@@ -35,9 +36,7 @@ export default async function TypologyPage({ params }: Props) {
         type: room.tipo,
         description: room.descricao,
         points: geometry.data.pontos,
-        area:
-          room.area_m2 ??
-          Math.round(polygonArea(geometry.data.pontos) * 100) / 100,
+        area: room.area_m2 ?? roundArea(geometry.data.pontos),
         ceilingHeight: geometry.data.pe_direito,
       },
     ];

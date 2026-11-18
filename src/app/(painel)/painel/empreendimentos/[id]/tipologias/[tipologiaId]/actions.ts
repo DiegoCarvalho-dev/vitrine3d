@@ -9,7 +9,12 @@ import {
   listRooms,
   type RoomRow,
 } from "@/lib/empreendimentos/queries";
-import { findOverlap, type Rect, roundArea } from "@/lib/planta/geometry";
+import {
+  findOverlap,
+  polygonToRect,
+  type Rect,
+  roundArea,
+} from "@/lib/planta/geometry";
 import { createClient } from "@/lib/supabase/server";
 import {
   rectGeometry,
@@ -106,25 +111,28 @@ export async function createRoom(
 }
 
 /**
- * Updates a room. `keepShape` = only name/type/description (rooms with a
- * special shape, e.g. an L from the demo, until the visual editor arrives).
+ * Updates a room. Rooms with a special shape (not a rectangle, e.g. an L from
+ * the demo) keep their shape: only name/type/description change, until the
+ * visual editor arrives. The server decides this from the stored shape.
  */
 export async function updateRoom(
   rawProjectId: unknown,
   rawTypologyId: unknown,
   rawRoomId: unknown,
   input: unknown,
-  keepShape: unknown = false,
 ): Promise<RoomResult> {
   const loaded = await load(rawProjectId, rawTypologyId);
   const roomId = idSchema.safeParse(rawRoomId);
   if (!loaded || !roomId.success) return NOT_FOUND;
   const rooms = await listRooms(loaded.typology.id);
-  if (!rooms.some((room) => room.id === roomId.data))
-    return { error: "Cômodo não encontrado." };
+  const stored = rooms.find((room) => room.id === roomId.data);
+  if (!stored) return { error: "Cômodo não encontrado." };
+  const storedShape = roomGeometrySchema.safeParse(stored.geometria);
+  const keepShape =
+    storedShape.success && polygonToRect(storedShape.data.pontos) === null;
 
   let changes;
-  if (keepShape === true) {
+  if (keepShape) {
     const details = roomDetailsSchema.safeParse(input);
     if (!details.success) return firstIssue(details.error);
     changes = {
@@ -193,7 +201,10 @@ export async function moveRoom(
   const direction = z.enum(["up", "down"]).safeParse(rawDirection);
   if (!loaded || !roomId.success || !direction.success) return NOT_FOUND;
 
-  const rooms = await listRooms(loaded.typology.id);
+  // Same rooms the page shows (rows with an invalid shape are hidden there).
+  const rooms = (await listRooms(loaded.typology.id)).filter(
+    (room) => roomGeometrySchema.safeParse(room.geometria).success,
+  );
   const from = rooms.findIndex((room) => room.id === roomId.data);
   if (from < 0) return { error: "Cômodo não encontrado." };
   const to = direction.data === "up" ? from - 1 : from + 1;
