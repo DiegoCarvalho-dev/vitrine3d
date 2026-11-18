@@ -97,3 +97,27 @@ export const getMyProjectDetails = cache(async (id: string) => {
   };
   return { project, facts, leadCount: leads.count ?? 0 };
 });
+
+/** Typologies of one of MY projects, with how many rooms and units use each. */
+export async function listMyTypologies(projectId: string) {
+  const project = await getMyProject(projectId);
+  if (!project) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tipologias")
+    .select(
+      "id, nome, quartos, suites, banheiros, vagas, area_privativa_m2, comodos(count), unidades(count)",
+    )
+    .eq("empreendimento_id", projectId)
+    .order("nome");
+  if (error)
+    throw new Error(
+      `Não foi possível carregar as tipologias: ${error.message}`,
+    );
+  return data.map(({ comodos, unidades, ...typology }) => ({
+    ...typology,
+    roomCount: comodos[0]?.count ?? 0,
+    unitCount: unidades[0]?.count ?? 0,
+  }));
+}
+export type MyTypology = Awaited<ReturnType<typeof listMyTypologies>>[number];
