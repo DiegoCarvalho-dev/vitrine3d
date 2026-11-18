@@ -66,6 +66,13 @@ export default async function ProjectPage({
     deliveryForecast: project.previsao_entrega ?? "",
     checkedAt: project.informacoes_conferidas_em ?? "",
   };
+  // One rule for both the "Unidades" shortcut and the section itself.
+  const unitGrid =
+    project.tipo === "predio" &&
+    project.numero_andares &&
+    project.unidades_por_andar
+      ? { floors: project.numero_andares, perFloor: project.unidades_por_andar }
+      : null;
 
   return (
     <section className="flex max-w-3xl flex-col gap-10">
@@ -87,7 +94,7 @@ export default async function ProjectPage({
         <nav aria-label="Seções do empreendimento" className="mt-4">
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {SECTIONS.filter(
-              ([anchor]) => anchor !== "unidades" || project.tipo === "predio",
+              ([anchor]) => anchor !== "unidades" || unitGrid !== null,
             ).map(([anchor, label]) => (
               <li key={anchor}>
                 <a
@@ -130,14 +137,12 @@ export default async function ProjectPage({
         <TypologiesSection projectId={project.id} typologies={typologies} />
       </div>
 
-      {project.tipo === "predio" &&
-      project.numero_andares &&
-      project.unidades_por_andar ? (
+      {unitGrid ? (
         <div id="unidades" className="scroll-mt-6">
           <UnitsSection
             projectId={project.id}
-            floors={project.numero_andares}
-            unitsPerFloor={project.unidades_por_andar}
+            floors={unitGrid.floors}
+            unitsPerFloor={unitGrid.perFloor}
             units={details.units}
             typologies={typologies.map(({ id, nome }) => ({ id, nome }))}
             gridComplete={facts.unitGridComplete}

@@ -8,26 +8,27 @@ import { bigPhoto, createBuilding, hasSupabaseEnv } from "./fixtures";
 // e nenhum erro no console. Cria uma conta nova de verdade
 // (e2e-...@exemplo.test, apagada no fim pelo tests/global-teardown.ts).
 
-const violations: string[] = [];
-
-/** Roda o axe na tela atual e guarda o que encontrar (falha no fim). */
+/**
+ * Roda o axe na tela atual. expect.soft: o problema fica no relatório mesmo
+ * que um passo seguinte do fluxo falhe, e o teste continua.
+ */
 async function checkA11y(page: Page, where: string) {
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])
     // Toasts are measured mid-animation (still transparent): false positive.
     .exclude("[data-sonner-toaster]")
     .analyze();
-  for (const v of result.violations) {
-    violations.push(
-      `${where}: ${v.id} (${v.impact}) – ${v.help} – ${v.nodes
+  const found = result.violations.map(
+    (v) =>
+      `${v.id} (${v.impact}) – ${v.help} – ${v.nodes
         .slice(0, 3)
         .map(
           (n) =>
             `${n.target.join(" ")} ${n.html.slice(0, 160)} ${n.any[0]?.message ?? ""}`,
         )
         .join(" | ")}`,
-    );
-  }
+  );
+  expect.soft(found, `acessibilidade (axe) em: ${where}`).toEqual([]);
 }
 
 test.describe("Fluxo completo do painel", () => {
@@ -142,6 +143,5 @@ test.describe("Fluxo completo do painel", () => {
       description: `${Math.round((Date.now() - started) / 1000)} s`,
     });
     expect(consoleErrors, "erros no console").toEqual([]);
-    expect(violations, "problemas de acessibilidade (axe)").toEqual([]);
   });
 });

@@ -53,6 +53,7 @@ npm run test
 ```bash
 npm run test:e2e
 ```
+> **Para não perder tempo:** durante o desenvolvimento, rode só os testes da parte mexida (`npx playwright test tests/unidades.spec.ts`). A suíte inteira roda **uma vez**, antes do merge. Ela testa o site compilado (`build` + `start`), que é mais rápido que o servidor de dev; para usar o dev, `E2E_DEV=1 npm run test:e2e` (no PowerShell: `$env:E2E_DEV=1; npm run test:e2e`).
 ```bash
 npm run test:rls   # quando a issue mexe no banco (migrations, RLS)
 ```

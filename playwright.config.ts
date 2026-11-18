@@ -31,10 +31,15 @@ export default defineConfig({
     },
   ],
   // Sobe o site sozinho antes dos testes (ou reaproveita um `npm run dev` já aberto).
+  // Por padrão testa o site COMPILADO (build + start): responde bem mais
+  // rápido que o servidor de dev, que compila cada página na primeira visita.
+  // Com E2E_DEV=1, usa o `npm run dev` (ou reaproveita um já aberto).
   webServer: {
-    command: "npm run dev",
+    command: process.env.E2E_DEV
+      ? "npm run dev"
+      : "npm run build && npm run start",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 300_000, // o build leva de 1 a 2 minutos
   },
 });
