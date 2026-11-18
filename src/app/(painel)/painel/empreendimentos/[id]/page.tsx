@@ -17,6 +17,7 @@ import { DeleteProject } from "./delete-project";
 import { ProjectEditForm } from "./project-edit-form";
 import { PublishPanel } from "./publish-panel";
 import { TypologiesSection } from "./tipologias/typologies-section";
+import { UnitsSection } from "./unidades/units-section";
 
 export async function generateMetadata({
   params,
@@ -99,16 +100,18 @@ export default async function ProjectPage({
 
       <TypologiesSection projectId={project.id} typologies={typologies} />
 
-      <section aria-labelledby="units-title" className="flex flex-col gap-2">
-        <h2 id="units-title" className="font-heading text-xl font-semibold">
-          Unidades
-        </h2>
-        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-          {facts.units > 0
-            ? `${facts.units} unidades geradas. Em breve: preço e status de cada uma.`
-            : "Em breve: a grade de unidades do prédio, com preço e status."}
-        </p>
-      </section>
+      {project.tipo === "predio" &&
+      project.numero_andares &&
+      project.unidades_por_andar ? (
+        <UnitsSection
+          projectId={project.id}
+          floors={project.numero_andares}
+          unitsPerFloor={project.unidades_por_andar}
+          units={details.units}
+          typologies={typologies.map(({ id, nome }) => ({ id, nome }))}
+          gridComplete={facts.unitGridComplete}
+        />
+      ) : null}
 
       <section
         aria-labelledby="danger-title"

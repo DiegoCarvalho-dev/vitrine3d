@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { test as base, expect, type Page } from "@playwright/test";
 
@@ -47,7 +47,8 @@ export function runSql(sql: string) {
 export async function createBuilding(page: Page, name: string) {
   await page.goto("/painel");
   await page.getByRole("link", { name: "Novo empreendimento" }).click();
-  await expect(page).toHaveURL(/\/novo$/);
+  // 30 s: in dev the page may be compiling for the first time.
+  await expect(page).toHaveURL(/\/novo$/, { timeout: 30_000 });
   await expect(async () => {
     await page.getByLabel("Nome do empreendimento").fill(name);
     await expect(page.getByTestId("slug-preview")).toBeVisible({
@@ -77,4 +78,24 @@ export function querySql<Row>(sql: string): Row[] {
     throw new Error(`Falha na consulta de teste: ${result.stderr ?? ""}`);
   }
   return (JSON.parse(result.stdout) as { rows: Row[] }).rows;
+}
+
+/** URL e chave pública do Supabase (as mesmas que o navegador usa). */
+export function publicSupabase() {
+  const fromFile = existsSync(".env.local")
+    ? Object.fromEntries(
+        readFileSync(".env.local", "utf8")
+          .split(/\r?\n/)
+          .map((line) => line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?([^"]*)"?\s*$/))
+          .filter((m): m is RegExpMatchArray => m !== null)
+          .map((m) => [m[1], m[2]]),
+      )
+    : {};
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? fromFile.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    fromFile.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) throw new Error("Faltam as chaves públicas do Supabase.");
+  return { url: url.replace(/\/$/, ""), key };
 }
