@@ -15,7 +15,31 @@ function localNetworkIPs(): string[] {
     .map((net) => net!.address);
 }
 
+/**
+ * Cabeçalhos de segurança em todas as páginas (issue #8):
+ * - nosniff: o navegador não "adivinha" o tipo de um arquivo;
+ * - Referrer-Policy: outros sites não recebem o endereço completo da página
+ *   (que pode ter filtros ou ids);
+ * - frame-ancestors 'none' / X-Frame-Options: nenhum site coloca o painel
+ *   dentro de um iframe para enganar o corretor (clickjacking);
+ * - Permissions-Policy: câmera, microfone e localização desligados.
+ */
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false, // não anuncia "Next.js" em cada resposta
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
   allowedDevOrigins: localNetworkIPs(),
   turbopack: {
     rules: {
