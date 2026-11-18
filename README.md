@@ -24,6 +24,7 @@ O corretor vende mandando fotos de celular e textos soltos no WhatsApp. O client
 | [05 – Pesquisa de mercado](docs/05-pesquisa-de-mercado.md) | Dores dos corretores, objeções dos compradores, propostas para o produto |
 | [Sprint 1](docs/sprints/sprint-1.md) | Preparação do ambiente (issues) |
 | [Sprint 2](docs/sprints/sprint-2.md) | Banco de dados e login (issues) |
+| [Sprint 3](docs/sprints/sprint-3.md) | Painel do corretor (issues) |
 
 ## Como rodar
 
@@ -61,4 +62,6 @@ Next.js · TypeScript · Tailwind CSS · shadcn/ui · React Three Fiber (Three.j
 
 ## Status
 
-🚧 Sprint 3: painel do corretor (cadastro de empreendimentos, plantas e unidades). Sprints 1 e 2 concluídas: ambiente, banco com RLS testado, login e perfil.
+✅ Sprints 1 a 3 concluídas: ambiente, banco com RLS testado, login e perfil, e o **painel do corretor** completo: criar, editar, publicar e arquivar empreendimentos, capa, foto e logo (imagens comprimidas no navegador), tipologias, cômodos com prévia 2D da planta e unidades em grade com edição em lote. Um teste automático percorre o fluxo inteiro (do cadastro à publicação) com revisão de acessibilidade.
+
+🚧 Próximo: Sprint 4, o tour público (`/e/[slug]`) e o deploy na Vercel.

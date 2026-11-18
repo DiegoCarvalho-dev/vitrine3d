@@ -73,7 +73,7 @@
   --muted-foreground: #5b6470;
   --accent: #f2f1ee;
   --accent-foreground: #17202b;
-  --destructive: #c2410c;
+  --destructive: #9a3412; /* 6,2:1 no fundo do botão destrutivo (WCAG AA, revisão da #34) */
   --border: #e2e0db;
   --input: #d6d3cd;
   --ring: #1b365d;
