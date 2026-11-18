@@ -37,6 +37,8 @@ npm run dev          # http://localhost:3000
 
 ## Deploy
 
+**No ar:** https://vitrine3d-jade.vercel.app
+
 O site roda na **Vercel** (plano gratuito), ligada a este repositório no GitHub:
 
 - cada push na `main` publica o site;
