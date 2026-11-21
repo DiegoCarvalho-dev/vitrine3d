@@ -125,6 +125,8 @@ export function RoomsEditor({
   const [pending, startTransition] = useTransition();
   const [deleting, setDeleting] = useState<EditorRoom | null>(null);
   const [show3d, setShow3d] = useState(false);
+  // No rooms left: back to the 2D plan (the toggle is hidden).
+  if (show3d && !rooms.length) setShow3d(false);
   const modelRooms = useMemo(
     () =>
       rooms.map((room) => ({

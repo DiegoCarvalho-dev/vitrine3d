@@ -93,6 +93,25 @@ describe("paredes da planta", () => {
     expect(bathroomOnly.every((w) => w.height === 2.5)).toBe(true);
   });
 
+  it("bordas quase iguais (3,0 e 3,0008) e paredes longas não duplicam", () => {
+    const walls = buildWalls([
+      rect("corredor", 0, 0, 20, 3),
+      {
+        id: "sala",
+        height: 2.7,
+        points: [
+          [0.0004, 3.0008],
+          [20, 3.0008],
+          [20, 6],
+          [0.0004, 6],
+        ],
+      },
+    ]);
+    const shared = walls.filter((w) => w.rooms.length === 2);
+    expect(shared.map(wallLength)).toEqual([20]);
+    expect(totalLength(walls)).toBe(2 * (20 + 6) + 20);
+  });
+
   it("pontos em ordem horária também funcionam", () => {
     const clockwise: PlanRoom = {
       ...rect("quarto", 4, 0, 3, 3),

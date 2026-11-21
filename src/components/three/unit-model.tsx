@@ -64,11 +64,17 @@ function flatShape(points: readonly Point[], elevation: number) {
 }
 
 /** Builds the merged geometries (pure: easy to reuse in other views). */
-export function buildUnitGeometry(rooms: readonly ModelRoom[]) {
+export function buildUnitGeometry(
+  rooms: readonly ModelRoom[],
+  { ceiling = false }: { ceiling?: boolean } = {},
+) {
   const floors = rooms.map((room) =>
     paint(flatShape(room.points, 0), FLOOR_COLOR[room.type]),
   );
-  const ceilings = rooms.map((room) => flatShape(room.points, room.height));
+  // Built only when asked for (it's hidden in most views).
+  const ceilings = ceiling
+    ? rooms.map((room) => flatShape(room.points, room.height))
+    : [];
   const walls = buildWalls(rooms).map((wall) => {
     const [ax, ay] = wall.a;
     const [bx, by] = wall.b;
@@ -104,7 +110,10 @@ export function UnitModel({
   /** Hidden in the top view; from below it's seen only from inside anyway. */
   showCeiling?: boolean;
 }) {
-  const geometry = useMemo(() => buildUnitGeometry(rooms), [rooms]);
+  const geometry = useMemo(
+    () => buildUnitGeometry(rooms, { ceiling: showCeiling }),
+    [rooms, showCeiling],
+  );
   useEffect(
     () => () => {
       geometry.floor?.dispose();

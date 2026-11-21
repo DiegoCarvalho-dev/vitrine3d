@@ -1,50 +1,30 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import { FloorPlanPreview } from "@/components/floor-plan-preview";
+import {
+  FloorPlanPreview,
+  type PreviewRoom,
+} from "@/components/floor-plan-preview";
+import type { ModelRoom } from "@/components/three/unit-model";
 import { Button } from "@/components/ui/button";
-import { roundArea } from "@/lib/planta/geometry";
-import type { RoomType } from "@/lib/validacoes/comodo";
-import type { Point } from "@/lib/validacoes/planta";
-
-import seed from "../../../../supabase/seed/residencial-demo.json";
 
 const UnitPreview = dynamic(
   () => import("@/components/three/unit-preview").then((m) => m.UnitPreview),
   { ssr: false },
 );
 
-type SeedRoom = {
-  nome: string;
-  tipo: string;
-  geometria: { pontos: number[][]; pe_direito: number };
-};
+export type LabTypology = { name: string; rooms: (ModelRoom & PreviewRoom)[] };
 
-const TYPOLOGIES = (
-  seed.tipologias as { nome: string; comodos: SeedRoom[] }[]
-).map((t) => ({
-  name: t.nome,
-  rooms: t.comodos.map((c, i) => ({
-    id: `${t.nome}-${i}`,
-    name: c.nome,
-    type: c.tipo as RoomType,
-    points: c.geometria.pontos as Point[],
-    height: c.geometria.pe_direito,
-    area: roundArea(c.geometria.pontos as Point[]),
-  })),
-}));
-
-export function PlanLab() {
+export function PlanLab({ typologies }: { typologies: LabTypology[] }) {
   const [index, setIndex] = useState(0);
-  const typology = TYPOLOGIES[index];
-  const rooms = useMemo(() => typology.rooms, [typology]);
+  const typology = typologies[index];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
-        {TYPOLOGIES.map((t, i) => (
+        {typologies.map((t, i) => (
           <Button
             key={t.name}
             size="sm"
@@ -58,9 +38,9 @@ export function PlanLab() {
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="aspect-[4/3] overflow-hidden rounded-lg border">
-          <UnitPreview rooms={rooms} />
+          <UnitPreview rooms={typology.rooms} />
         </div>
-        <FloorPlanPreview rooms={rooms} />
+        <FloorPlanPreview rooms={typology.rooms} />
       </div>
     </div>
   );

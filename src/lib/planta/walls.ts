@@ -24,6 +24,11 @@ export const WALL_THICKNESS = 0.12;
 const EPS = 1e-3;
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
+/** The plan is drawn in centimeters: snapping makes 3.0 and 3.0008 the same line. */
+const snap = (p: Point): Point => [
+  Math.round(p[0] * 100) / 100,
+  Math.round(p[1] * 100) / 100,
+];
 const keyOf = (p: Point) => `${round(p[0])},${round(p[1])}`;
 
 type Edge = { a: Point; b: Point; room: PlanRoom };
@@ -41,11 +46,10 @@ function along(a: Point, b: Point, p: Point): number | null {
 }
 
 export function edgesOf(room: PlanRoom): Edge[] {
-  return room.points.map((a, i) => ({
-    a,
-    b: room.points[(i + 1) % room.points.length],
-    room,
-  }));
+  const points = room.points.map(snap);
+  return points
+    .map((a, i) => ({ a, b: points[(i + 1) % points.length], room }))
+    .filter((edge) => wallLength(edge) > EPS); // repeated point: no edge
 }
 
 /**
@@ -64,7 +68,10 @@ export function buildWalls(rooms: readonly PlanRoom[]): WallSegment[] {
       const ta = along(edge.a, edge.b, other.a);
       const tb = along(edge.a, edge.b, other.b);
       if (ta === null || tb === null) continue; // not on the same line
-      for (const t of [ta, tb]) if (t > EPS && t < 1 - EPS) cuts.add(t);
+      // Tolerance in meters (t is a fraction of the edge).
+      const length = wallLength(edge);
+      for (const t of [ta, tb])
+        if (t * length > EPS && (1 - t) * length > EPS) cuts.add(t);
     }
     const sorted = [...cuts].sort((x, y) => x - y);
     for (let i = 0; i < sorted.length - 1; i++) {
@@ -81,7 +88,12 @@ export function buildWalls(rooms: readonly PlanRoom[]): WallSegment[] {
       const wall = walls.get(key);
       if (!wall) {
         const [a, b] = keyOf(p) === ka ? [p, q] : [q, p];
-        walls.set(key, { a, b, height: edge.room.height, rooms: [edge.room.id] });
+        walls.set(key, {
+          a,
+          b,
+          height: edge.room.height,
+          rooms: [edge.room.id],
+        });
       } else if (!wall.rooms.includes(edge.room.id)) {
         wall.rooms.push(edge.room.id);
         wall.height = Math.max(wall.height, edge.room.height);
@@ -93,3 +105,91 @@ export function buildWalls(rooms: readonly PlanRoom[]): WallSegment[] {
 
 export const wallLength = (wall: { a: Point; b: Point }) =>
   Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1]);
+
+/** An opening in the walls: a door (bottom 0) or a window, in meters. */
+export type Opening = { a: Point; b: Point; bottom: number; top: number };
+
+/**
+ * A solid part of a wall, from `bottom` to `top` meters high. `extendA` /
+ * `extendB`: the end touches a corner (not an opening), so the 3D box grows
+ * half a thickness there to close the corner.
+ */
+export type WallPiece = {
+  a: Point;
+  b: Point;
+  bottom: number;
+  top: number;
+  extendA: boolean;
+  extendB: boolean;
+};
+
+/** Cuts the openings out of the walls: solid parts, sills and lintels. */
+export function wallPieces(
+  walls: readonly WallSegment[],
+  openings: readonly Opening[],
+): WallPiece[] {
+  const pieces: WallPiece[] = [];
+  for (const wall of walls) {
+    const length = wallLength(wall);
+    const point = (t: number): Point => [
+      round(wall.a[0] + ((wall.b[0] - wall.a[0]) * t) / length),
+      round(wall.a[1] + ((wall.b[1] - wall.a[1]) * t) / length),
+    ];
+    // Openings on this wall, as [start, end, bottom, top] in meters from wall.a.
+    const holes = openings
+      .flatMap((o) => {
+        const ta = along(wall.a, wall.b, o.a);
+        const tb = along(wall.a, wall.b, o.b);
+        if (ta === null || tb === null) return [];
+        const start = Math.max(0, Math.min(ta, tb) * length);
+        const end = Math.min(length, Math.max(ta, tb) * length);
+        return end - start > EPS
+          ? [[start, end, o.bottom, o.top] as const]
+          : [];
+      })
+      .sort((x, y) => x[0] - y[0]);
+
+    let cursor = 0;
+    for (const [start, end, bottom, top] of holes) {
+      if (start > cursor + EPS)
+        pieces.push({
+          a: point(cursor),
+          b: point(start),
+          bottom: 0,
+          top: wall.height,
+          extendA: cursor === 0,
+          extendB: false,
+        });
+      const hole = { a: point(Math.max(start, cursor)), b: point(end) };
+      if (bottom > 0)
+        // sill under a window
+        pieces.push({
+          ...hole,
+          bottom: 0,
+          top: Math.min(bottom, wall.height),
+          extendA: false,
+          extendB: false,
+        });
+      if (top < wall.height)
+        // lintel above
+        pieces.push({
+          ...hole,
+          bottom: top,
+          top: wall.height,
+          extendA: false,
+          extendB: false,
+        });
+      cursor = Math.max(cursor, end);
+    }
+    if (length > cursor + EPS)
+      pieces.push({
+        a: point(cursor),
+        b: wall.b,
+        bottom: 0,
+        top: wall.height,
+        extendA: cursor === 0,
+        extendB: true,
+      });
+  }
+  return pieces;
+}

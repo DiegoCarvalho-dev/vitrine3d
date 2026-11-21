@@ -22,6 +22,9 @@ export function UnitPreview({ rooms }: { rooms: readonly ModelRoom[] }) {
 
   return (
     <Canvas
+      // The camera prop only applies on mount: a different plan size (a room
+      // added or removed) mounts a fresh view, centered again.
+      key={`${center.join()}|${size}`}
       frameloop="demand"
       dpr={[1, 2]}
       camera={{
