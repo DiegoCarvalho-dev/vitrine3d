@@ -37,12 +37,15 @@ export function BuildingIllustration({
   floors = DEMO_FLOORS,
   unitsPerFloor = DEMO_UNITS_PER_FLOOR,
   units,
+  isDimmed,
 }: {
   className?: string;
   floors?: number;
   unitsPerFloor?: number;
   /** Real units; omitted = the demo building (fixed statuses). */
   units?: readonly BuildingUnit[];
+  /** true = unit outside the tour filters: drawn faded. */
+  isDimmed?: (floor: number, position: number) => boolean;
 }) {
   const byPosition = units
     ? new Map(units.map((u) => [`${u.andar}-${u.posicao_no_andar}`, u.status]))
@@ -146,7 +149,10 @@ export function BuildingIllustration({
                 highlighted?.floor === floor &&
                 highlighted.position === position;
               return status ? (
-                <g key={position}>
+                <g
+                  key={position}
+                  opacity={isDimmed?.(floor, position) ? 0.22 : 1}
+                >
                   {/* Vidro do apartamento */}
                   <rect
                     x={x}

@@ -17,8 +17,21 @@ import {
 import { NativeSelect } from "@/components/native-select";
 import type { SelectedUnit } from "@/components/three/BuildingPreview";
 import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
+import {
+  filtersToSearch,
+  matchesFilters,
+  type TourFilters as Filters,
+} from "@/lib/tour/filters";
 
-export type TourUnit = BuildingUnit & { numero: string };
+import { TourFilters } from "./tour-filters";
+
+export type TourUnit = BuildingUnit & {
+  numero: string;
+  /** Bedrooms of the typology (null = none). */
+  quartos: number | null;
+  /** Public price (null = "sob consulta"). */
+  preco: number | null;
+};
 
 const BuildingPreview = dynamic(
   () =>
@@ -70,29 +83,53 @@ export function TourBuilding({
   unitsPerFloor,
   units,
   accentColor,
+  initialFilters,
 }: {
   floors: number;
   unitsPerFloor: number;
   units: TourUnit[];
   /** The broker's brand color (entrance canopy). */
   accentColor?: string;
+  /** Filters from the link (?quartos=3&ate=500000). */
+  initialFilters: Filters;
 }) {
   const [selected, setSelected] = useState<SelectedUnit | null>(null);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
+
+  function changeFilters(next: Filters) {
+    setFilters(next);
+    // Keeps the link shareable without reloading the page.
+    const search = filtersToSearch(next);
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${search ? `?${search}` : ""}`,
+    );
+  }
+
+  const bedroomOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          units.map((u) => u.quartos).filter((n): n is number => n !== null),
+        ),
+      ].sort((a, b) => a - b),
+    [units],
+  );
+
   // null on the server (no document); true/false in the browser.
   const webgl = useSyncExternalStore(noop, hasWebGL, () => null);
-
-  const illustration = (
-    <BuildingIllustration
-      className="mx-auto max-h-[28rem] w-full"
-      floors={floors}
-      unitsPerFloor={unitsPerFloor}
-      units={units}
-    />
-  );
 
   const byPosition = useMemo(
     () => new Map(units.map((u) => [`${u.andar}-${u.posicao_no_andar}`, u])),
     [units],
+  );
+  const isDimmed = useCallback(
+    (floor: number, position: number) => {
+      const unit = byPosition.get(`${floor}-${position}`);
+      return unit ? !matchesFilters(unit, filters) : false;
+    },
+    [byPosition, filters],
   );
   const getStatus = useCallback(
     (floor: number, position: number): UnitStatus | null =>
@@ -104,6 +141,16 @@ export function TourBuilding({
       byPosition.get(`${floor}-${position}`)?.numero ??
       `${floor}${String(position).padStart(2, "0")}`,
     [byPosition],
+  );
+
+  const illustration = (
+    <BuildingIllustration
+      className="mx-auto max-h-[28rem] w-full"
+      floors={floors}
+      unitsPerFloor={unitsPerFloor}
+      units={units}
+      isDimmed={isDimmed}
+    />
   );
 
   function selectByNumber(numero: string) {
@@ -122,12 +169,22 @@ export function TourBuilding({
 
   return (
     <div className="flex flex-col gap-3">
+      <TourFilters
+        filters={filters}
+        onChange={changeFilters}
+        units={units}
+        bedroomOptions={bedroomOptions}
+        maxFloor={floors}
+      />
       <div
         role="region"
         aria-label={`Prédio com ${floors} andares e ${unitsPerFloor} unidades por andar. Toque numa unidade ou use a lista "Escolher unidade" para ver o número e a situação.`}
         className="relative h-[60svh] max-h-[34rem] min-h-80 w-full overflow-hidden rounded-md"
         data-testid="tour-building-3d"
       >
+        <span className="absolute top-3 left-3 z-10 rounded-full bg-background/90 px-2 py-0.5 text-xs text-muted-foreground">
+          Imagem ilustrativa
+        </span>
         {/* SVG underneath while the 3D loads; the 3D canvas covers it. */}
         <div aria-hidden className="absolute inset-0 flex items-center p-4">
           {illustration}
@@ -149,6 +206,7 @@ export function TourBuilding({
                 selected={selected?.number ?? null}
                 onSelectUnit={setSelected}
                 accentColor={accentColor}
+                isDimmed={isDimmed}
               />
             </Fallback3D>
           </div>

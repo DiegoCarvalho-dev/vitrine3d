@@ -9,6 +9,7 @@ import {
   lowestPublicPrice,
   statusCounts,
 } from "@/lib/tour/format";
+import { parseFilters } from "@/lib/tour/filters";
 import { getPublishedProject } from "@/lib/tour/queries";
 import { publicImageUrl } from "@/lib/validacoes/midia";
 import { formatDecimal } from "@/lib/validacoes/numero";
@@ -41,11 +42,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
 
-export default async function TourPage({ params }: Props) {
+export default async function TourPage({ params, searchParams }: Props) {
   const tour = await getPublishedProject((await params).slug);
   // Not published (rascunho/arquivado) or nonexistent: same 404.
   if (!tour) notFound();
   const { project, broker, typologies, units } = tour;
+  // Filters from the link (?quartos=3&ate=500000); invalid values are ignored.
+  const initialFilters = parseFilters(await searchParams);
+  const bedroomsOf = new Map(typologies.map((t) => [t.id, t.quartos]));
 
   const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
   const cover = publicImageUrl(supabaseUrl, project.capa_url);
@@ -130,14 +134,17 @@ export default async function TourPage({ params }: Props) {
                 floors={project.numero_andares!}
                 unitsPerFloor={project.unidades_por_andar!}
                 // Only what the 3D needs goes to the browser.
-                units={units.map(
-                  ({ andar, posicao_no_andar, status, numero }) => ({
-                    andar,
-                    posicao_no_andar,
-                    status,
-                    numero,
-                  }),
-                )}
+                initialFilters={initialFilters}
+                units={units.map((unit) => ({
+                  andar: unit.andar,
+                  posicao_no_andar: unit.posicao_no_andar,
+                  status: unit.status,
+                  numero: unit.numero,
+                  quartos: unit.tipologia_id
+                    ? (bedroomsOf.get(unit.tipologia_id) ?? null)
+                    : null,
+                  preco: unit.preco_publico,
+                }))}
               />
             ) : (
               <p className="p-8 text-center text-muted-foreground">
@@ -145,11 +152,6 @@ export default async function TourPage({ params }: Props) {
                   ? "Casa: uma unidade só."
                   : "A planta do prédio ainda não foi cadastrada."}
               </p>
-            )}
-            {isBuilding && (
-              <span className="absolute top-3 left-3 rounded-full bg-background/90 px-2 py-0.5 text-xs text-muted-foreground">
-                Imagem ilustrativa
-              </span>
             )}
           </div>
 
