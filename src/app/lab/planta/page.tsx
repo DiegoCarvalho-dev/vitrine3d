@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { roundArea } from "@/lib/planta/geometry";
 import { roomTypeSchema } from "@/lib/validacoes/comodo";
-import { roomGeometrySchema } from "@/lib/validacoes/planta";
+import { floorPlanSchema, roomGeometrySchema } from "@/lib/validacoes/planta";
 
 import seed from "../../../../supabase/seed/residencial-demo.json";
 import { type LabTypology, PlanLab } from "./plan-lab";
@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 // Only the typologies go to the browser (validated like the real data).
 const typologies: LabTypology[] = seed.tipologias.map((t) => ({
   name: t.nome,
+  plan: floorPlanSchema.safeParse(t.planta).data,
   rooms: t.comodos.flatMap((c, i) => {
     const type = roomTypeSchema.safeParse(c.tipo);
     const geometry = roomGeometrySchema.safeParse(c.geometria);

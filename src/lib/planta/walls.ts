@@ -82,12 +82,13 @@ export function buildWalls(rooms: readonly PlanRoom[]): WallSegment[] {
       const p = at(sorted[i]);
       const q = at(sorted[i + 1]);
       if (Math.hypot(q[0] - p[0], q[1] - p[1]) < EPS) continue;
-      // Same key whatever the direction (the neighbor walks the other way).
-      const [ka, kb] = [keyOf(p), keyOf(q)].sort();
-      const key = `${ka}|${kb}`;
+      // Same key and direction whatever way the room walks the edge: always
+      // from the smaller x (then the smaller y), so collinear walls line up.
+      const [a, b] =
+        p[0] < q[0] || (p[0] === q[0] && p[1] < q[1]) ? [p, q] : [q, p];
+      const key = `${keyOf(a)}|${keyOf(b)}`;
       const wall = walls.get(key);
       if (!wall) {
-        const [a, b] = keyOf(p) === ka ? [p, q] : [q, p];
         walls.set(key, {
           a,
           b,
@@ -136,7 +137,7 @@ export function wallPieces(
       round(wall.a[1] + ((wall.b[1] - wall.a[1]) * t) / length),
     ];
     // Openings on this wall, as [start, end, bottom, top] in meters from wall.a.
-    const holes = openings
+    const found = openings
       .flatMap((o) => {
         const ta = along(wall.a, wall.b, o.a);
         const tb = along(wall.a, wall.b, o.b);
@@ -144,52 +145,54 @@ export function wallPieces(
         const start = Math.max(0, Math.min(ta, tb) * length);
         const end = Math.min(length, Math.max(ta, tb) * length);
         return end - start > EPS
-          ? [[start, end, o.bottom, o.top] as const]
+          ? [{ start, end, bottom: o.bottom, top: o.top }]
           : [];
       })
-      .sort((x, y) => x[0] - y[0]);
-
-    let cursor = 0;
-    for (const [start, end, bottom, top] of holes) {
-      if (start > cursor + EPS)
-        pieces.push({
-          a: point(cursor),
-          b: point(start),
-          bottom: 0,
-          top: wall.height,
-          extendA: cursor === 0,
-          extendB: false,
-        });
-      const hole = { a: point(Math.max(start, cursor)), b: point(end) };
-      if (bottom > 0)
-        // sill under a window
-        pieces.push({
-          ...hole,
-          bottom: 0,
-          top: Math.min(bottom, wall.height),
-          extendA: false,
-          extendB: false,
-        });
-      if (top < wall.height)
-        // lintel above
-        pieces.push({
-          ...hole,
-          bottom: top,
-          top: wall.height,
-          extendA: false,
-          extendB: false,
-        });
-      cursor = Math.max(cursor, end);
+      .sort((x, y) => x.start - y.start);
+    // Overlapping openings (a door inside a glass door) become one hole.
+    const holes: typeof found = [];
+    for (const hole of found) {
+      const last = holes.at(-1);
+      if (last && hole.start < last.end - EPS) {
+        last.end = Math.max(last.end, hole.end);
+        last.bottom = Math.min(last.bottom, hole.bottom);
+        last.top = Math.max(last.top, hole.top);
+      } else holes.push({ ...hole });
     }
-    if (length > cursor + EPS)
-      pieces.push({
+
+    const add = (piece: WallPiece) => {
+      if (wallLength(piece) > EPS && piece.top - piece.bottom > EPS)
+        pieces.push(piece);
+    };
+    let cursor = 0;
+    for (const { start, end, bottom, top } of holes) {
+      add({
         a: point(cursor),
-        b: wall.b,
+        b: point(start),
         bottom: 0,
         top: wall.height,
         extendA: cursor === 0,
-        extendB: true,
+        extendB: false,
       });
+      // Sill and lintel close the corner when the hole touches it.
+      const hole = {
+        a: point(start),
+        b: point(end),
+        extendA: start <= EPS,
+        extendB: end >= length - EPS,
+      };
+      add({ ...hole, bottom: 0, top: Math.min(bottom, wall.height) }); // sill
+      add({ ...hole, bottom: top, top: wall.height }); // lintel
+      cursor = end;
+    }
+    add({
+      a: point(cursor),
+      b: wall.b,
+      bottom: 0,
+      top: wall.height,
+      extendA: cursor === 0,
+      extendB: true,
+    });
   }
   return pieces;
 }

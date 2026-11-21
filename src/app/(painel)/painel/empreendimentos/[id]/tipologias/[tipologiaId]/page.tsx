@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { getMyTypology, listRooms } from "@/lib/empreendimentos/queries";
 import { roundArea } from "@/lib/planta/geometry";
-import { roomGeometrySchema } from "@/lib/validacoes/planta";
+import { floorPlanSchema, roomGeometrySchema } from "@/lib/validacoes/planta";
 
 import { type EditorRoom, RoomsEditor } from "./rooms-editor";
 
@@ -64,6 +64,8 @@ export default async function TypologyPage({ params }: Props) {
         typologyId={typology.id}
         rooms={rooms}
         privateArea={typology.area_privativa_m2}
+        // Saved doors/windows; invalid or empty → automatic doors (#49).
+        plan={floorPlanSchema.safeParse(typology.planta).data}
       />
     </section>
   );
