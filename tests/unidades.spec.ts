@@ -100,7 +100,7 @@ test.describe("Unidades: grade, edição em lote e sob consulta", () => {
     // Status de uma unidade muda o mini prédio.
     await page.getByLabel("Status da Unidade 101").selectOption("vendido");
     await expect(page.getByTestId("status-summary")).toContainText(
-      "1 vendido",
+      "1 vendida",
       {
         timeout: 30_000,
       },
