@@ -15,7 +15,6 @@ import { getPublishedProject } from "@/lib/tour/queries";
 import { publicImageUrl } from "@/lib/validacoes/midia";
 import { formatDecimal } from "@/lib/validacoes/numero";
 import {
-  contrastWithWhite,
   DEFAULT_BRAND_COLOR,
   HEX_COLOR,
 } from "@/lib/validacoes/perfil";
@@ -26,17 +25,42 @@ import { TourBuilding } from "./tour-building";
 type Props = PageProps<"/e/[slug]">;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const tour = await getPublishedProject((await params).slug);
+  const { slug } = await params;
+  const tour = await getPublishedProject(slug);
   if (!tour) return { title: "Empreendimento não encontrado | Vitrine 3D" };
-  const { project } = tour;
+  const { project, broker, units } = tour;
   const place = [project.cidade, project.uf].filter(Boolean).join(" / ");
-  // Full Open Graph preview (WhatsApp) comes in issue #47.
+  const title = `${project.nome}${place ? ` – ${place}` : ""}`;
+  // "A partir de" uses the PUBLIC price only: "sob consulta" never appears.
+  const fromPrice = lowestPublicPrice(units);
+  const about = project.descricao?.replace(/\s+/g, " ").trim().slice(0, 160);
+  const description =
+    [
+      fromPrice !== null ? `A partir de ${formatMoney(fromPrice)}` : null,
+      broker?.nome ? `Corretor: ${broker.nome}` : null,
+      about || `Conheça o ${project.nome} em 3D.`,
+    ]
+      .filter(Boolean)
+      .join(" · ")
+      .slice(0, 200);
+  // Cover when there is one; otherwise the generated image (./og).
+  const cover = publicImageUrl(
+    getPublicEnv().NEXT_PUBLIC_SUPABASE_URL,
+    project.capa_url,
+  );
+  const images = [{ url: cover ?? `/e/${slug}/og`, alt: project.nome }];
   return {
-    title: `${project.nome}${place ? ` – ${place}` : ""}`,
-    description:
-      // One line, up to 160 chars; empty description → default text.
-      project.descricao?.replace(/\s+/g, " ").trim().slice(0, 160) ||
-      `Conheça o ${project.nome} em 3D.`,
+    title,
+    description,
+    openGraph: {
+      type: "website",
+      locale: "pt_BR",
+      siteName: "Vitrine 3D",
+      title,
+      description,
+      images,
+    },
+    twitter: { card: "summary_large_image", title, description, images },
   };
 }
 
@@ -62,7 +86,6 @@ export default async function TourPage({ params, searchParams }: Props) {
     broker?.cor_marca && HEX_COLOR.test(broker.cor_marca)
       ? broker.cor_marca
       : DEFAULT_BRAND_COLOR;
-  const onBrand = contrastWithWhite(brand) >= 4.5 ? "#ffffff" : "#17202b";
   const count = statusCounts(units);
   const fromPrice = lowestPublicPrice(units);
   const place = [project.cidade, project.uf].filter(Boolean).join(" / ");
@@ -75,7 +98,7 @@ export default async function TourPage({ params, searchParams }: Props) {
   return (
     <div
       className="min-h-dvh bg-background"
-      style={{ "--brand": brand, "--on-brand": onBrand } as React.CSSProperties}
+      style={{ "--brand": brand } as React.CSSProperties}
     >
       {/* Broker's brand on top: the tour is "theirs" */}
       <header className="border-b">
@@ -273,8 +296,8 @@ export default async function TourPage({ params, searchParams }: Props) {
         {broker && (
           <section
             aria-labelledby="broker-title"
-            className="flex max-w-2xl items-center gap-4 rounded-lg p-5"
-            style={{ background: "var(--brand)", color: "var(--on-brand)" }}
+            className="flex max-w-2xl items-center gap-4 rounded-lg border border-l-8 bg-card p-5"
+            style={{ borderLeftColor: "var(--brand)" }}
           >
             {avatar && (
               // eslint-disable-next-line @next/next/no-img-element -- already compressed WebP
@@ -285,7 +308,7 @@ export default async function TourPage({ params, searchParams }: Props) {
               />
             )}
             <div>
-              <p className="text-sm opacity-85">Seu corretor</p>
+              <p className="text-sm text-muted-foreground">Seu corretor</p>
               <h2
                 id="broker-title"
                 className="font-heading text-lg font-semibold"
@@ -293,7 +316,7 @@ export default async function TourPage({ params, searchParams }: Props) {
                 {broker.nome}
               </h2>
               {broker.creci && (
-                <p className="text-sm opacity-85">CRECI {broker.creci}</p>
+                <p className="text-sm text-muted-foreground">CRECI {broker.creci}</p>
               )}
             </div>
           </section>

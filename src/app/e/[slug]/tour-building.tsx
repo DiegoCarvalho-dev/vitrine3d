@@ -188,6 +188,19 @@ export function TourBuilding({
   // null on the server (no document); true/false in the browser.
   const webgl = useSyncExternalStore(noop, hasWebGL, () => null);
 
+  // The heavy 3D code only starts after the page content is up (and the
+  // browser is idle), so the text, cover and SVG show first on slow phones.
+  const [idle, setIdle] = useState(false);
+  useEffect(() => {
+    const start = () => setIdle(true);
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(start, { timeout: 500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(start, 800);
+    return () => clearTimeout(id);
+  }, []);
+
   const byPosition = useMemo(
     () => new Map(units.map((u) => [`${u.andar}-${u.posicao_no_andar}`, u])),
     [units],
@@ -289,7 +302,7 @@ export function TourBuilding({
         <div aria-hidden className="absolute inset-0 flex items-center p-4">
           {illustration}
         </div>
-        {webgl && (
+        {webgl && idle && (
           <div className="absolute inset-0">
             <Fallback3D
               fallback={

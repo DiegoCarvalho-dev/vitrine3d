@@ -66,6 +66,19 @@ test.describe("Tour público /e/[slug]", () => {
     await expect(anon.getByRole("heading", { level: 1, name })).toBeVisible();
     expect(await anon.content()).not.toMatch(/777[.,]?777/);
 
+    // Prévia do WhatsApp (#47): título, "a partir de" público e imagem gerada.
+    const meta = (property: string) =>
+      anon.locator(`meta[property="${property}"]`).getAttribute("content");
+    expect(await meta("og:title")).toContain(name);
+    expect(await meta("og:description")).toContain("A partir de R$");
+    expect(await meta("og:description")).toMatch(/450\.000,00/);
+    expect(await meta("og:description")).not.toMatch(/777[.,]?777/);
+    const image = (await meta("og:image"))!;
+    expect(image).toMatch(/^https?:\/\/.+\/og$/);
+    const generated = await anon.request.get(new URL(image).pathname);
+    expect(generated.status()).toBe(200);
+    expect(generated.headers()["content-type"]).toContain("image/png");
+
     // Prédio 3D (#44): tocar no meio do prédio escolhe uma unidade real.
     const canvas = anon.getByTestId("tour-building-3d").locator("canvas");
     await expect(canvas).toBeVisible({ timeout: 30_000 });
