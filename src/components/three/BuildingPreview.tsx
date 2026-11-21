@@ -49,6 +49,8 @@ type BuildingPreviewProps = {
   onSelectUnit?: (unit: SelectedUnit) => void;
   /** Cor de detalhe (marquise da entrada): a marca do corretor. */
   accentColor?: string;
+  /** true = unit outside the filters: drawn faded (still selectable). */
+  isDimmed?: (floor: number, position: number) => boolean;
 };
 
 const LOBBY_H = 1.3; // térreo mais alto que os andares
@@ -67,6 +69,7 @@ export function BuildingPreview({
   selected = null,
   onSelectUnit,
   accentColor = SELECTED_EDGE,
+  isDimmed,
 }: BuildingPreviewProps) {
   // Térreo + andares + cobertura.
   const height = LOBBY_H + floors * (UNIT_H + GAP) + 1;
@@ -113,6 +116,7 @@ export function BuildingPreview({
         selected={selected}
         onSelectUnit={onSelectUnit}
         accentColor={accentColor}
+        isDimmed={isDimmed}
       />
       {/* Sombra suave no chão, calculada uma vez (frames={1}): quase de graça. */}
       <ContactShadows
@@ -192,13 +196,17 @@ function Building({
   selected,
   onSelectUnit,
   accentColor,
+  isDimmed,
 }: Required<
   Pick<
     BuildingPreviewProps,
     "floors" | "unitsPerFloor" | "getStatus" | "accentColor"
   >
 > &
-  Pick<BuildingPreviewProps, "getNumber" | "selected" | "onSelectUnit">) {
+  Pick<
+    BuildingPreviewProps,
+    "getNumber" | "selected" | "onSelectUnit" | "isDimmed"
+  >) {
   const [hovered, setHovered] = useState<string | null>(null);
   useCursor(hovered !== null); // mãozinha no desktop ao passar sobre uma unidade
 
@@ -207,6 +215,8 @@ function Building({
   const {
     glassGeometry,
     glassMaterial,
+    dimmedGlassMaterial,
+    dimmedBandMaterial,
     bandGeometry,
     slabGeometry,
     slabMaterial,
@@ -221,6 +231,19 @@ function Building({
         color: "#9db3c4",
         roughness: 0.12,
         metalness: 0.35,
+      }),
+      // Outside the filters: see-through glass and a gray band.
+      dimmedGlassMaterial: new MeshStandardMaterial({
+        color: "#9db3c4",
+        transparent: true,
+        opacity: 0.16,
+        depthWrite: false,
+      }),
+      dimmedBandMaterial: new MeshStandardMaterial({
+        color: "#a3a9b1",
+        transparent: true,
+        opacity: 0.25,
+        depthWrite: false,
       }),
       bandGeometry: new BoxGeometry(UNIT_W - 0.16, 0.26, 0.1),
       slabGeometry: new BoxGeometry(1, 0.1, UNIT_D + 0.35),
@@ -237,11 +260,21 @@ function Building({
     () => () => {
       glassGeometry.dispose();
       glassMaterial.dispose();
+      dimmedGlassMaterial.dispose();
+      dimmedBandMaterial.dispose();
       bandGeometry.dispose();
       slabGeometry.dispose();
       slabMaterial.dispose();
     },
-    [glassGeometry, glassMaterial, bandGeometry, slabGeometry, slabMaterial],
+    [
+      glassGeometry,
+      glassMaterial,
+      dimmedGlassMaterial,
+      dimmedBandMaterial,
+      bandGeometry,
+      slabGeometry,
+      slabMaterial,
+    ],
   );
   const bandMaterials = useMemo(
     () =>
@@ -347,6 +380,7 @@ function Building({
         {units.map(({ x, y, ...unit }) => {
           const isSelected = unit.number === selected;
           const isHovered = unit.number === hovered;
+          const dimmed = isDimmed?.(unit.floor, unit.position) ?? false;
           return (
             <group
               key={unit.number}
@@ -366,7 +400,7 @@ function Building({
               <mesh
                 name={`unidade-${unit.number}`}
                 geometry={glassGeometry}
-                material={glassMaterial}
+                material={dimmed ? dimmedGlassMaterial : glassMaterial}
               >
                 {(isSelected || isHovered) && (
                   <Edges
@@ -379,7 +413,9 @@ function Building({
               <mesh
                 position={[0, -UNIT_H / 2 + 0.16, UNIT_D / 2 - 0.08]}
                 geometry={bandGeometry}
-                material={bandMaterials[unit.status]}
+                material={
+                  dimmed ? dimmedBandMaterial : bandMaterials[unit.status]
+                }
               />
             </group>
           );

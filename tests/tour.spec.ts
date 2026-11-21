@@ -99,3 +99,103 @@ test.describe("Tour público /e/[slug]", () => {
     await visitor.close();
   });
 });
+
+// Filtros do tour (issue #45). Prédio de 6 andares × 4 montado direto no banco:
+// finais 01 e 04 = Tipo B (3 quartos), 02 e 03 = Tipo A (2 quartos); o andar n
+// custa n × R$ 100 mil; o 6º andar é "sob consulta"; a 101 está vendida.
+test.describe("Filtros do tour", () => {
+  test.skip(!hasSupabaseEnv, "Sem .env.local com as chaves do Supabase.");
+  test.setTimeout(150_000);
+
+  test("filtra, mostra o contador, vale pelo link e limpa", async ({
+    page,
+    browser,
+  }, testInfo) => {
+    const id = await createBuilding(
+      page,
+      `Filtros ${Date.now()} ${testInfo.project.name}`,
+    );
+    runSql(
+      `insert into public.tipologias (empreendimento_id, nome, quartos) values ('${id}', 'Tipo A', 2), ('${id}', 'Tipo B', 3)`,
+    );
+    const types = querySql<{ id: string; nome: string }>(
+      `select id, nome from public.tipologias where empreendimento_id = '${id}'`,
+    );
+    const typeA = types.find((t) => t.nome === "Tipo A")!.id;
+    const typeB = types.find((t) => t.nome === "Tipo B")!.id;
+    runSql(
+      `insert into public.unidades (empreendimento_id, andar, numero, posicao_no_andar, tipologia_id, preco, exibir_preco)
+         select '${id}', f, (f * 100 + p)::text, p, case when p in (1, 4) then '${typeB}'::uuid else '${typeA}'::uuid end, f * 100000, f <> 6
+         from generate_series(1, 6) f, generate_series(1, 4) p;
+       update public.unidades set status = 'vendido' where empreendimento_id = '${id}' and numero = '101';
+       update public.empreendimentos set status = 'publicado' where id = '${id}'`,
+    );
+    const [{ slug }] = querySql<{ slug: string }>(
+      `select slug from public.empreendimentos where id = '${id}'`,
+    );
+
+    const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } =
+      testInfo.project.use;
+    const visitor = await browser.newContext({
+      viewport,
+      userAgent,
+      deviceScaleFactor,
+      isMobile,
+      hasTouch,
+    });
+    const anon = await visitor.newPage();
+    const found = anon.getByTestId("tour-found");
+
+    await anon.goto(`/e/${slug}`);
+    await expect(found).toHaveText("24 unidades encontradas");
+
+    // No celular os filtros ficam numa gaveta.
+    const openFilters = anon.getByRole("button", { name: /^Filtros/ });
+    if (isMobile) await openFilters.click();
+
+    // 3 quartos (finais 01 e 04): 12 unidades.
+    await anon.getByLabel("Quartos").selectOption("3");
+    await expect(found).toHaveText("12 unidades encontradas");
+
+    // Até R$ 300 mil: andares 1 a 3 (6) + os 2 do 6º andar "sob consulta" = 8.
+    await anon.getByLabel("Preço até").fill("300000");
+    await expect(found).toHaveText("8 unidades encontradas");
+    await expect(anon.getByTestId("tour-price-note")).toContainText(
+      "sob consulta",
+    );
+
+    // Só disponíveis tira a 101 (vendida): 7.
+    await anon.getByLabel("Só disponíveis").check();
+    await expect(found).toHaveText("7 unidades encontradas");
+    expect(new URL(anon.url()).search).toBe(
+      "?quartos=3&ate=300000&disponiveis=1",
+    );
+
+    // O mesmo link, aberto do zero, já vem filtrado.
+    const shared = await visitor.newPage();
+    await shared.goto(`/e/${slug}?quartos=3&ate=300000&disponiveis=1`);
+    await expect(shared.getByTestId("tour-found")).toHaveText(
+      "7 unidades encontradas",
+    );
+    await shared.close();
+
+    // Link com lixo é ignorado, sem quebrar a página.
+    const junk = await visitor.newPage();
+    expect(
+      (
+        await junk.goto(`/e/${slug}?quartos=abc&ate=-1&andar_de=999999`)
+      )?.status(),
+    ).toBe(200);
+    await expect(junk.getByTestId("tour-found")).toHaveText(
+      "24 unidades encontradas",
+    );
+    await junk.close();
+
+    // Limpar volta ao começo e à URL sem filtros.
+    await anon.getByRole("button", { name: "Limpar filtros" }).click();
+    await expect(found).toHaveText("24 unidades encontradas");
+    await expect(anon.getByLabel("Preço até")).toHaveValue("");
+    expect(new URL(anon.url()).search).toBe("");
+    await visitor.close();
+  });
+});
