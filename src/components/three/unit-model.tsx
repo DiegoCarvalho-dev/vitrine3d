@@ -83,18 +83,21 @@ export function buildUnitGeometry(
     ? rooms.map((room) => flatShape(room.points, room.height))
     : [];
   // Doors (saved or automatic, #49) and windows are holes in the walls.
+  const windows: Opening[] = (plan?.janelas ?? []).map((w) => ({
+    a: w.de,
+    b: w.ate,
+    bottom: w.peitoril,
+    top: w.peitoril + w.altura,
+  }));
+  // A window from the floor is a glass door: it already connects the rooms.
+  const glassDoors = windows.filter((w) => w.bottom === 0);
   const openings: Opening[] = [
-    ...planDoors(rooms, plan?.portas).map((door) => ({
+    ...planDoors(rooms, plan?.portas, glassDoors).map((door) => ({
       ...door,
       bottom: 0,
       top: DOOR_HEIGHT,
     })),
-    ...(plan?.janelas ?? []).map((w) => ({
-      a: w.de,
-      b: w.ate,
-      bottom: w.peitoril,
-      top: w.peitoril + w.altura,
-    })),
+    ...windows,
   ];
   const half = WALL_THICKNESS / 2;
   const walls = wallPieces(buildWalls(rooms), openings).map((piece) => {

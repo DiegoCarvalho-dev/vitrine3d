@@ -93,6 +93,47 @@ describe("portas automáticas", () => {
     expect(between(doors, rooms, "varanda", "cozinha")).toHaveLength(0);
   });
 
+  it("porta salva fora das paredes (cômodo editado) cai e volta a automática", () => {
+    const rooms = [
+      rect("sala", "sala", 0, 0, 4, 3),
+      rect("q", "quarto", 4, 0, 3, 3),
+    ];
+    const stale = [{ de: [5, 1] as Point, ate: [5, 1.8] as Point }];
+    expect(planDoors(rooms, stale)).toEqual([{ a: [4, 1.1], b: [4, 1.9] }]);
+  });
+
+  it("porta de vidro (passagem) dispensa outra porta no mesmo par", () => {
+    const rooms = [
+      rect("varanda", "varanda", 0, 0, 5, 1.5),
+      rect("sala", "sala", 0, 1.5, 5, 3),
+    ];
+    const glass = [{ a: [0.5, 1.5] as Point, b: [4.5, 1.5] as Point }];
+    expect(planDoors(rooms, [], glass)).toEqual([]);
+  });
+
+  it("paredes no mesmo alinhamento, cortadas por um vértice, viram um trecho só", () => {
+    // O hall tem um vértice no meio da parede comum (x = 10).
+    const rooms: DoorRoom[] = [
+      {
+        id: "hall",
+        type: "outro",
+        height: 2.7,
+        points: [
+          [9, 4],
+          [11, 4],
+          [11, 5],
+          [10, 5],
+          [9, 5],
+        ],
+      },
+      rect("q", "quarto", 9.6, 5, 0.9, 3),
+    ];
+    const runs = sharedRuns(rooms);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].length).toBeCloseTo(0.9);
+    expect(planDoors(rooms)).toHaveLength(1);
+  });
+
   it("portas salvas na planta (planta.portas) valem no lugar das automáticas", () => {
     const rooms = [
       rect("sala", "sala", 0, 0, 4, 3),
@@ -143,14 +184,17 @@ describe("portas automáticas", () => {
       });
 
       it("as portas salvas no seed (e a porta de vidro da varanda) ligam todos os cômodos", () => {
-        const saved = planDoors(
-          rooms,
-          typology.planta.portas as { de: Point; ate: Point }[],
-        );
         // A "janela" que começa no chão (peitoril 0) é a porta de vidro da varanda.
         const glassDoors = typology.planta.janelas
           .filter((j) => j.peitoril === 0)
           .map((j) => ({ a: j.de as Point, b: j.ate as Point }));
+        const saved = planDoors(
+          rooms,
+          typology.planta.portas as { de: Point; ate: Point }[],
+          glassDoors,
+        );
+        // Nenhuma porta a mais: as salvas e a de vidro já ligam tudo.
+        expect(saved).toHaveLength(typology.planta.portas.length);
         expect(
           roomsReachable(rooms, [...saved, ...glassDoors], hall.id).size,
         ).toBe(rooms.length);
@@ -160,6 +204,33 @@ describe("portas automáticas", () => {
 });
 
 describe("vãos nas paredes", () => {
+  it("vãos sobrepostos viram um só, sem verga dentro do vão", () => {
+    const walls = buildWalls([
+      rect("varanda", "varanda", 0, 0, 5, 1.5),
+      rect("sala", "sala", 0, 1.5, 5, 3),
+    ]).filter((w) => w.rooms.length === 2);
+    const pieces = wallPieces(walls, [
+      { a: [0.5, 1.5], b: [4.5, 1.5], bottom: 0, top: 2.2 },
+      { a: [2.1, 1.5], b: [2.9, 1.5], bottom: 0, top: 2.1 },
+      { a: [2.1, 1.5], b: [2.9, 1.5], bottom: 0, top: 2.1 }, // repetida
+    ]);
+    expect(pieces.map((p) => [wallLength(p), p.bottom, p.top])).toEqual([
+      [0.5, 0, 2.7],
+      [4, 2.2, 2.7],
+      [0.5, 0, 2.7],
+    ]);
+  });
+
+  it("janela encostada no canto fecha a quina (verga e peitoril crescem)", () => {
+    const walls = buildWalls([rect("q", "quarto", 0, 0, 3, 3)]);
+    const bottom = walls.filter((w) => w.a[1] === 0 && w.b[1] === 0);
+    const pieces = wallPieces(bottom, [
+      { a: [0, 0], b: [1, 0], bottom: 1, top: 2.2 },
+    ]);
+    const sill = pieces.find((p) => p.bottom === 0 && p.top === 1)!;
+    expect(sill.extendA).toBe(true);
+  });
+
   it("porta vira dois trechos cheios e uma verga em cima", () => {
     const walls = buildWalls([
       rect("sala", "sala", 0, 0, 4, 3),

@@ -110,57 +110,86 @@ function doorIn(run: Run): Door {
   return { a: lerp(t), b: lerp(1 - t) };
 }
 
+const midpoint = (door: Door): Point => [
+  (door.a[0] + door.b[0]) / 2,
+  (door.a[1] + door.b[1]) / 2,
+];
+
 /**
- * Doors of the unit: the saved ones (planta.portas) when there are any;
- * otherwise the automatic ones, only between rooms (never exterior walls).
+ * Doors of the unit. Saved doors (planta.portas) that still sit on a wall are
+ * kept as they are; with none, automatic doors go only between rooms (never
+ * on exterior walls). `passages` are openings that already connect rooms
+ * (a glass door: a window from the floor): no extra door goes there. In both
+ * cases, a room left unreachable gets a door to a reachable neighbor.
  */
 export function planDoors(
   rooms: readonly DoorRoom[],
   saved: readonly { de: Point; ate: Point }[] = [],
+  passages: readonly Door[] = [],
 ): Door[] {
-  if (saved.length) return saved.map((d) => ({ a: d.de, b: d.ate }));
+  const allRuns = sharedRuns(rooms);
+  const walls = buildWalls(rooms);
+  // A saved door left off the walls (the rooms were edited) is dropped.
+  const kept = saved
+    .map((d) => ({ a: d.de, b: d.ate }))
+    .filter((door) =>
+      walls.some((wall) => onSegment(wall.a, wall.b, midpoint(door))),
+    );
+  const crossing = (door: Door) =>
+    allRuns.find((run) => onSegment(run.a, run.b, midpoint(door)));
 
-  const runs = sharedRuns(rooms).filter((run) => run.length >= MIN_SHARED);
-  const chosen = new Set<Run>();
+  const open = new Set<Run>(); // already connected (saved door or passage)
+  for (const door of [...kept, ...passages]) {
+    const run = crossing(door);
+    if (run) open.add(run);
+  }
+  const runs = allRuns.filter((run) => run.length >= MIN_SHARED);
+  const chosen = new Set<Run>(); // new automatic doors
+  const connected = () => new Set([...open, ...chosen]);
   const hasDoor = (room: DoorRoom) =>
-    [...chosen].some((run) => run.rooms.includes(room));
+    [...connected()].some((run) => run.rooms.includes(room));
   const bathroomBlocked = (run: Run) =>
     run.rooms.some((room) => room.type === "banheiro" && hasDoor(room));
-  const longestFirst = (a: Run, b: Run) => b.length - a.length;
-
-  // 1. Bathrooms: one door, to the preferred neighbor.
-  for (const room of rooms.filter((r) => r.type === "banheiro")) {
-    const options = runs
-      .filter((run) => run.rooms.includes(room))
-      .filter((run) => isAllowed(...run.rooms))
-      .filter((run) => otherRoom(run, room).type !== "banheiro")
-      .sort(
-        (a, b) =>
-          rank(otherRoom(a, room).type) - rank(otherRoom(b, room).type) ||
-          longestFirst(a, b),
-      );
-    if (options[0]) chosen.add(options[0]);
-  }
-  // 2. The other allowed pairs (one door per pair: the longest stretch).
-  const pairs = new Set<string>();
-  for (const run of [...runs].sort(longestFirst)) {
-    const pair = run.rooms
+  const pairOf = (run: Run) =>
+    run.rooms
       .map((r) => r.id)
       .sort()
       .join("|");
-    if (run.rooms.some((r) => r.type === "banheiro")) continue;
-    if (!isAllowed(...run.rooms) || pairs.has(pair)) continue;
-    pairs.add(pair);
-    chosen.add(run);
+  const longestFirst = (a: Run, b: Run) => b.length - a.length;
+
+  if (!kept.length) {
+    // 1. Bathrooms: one door, to the preferred neighbor.
+    for (const room of rooms.filter((r) => r.type === "banheiro")) {
+      if (hasDoor(room)) continue;
+      const options = runs
+        .filter((run) => run.rooms.includes(room))
+        .filter((run) => isAllowed(...run.rooms))
+        .filter((run) => otherRoom(run, room).type !== "banheiro")
+        .sort(
+          (a, b) =>
+            rank(otherRoom(a, room).type) - rank(otherRoom(b, room).type) ||
+            longestFirst(a, b),
+        );
+      if (options[0]) chosen.add(options[0]);
+    }
+    // 2. The other allowed pairs (one door per pair: the longest stretch).
+    const pairs = new Set([...open].map(pairOf));
+    for (const run of [...runs].sort(longestFirst)) {
+      if (run.rooms.some((r) => r.type === "banheiro")) continue;
+      if (!isAllowed(...run.rooms) || pairs.has(pairOf(run))) continue;
+      pairs.add(pairOf(run));
+      chosen.add(run);
+    }
   }
   // 3. Any room still unreachable from the hall/living room gets a door to a
   //    reachable neighbor (e.g. a bedroom that only touches another bedroom).
   const start = rooms.find((r) => HUBS.includes(r.type)) ?? rooms[0];
   for (let changed = true; changed && start;) {
     changed = false;
-    const reached = reachable(start, chosen);
+    const reached = reachable(start, connected());
     const bridge = runs
-      .filter((run) => !chosen.has(run) && !bathroomBlocked(run))
+      .filter((run) => !open.has(run) && !chosen.has(run))
+      .filter((run) => !bathroomBlocked(run))
       .filter((run) => reached.has(run.rooms[0]) !== reached.has(run.rooms[1]))
       .sort(longestFirst)[0];
     if (bridge) {
@@ -168,7 +197,7 @@ export function planDoors(
       changed = true;
     }
   }
-  return [...chosen].map(doorIn);
+  return [...kept, ...[...chosen].map(doorIn)];
 }
 
 const rank = (type: RoomType) => {
