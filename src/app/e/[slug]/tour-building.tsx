@@ -5,7 +5,9 @@ import {
   Component,
   type ReactNode,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -82,6 +84,18 @@ class Fallback3D extends Component<
   }
 }
 
+/** Keeps the link shareable (filters + open unit) without reloading. */
+function syncUrl(filters: Filters, unit: SelectedUnit | null) {
+  const search = new URLSearchParams(filtersToSearch(filters));
+  if (unit) search.set("unidade", unit.number);
+  const query = search.toString();
+  window.history.replaceState(
+    null,
+    "",
+    `${window.location.pathname}${query ? `?${query}` : ""}`,
+  );
+}
+
 const toSelected = (unit: TourUnit): SelectedUnit => ({
   floor: unit.andar,
   position: unit.posicao_no_andar,
@@ -92,8 +106,8 @@ const toSelected = (unit: TourUnit): SelectedUnit => ({
 /**
  * Prédio do tour (issues #44 a #46). O 3D só existe no navegador (WebGL):
  * carregado com ssr: false. Enquanto carrega, sem WebGL ou se o 3D falhar,
- * aparece o prédio em SVG com os mesmos dados. Filtros, corte por andar e a
- * ficha da unidade ficam na URL (?quartos=3&unidade=902) para compartilhar.
+ * aparece o prédio em SVG com os mesmos dados. Os filtros e a unidade aberta
+ * ficam na URL (?quartos=3&unidade=902); a unidade abre já no andar dela.
  */
 export function TourBuilding({
   floors,
@@ -141,27 +155,35 @@ export function TourBuilding({
     normalizeFilters(initialFilters, { bedroomOptions, maxFloor: floors }),
   );
 
-  /** Keeps the link shareable (filters + open unit) without reloading. */
-  function syncUrl(nextFilters: Filters, unit: SelectedUnit | null) {
-    const search = new URLSearchParams(filtersToSearch(nextFilters));
-    if (unit) search.set("unidade", unit.number);
-    const query = search.toString();
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}${query ? `?${query}` : ""}`,
-    );
-  }
-
   function changeFilters(next: Filters) {
     setFilters(next);
     syncUrl(next, selected);
   }
 
+  /** Opening a unit (3D tap or list) also cuts the building at its floor. */
   function selectUnit(unit: SelectedUnit | null) {
     setSelected(unit);
+    if (unit) setCutFloor(unit.floor);
     syncUrl(filters, unit);
   }
+
+  function changeFloor(floor: number | null) {
+    setCutFloor(floor);
+    // The open unit is on another floor: close its sheet.
+    if (selected && floor !== null && selected.floor !== floor) {
+      setSelected(null);
+      syncUrl(filters, null);
+    }
+  }
+
+  // An unknown ?unidade= (e.g. 9999) leaves the link right away.
+  useEffect(() => {
+    if (initialUnit && !linkedUnit) syncUrl(initialFilters, null);
+  }, [initialUnit, linkedUnit, initialFilters]);
+
+  // After "Fechar" / "Ver o prédio inteiro", focus goes to a stable control.
+  const unitSelectRef = useRef<HTMLSelectElement>(null);
+  const floorSelectRef = useRef<HTMLSelectElement>(null);
 
   // null on the server (no document); true/false in the browser.
   const webgl = useSyncExternalStore(noop, hasWebGL, () => null);
@@ -224,9 +246,10 @@ export function TourBuilding({
         <NativeSelect
           id="tour-floor"
           className="h-10 w-44 md:h-8"
+          ref={floorSelectRef}
           value={cutFloor ?? ""}
           onChange={(event) =>
-            setCutFloor(
+            changeFloor(
               event.target.value === "" ? null : Number(event.target.value),
             )
           }
@@ -239,7 +262,14 @@ export function TourBuilding({
           ))}
         </NativeSelect>
         {cutFloor !== null && (
-          <Button variant="ghost" size="sm" onClick={() => setCutFloor(null)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              changeFloor(null);
+              floorSelectRef.current?.focus();
+            }}
+          >
             Ver o prédio inteiro
           </Button>
         )}
@@ -290,6 +320,7 @@ export function TourBuilding({
         </label>
         <NativeSelect
           id="tour-unit"
+          ref={unitSelectRef}
           className="h-10 w-36 md:h-8"
           value={selected?.number ?? ""}
           onChange={(event) => {
@@ -378,7 +409,13 @@ export function TourBuilding({
           <div className="flex flex-wrap items-center gap-3">
             {/* Inside the unit in 3D: Sprint 5. */}
             <Button disabled>Ver por dentro (em breve)</Button>
-            <Button variant="ghost" onClick={() => selectUnit(null)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                selectUnit(null);
+                unitSelectRef.current?.focus();
+              }}
+            >
               Fechar
             </Button>
           </div>

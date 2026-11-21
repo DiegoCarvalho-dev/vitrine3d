@@ -148,6 +148,10 @@ test.describe("Filtros do tour", () => {
 
     await anon.goto(`/e/${slug}`);
     await expect(found).toHaveText("24 unidades encontradas");
+    // The counter is already in the HTML; wait for the page to be interactive.
+    await expect(
+      anon.getByTestId("tour-building-3d").locator("canvas"),
+    ).toBeVisible({ timeout: 30_000 });
 
     // No celular os filtros ficam numa gaveta.
     const openFilters = anon.getByRole("button", { name: /^Filtros/ });
