@@ -69,10 +69,13 @@ export function TourBuilding({
   floors,
   unitsPerFloor,
   units,
+  accentColor,
 }: {
   floors: number;
   unitsPerFloor: number;
   units: TourUnit[];
+  /** The broker's brand color (entrance canopy). */
+  accentColor?: string;
 }) {
   const [selected, setSelected] = useState<SelectedUnit | null>(null);
   // null on the server (no document); true/false in the browser.
@@ -145,6 +148,7 @@ export function TourBuilding({
                 getNumber={getNumber}
                 selected={selected?.number ?? null}
                 onSelectUnit={setSelected}
+                accentColor={accentColor}
               />
             </Fallback3D>
           </div>

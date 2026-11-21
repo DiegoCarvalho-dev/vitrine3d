@@ -20,6 +20,7 @@ const DEPTH_X = 18; // profundidade da lateral (perspectiva oblíqua)
 const DEPTH_Y = -11;
 const LEFT = 10;
 const TOP = 24;
+const LOBBY_H = 26; // térreo mais alto que um andar
 
 const fill = (status: UnitStatus) => `var(--status-${status})`;
 const shade = (status: UnitStatus) =>
@@ -55,7 +56,8 @@ export function BuildingIllustration({
   const facadeW = unitsPerFloor * UNIT_W + (unitsPerFloor + 1) * GAP;
   const facadeH = floors * UNIT_H + (floors + 1) * GAP;
   const right = LEFT + facadeW;
-  const bottom = TOP + facadeH;
+  const towerBottom = TOP + facadeH;
+  const bottom = towerBottom + LOBBY_H; // térreo envidraçado embaixo
 
   const count = { disponivel: 0, reservado: 0, vendido: 0 };
   for (let floor = 1; floor <= floors; floor++)
@@ -82,14 +84,60 @@ export function BuildingIllustration({
         points={`${right},${TOP} ${right + DEPTH_X},${TOP + DEPTH_Y} ${right + DEPTH_X},${bottom + DEPTH_Y} ${right},${bottom}`}
         fill="#b9b5ad"
       />
-      {/* Fachada */}
-      <rect x={LEFT} y={TOP} width={facadeW} height={facadeH} fill="#e2e0db" />
+      {/* Fachada (concreto) */}
+      <rect x={LEFT} y={TOP} width={facadeW} height={facadeH} fill="#d4d0c8" />
+      {/* Platibanda (cobertura) */}
+      <rect
+        x={LEFT - 2}
+        y={TOP - 5}
+        width={facadeW + 4}
+        height={6}
+        fill="#c4c0b8"
+      />
+      {/* Térreo: vidro escuro, pilares e marquise na cor da marca */}
+      <rect
+        x={LEFT + 4}
+        y={towerBottom}
+        width={facadeW - 8}
+        height={LOBBY_H}
+        fill="#3b4652"
+      />
+      <rect
+        x={LEFT}
+        y={towerBottom}
+        width={5}
+        height={LOBBY_H}
+        fill="#d4d0c8"
+      />
+      <rect
+        x={right - 5}
+        y={towerBottom}
+        width={5}
+        height={LOBBY_H}
+        fill="#d4d0c8"
+      />
+      <rect
+        x={LEFT + facadeW / 2 - 18}
+        y={towerBottom + 6}
+        width={36}
+        height={3}
+        // Broker's brand on the tour (sets --brand), theme color elsewhere.
+        style={{ fill: "var(--brand, var(--primary))" }}
+      />
 
       {rows.map((floor, row) => {
         const y = TOP + GAP + row * (UNIT_H + GAP);
         const lastStatus = statusAt(floor, unitsPerFloor);
         return (
           <g key={floor}>
+            {/* Laje aparente, um pouco para fora da fachada */}
+            <rect
+              x={LEFT - 2}
+              y={y + UNIT_H + GAP / 2 - 1}
+              width={facadeW + 4}
+              height={2.2}
+              fill="#eeebe5"
+            />
             {Array.from({ length: unitsPerFloor }, (_, i) => {
               const position = i + 1;
               const status = statusAt(floor, position);
@@ -98,17 +146,43 @@ export function BuildingIllustration({
                 highlighted?.floor === floor &&
                 highlighted.position === position;
               return status ? (
-                <rect
-                  key={position}
-                  x={x}
-                  y={y}
-                  width={UNIT_W}
-                  height={UNIT_H}
-                  rx={1.5}
-                  style={{ fill: fill(status) }}
-                  stroke={isHighlighted ? "var(--primary)" : "none"}
-                  strokeWidth={isHighlighted ? 2.5 : 0}
-                />
+                <g key={position}>
+                  {/* Vidro do apartamento */}
+                  <rect
+                    x={x}
+                    y={y}
+                    width={UNIT_W}
+                    height={UNIT_H}
+                    rx={1}
+                    fill="#9db3c4"
+                  />
+                  {/* Faixa da varanda na cor do status; o contorno separa o
+                      cinza de "vendido" do vidro azulado. */}
+                  <rect
+                    x={x + 1}
+                    y={y + UNIT_H - 6}
+                    width={UNIT_W - 2}
+                    height={5}
+                    rx={0.8}
+                    style={{ fill: fill(status) }}
+                    stroke="#17202b"
+                    strokeOpacity={0.45}
+                    strokeWidth={0.7}
+                  />
+                  {/* Destaque por cima de tudo, para não ser cortado pela faixa */}
+                  {isHighlighted && (
+                    <rect
+                      x={x}
+                      y={y}
+                      width={UNIT_W}
+                      height={UNIT_H}
+                      rx={1}
+                      fill="none"
+                      stroke="var(--primary)"
+                      strokeWidth={2.5}
+                    />
+                  )}
+                </g>
               ) : (
                 <rect
                   key={position}

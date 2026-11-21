@@ -126,6 +126,7 @@ export default async function TourPage({ params }: Props) {
           >
             {isBuilding ? (
               <TourBuilding
+                accentColor={brand}
                 floors={project.numero_andares!}
                 unitsPerFloor={project.unidades_por_andar!}
                 // Only what the 3D needs goes to the browser.
