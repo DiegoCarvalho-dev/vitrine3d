@@ -148,6 +148,10 @@ test.describe("Filtros do tour", () => {
 
     await anon.goto(`/e/${slug}`);
     await expect(found).toHaveText("24 unidades encontradas");
+    // The counter is already in the HTML; wait for the page to be interactive.
+    await expect(
+      anon.getByTestId("tour-building-3d").locator("canvas"),
+    ).toBeVisible({ timeout: 30_000 });
 
     // No celular os filtros ficam numa gaveta.
     const openFilters = anon.getByRole("button", { name: /^Filtros/ });
@@ -196,6 +200,42 @@ test.describe("Filtros do tour", () => {
     await expect(found).toHaveText("24 unidades encontradas");
     await expect(anon.getByLabel("Preço até")).toHaveValue("");
     expect(new URL(anon.url()).search).toBe("");
+    if (isMobile)
+      await anon.getByRole("button", { name: /^Ver \d+ unidades/ }).click();
+
+    // Corte por andar e ficha (#46). Link da 601: sob consulta, 3 quartos, 6º andar.
+    const region = anon.getByTestId("tour-building-3d");
+    const sheet = anon.getByTestId("tour-unit-sheet");
+    await anon.goto(`/e/${slug}?unidade=601`);
+    // The sheet is already in the HTML; wait for the page to be interactive.
+    await expect(region.locator("canvas")).toBeVisible({ timeout: 30_000 });
+    await expect(sheet).toContainText("Unidade 601");
+    await expect(sheet).toContainText("6º andar");
+    await expect(sheet).toContainText("3 quartos");
+    await expect(anon.getByTestId("tour-unit-price")).toHaveText(
+      "Sob consulta",
+    );
+    await expect(
+      sheet.getByRole("button", { name: /Ver por dentro/ }),
+    ).toBeDisabled();
+    await expect(region).toHaveAttribute("data-cut-floor", "6");
+
+    // Escolher o 2º andar e abrir a 202 pela lista: preço público e link com a unidade.
+    await anon.getByLabel("Ver andar").selectOption("2");
+    await expect(region).toHaveAttribute("data-cut-floor", "2");
+    await anon
+      .getByLabel("Escolher unidade", { exact: true })
+      .selectOption("202");
+    await expect(anon.getByTestId("tour-unit-price")).toHaveText(/200\.000,00/);
+    await expect(sheet).toContainText("2 quartos");
+    expect(new URL(anon.url()).searchParams.get("unidade")).toBe("202");
+
+    // Fechar a ficha tira a unidade do link; voltar ao prédio inteiro.
+    await sheet.getByRole("button", { name: "Fechar" }).click();
+    await expect(sheet).toHaveCount(0);
+    expect(new URL(anon.url()).searchParams.get("unidade")).toBeNull();
+    await anon.getByRole("button", { name: "Ver o prédio inteiro" }).click();
+    await expect(region).toHaveAttribute("data-cut-floor", "");
     await visitor.close();
   });
 });
