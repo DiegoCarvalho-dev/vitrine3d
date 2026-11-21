@@ -16,6 +16,51 @@ export const STATUS_LABEL: Record<UnitStatus, string> = {
   vendido: "Vendido",
 };
 
+// Box sizes in the 3D scene (scene units ≈ meters / 3), shared with the layout.
+export const UNIT_W = 2;
+export const UNIT_H = 1;
+export const UNIT_D = 3;
+export const UNIT_GAP = 0.12;
+
+export type PlacedUnit = {
+  floor: number;
+  position: number;
+  number: string;
+  status: UnitStatus;
+  /** Center of the box in the scene (building centered on x = 0). */
+  x: number;
+  y: number;
+};
+
+/**
+ * Where each unit goes in the 3D building. `statusAt` returns null for a
+ * position without a unit (it stays as bare structure). `numberAt` lets the
+ * real number from the database win over the computed one.
+ */
+export function layoutUnits(
+  floors: number,
+  unitsPerFloor: number,
+  statusAt: (floor: number, position: number) => UnitStatus | null,
+  numberAt: (floor: number, position: number) => string = unitNumber,
+): PlacedUnit[] {
+  const list: PlacedUnit[] = [];
+  for (let floor = 1; floor <= floors; floor++) {
+    for (let position = 1; position <= unitsPerFloor; position++) {
+      const status = statusAt(floor, position);
+      if (!status) continue;
+      list.push({
+        floor,
+        position,
+        number: numberAt(floor, position),
+        status,
+        x: (position - 1 - (unitsPerFloor - 1) / 2) * (UNIT_W + UNIT_GAP),
+        y: (floor - 1) * (UNIT_H + UNIT_GAP) + UNIT_H / 2,
+      });
+    }
+  }
+  return list;
+}
+
 /** "1 disponível", "2 disponíveis", "3 reservadas" (counting "unidades"). */
 const STATUS_COUNT: Record<UnitStatus, [string, string]> = {
   disponivel: ["disponível", "disponíveis"],

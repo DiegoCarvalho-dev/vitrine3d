@@ -13,9 +13,13 @@ import {
 
 import {
   demoStatus,
+  layoutUnits,
   STATUS_HEX,
-  unitNumber,
+  UNIT_D,
+  UNIT_GAP as GAP,
+  UNIT_H,
   UNIT_STATUSES,
+  UNIT_W,
   type UnitStatus,
 } from "@/lib/building";
 
@@ -29,17 +33,16 @@ export type SelectedUnit = {
 type BuildingPreviewProps = {
   floors: number;
   unitsPerFloor: number;
-  /** Status de cada unidade; por padrão usa os dados de exemplo. */
-  getStatus?: (floor: number, position: number) => UnitStatus;
+  /**
+   * Status de cada unidade; por padrão usa os dados de exemplo. `null` =
+   * posição sem unidade (fica só a estrutura).
+   */
+  getStatus?: (floor: number, position: number) => UnitStatus | null;
+  /** Número da unidade (o do banco); por padrão andar + posição (101…). */
+  getNumber?: (floor: number, position: number) => string;
   selected?: string | null;
   onSelectUnit?: (unit: SelectedUnit) => void;
 };
-
-// Medidas de cada "caixa" (unidade) em unidades da cena (~metros/3).
-const UNIT_W = 2;
-const UNIT_H = 1;
-const UNIT_D = 3;
-const GAP = 0.12;
 // Se o dedo/mouse andou mais que isso entre apertar e soltar, foi para girar a
 // câmera, não para escolher uma unidade.
 const MAX_CLICK_DRAG_PX = 6;
@@ -50,6 +53,7 @@ export function BuildingPreview({
   floors,
   unitsPerFloor,
   getStatus = demoStatus,
+  getNumber,
   selected = null,
   onSelectUnit,
 }: BuildingPreviewProps) {
@@ -65,6 +69,8 @@ export function BuildingPreview({
       // Telas de celular têm densidade 3x; limitar a 2x evita renderizar 2,25x mais pixels.
       dpr={[1, 2]}
       camera={{ fov: 40 }}
+      // Quem usa este componente confere o WebGL antes (o fallback do Canvas
+      // não aparece quando o navegador tem <canvas> mas não tem WebGL).
       fallback={
         <p className="p-4 text-sm text-muted-foreground">
           Seu navegador não conseguiu abrir o 3D (WebGL indisponível).
@@ -81,6 +87,7 @@ export function BuildingPreview({
         floors={floors}
         unitsPerFloor={unitsPerFloor}
         getStatus={getStatus}
+        getNumber={getNumber}
         selected={selected}
         onSelectUnit={onSelectUnit}
       />
@@ -147,12 +154,13 @@ function Building({
   floors,
   unitsPerFloor,
   getStatus,
+  getNumber,
   selected,
   onSelectUnit,
 }: Required<
   Pick<BuildingPreviewProps, "floors" | "unitsPerFloor" | "getStatus">
 > &
-  Pick<BuildingPreviewProps, "selected" | "onSelectUnit">) {
+  Pick<BuildingPreviewProps, "getNumber" | "selected" | "onSelectUnit">) {
   const [hovered, setHovered] = useState<string | null>(null);
   useCursor(hovered !== null); // mãozinha no desktop ao passar sobre uma unidade
 
@@ -172,22 +180,10 @@ function Building({
     [],
   );
 
-  const units = useMemo(() => {
-    const list: (SelectedUnit & { x: number; y: number })[] = [];
-    for (let floor = 1; floor <= floors; floor++) {
-      for (let position = 1; position <= unitsPerFloor; position++) {
-        list.push({
-          floor,
-          position,
-          number: unitNumber(floor, position),
-          status: getStatus(floor, position),
-          x: (position - 1 - (unitsPerFloor - 1) / 2) * (UNIT_W + GAP),
-          y: (floor - 1) * (UNIT_H + GAP) + UNIT_H / 2,
-        });
-      }
-    }
-    return list;
-  }, [floors, unitsPerFloor, getStatus]);
+  const units = useMemo(
+    () => layoutUnits(floors, unitsPerFloor, getStatus, getNumber),
+    [floors, unitsPerFloor, getStatus, getNumber],
+  );
 
   function handleClick(event: ThreeEvent<MouseEvent>, unit: SelectedUnit) {
     event.stopPropagation(); // só a caixa mais à frente recebe o clique
