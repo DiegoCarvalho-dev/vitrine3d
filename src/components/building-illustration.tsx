@@ -121,7 +121,8 @@ export function BuildingIllustration({
         y={towerBottom + 6}
         width={36}
         height={3}
-        style={{ fill: "var(--primary)" }}
+        // Broker's brand on the tour (sets --brand), theme color elsewhere.
+        style={{ fill: "var(--brand, var(--primary))" }}
       />
 
       {rows.map((floor, row) => {
@@ -154,10 +155,9 @@ export function BuildingIllustration({
                     height={UNIT_H}
                     rx={1}
                     fill="#9db3c4"
-                    stroke={isHighlighted ? "var(--primary)" : "none"}
-                    strokeWidth={isHighlighted ? 2.5 : 0}
                   />
-                  {/* Faixa da varanda na cor do status */}
+                  {/* Faixa da varanda na cor do status; o contorno separa o
+                      cinza de "vendido" do vidro azulado. */}
                   <rect
                     x={x + 1}
                     y={y + UNIT_H - 6}
@@ -165,7 +165,23 @@ export function BuildingIllustration({
                     height={5}
                     rx={0.8}
                     style={{ fill: fill(status) }}
+                    stroke="#17202b"
+                    strokeOpacity={0.45}
+                    strokeWidth={0.7}
                   />
+                  {/* Destaque por cima de tudo, para não ser cortado pela faixa */}
+                  {isHighlighted && (
+                    <rect
+                      x={x}
+                      y={y}
+                      width={UNIT_W}
+                      height={UNIT_H}
+                      rx={1}
+                      fill="none"
+                      stroke="var(--primary)"
+                      strokeWidth={2.5}
+                    />
+                  )}
                 </g>
               ) : (
                 <rect

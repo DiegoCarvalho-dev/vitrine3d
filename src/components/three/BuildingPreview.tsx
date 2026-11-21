@@ -116,6 +116,8 @@ export function BuildingPreview({
       />
       {/* Sombra suave no chão, calculada uma vez (frames={1}): quase de graça. */}
       <ContactShadows
+        // New building size → new shadow (it is drawn only once).
+        key={`${floors}x${unitsPerFloor}`}
         position={[0, 0.01, 0]}
         scale={Math.max(width, UNIT_D) * 2.2}
         far={height}
@@ -229,6 +231,18 @@ function Building({
     }),
     [],
   );
+  // Free the GPU memory when the 3D leaves the screen (R3F doesn't dispose
+  // objects passed as props).
+  useEffect(
+    () => () => {
+      glassGeometry.dispose();
+      glassMaterial.dispose();
+      bandGeometry.dispose();
+      slabGeometry.dispose();
+      slabMaterial.dispose();
+    },
+    [glassGeometry, glassMaterial, bandGeometry, slabGeometry, slabMaterial],
+  );
   const bandMaterials = useMemo(
     () =>
       Object.fromEntries(
@@ -243,6 +257,11 @@ function Building({
         ]),
       ) as Record<UnitStatus, MeshStandardMaterial>,
     [],
+  );
+
+  useEffect(
+    () => () => Object.values(bandMaterials).forEach((m) => m.dispose()),
+    [bandMaterials],
   );
 
   const units = useMemo(
