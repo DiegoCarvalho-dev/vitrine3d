@@ -158,7 +158,7 @@ export const getMyTypology = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("tipologias")
-      .select("id, nome, area_privativa_m2")
+      .select("id, nome, area_privativa_m2, planta")
       .eq("id", typologyId)
       .eq("empreendimento_id", project.id)
       .maybeSingle();

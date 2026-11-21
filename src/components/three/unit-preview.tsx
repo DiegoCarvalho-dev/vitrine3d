@@ -5,13 +5,19 @@ import { Canvas } from "@react-three/fiber";
 
 import { bounds } from "@/lib/planta/geometry";
 
-import { type ModelRoom, UnitModel } from "./unit-model";
+import { type ModelPlan, type ModelRoom, UnitModel } from "./unit-model";
 
 /**
  * 3D preview of a typology (issue #48): the walls and floors seen from above
  * at an angle, to compare with the 2D plan. Load with dynamic(ssr: false).
  */
-export function UnitPreview({ rooms }: { rooms: readonly ModelRoom[] }) {
+export function UnitPreview({
+  rooms,
+  plan,
+}: {
+  rooms: readonly ModelRoom[];
+  plan?: ModelPlan;
+}) {
   const box = bounds(rooms.map((room) => room.points));
   const center: [number, number, number] = [
     (box.x0 + box.x1) / 2,
@@ -41,7 +47,7 @@ export function UnitPreview({ rooms }: { rooms: readonly ModelRoom[] }) {
       <color attach="background" args={["#f2f1ee"]} />
       <hemisphereLight args={["#f4f6fa", "#b9b5ad", 1.8]} />
       <directionalLight position={[6, 12, 8]} intensity={1.8} />
-      <UnitModel rooms={rooms} />
+      <UnitModel rooms={rooms} plan={plan} />
       <OrbitControls
         target={center}
         enablePan={false}

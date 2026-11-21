@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   FloorPlanPreview,
   type PreviewRoom,
 } from "@/components/floor-plan-preview";
-import type { ModelRoom } from "@/components/three/unit-model";
+import type { ModelPlan, ModelRoom } from "@/components/three/unit-model";
 import { Button } from "@/components/ui/button";
 
 const UnitPreview = dynamic(
@@ -15,11 +15,24 @@ const UnitPreview = dynamic(
   { ssr: false },
 );
 
-export type LabTypology = { name: string; rooms: (ModelRoom & PreviewRoom)[] };
+export type LabTypology = {
+  name: string;
+  rooms: (ModelRoom & PreviewRoom)[];
+  plan?: ModelPlan;
+};
 
 export function PlanLab({ typologies }: { typologies: LabTypology[] }) {
   const [index, setIndex] = useState(0);
+  const [automatic, setAutomatic] = useState(false);
   const typology = typologies[index];
+  // Automatic doors (#49): the saved ones are left out, the windows stay.
+  const plan = useMemo(
+    () =>
+      automatic && typology.plan
+        ? { ...typology.plan, portas: [] }
+        : typology.plan,
+    [automatic, typology],
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -35,10 +48,18 @@ export function PlanLab({ typologies }: { typologies: LabTypology[] }) {
             {t.name}
           </Button>
         ))}
+        <label className="ml-2 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={automatic}
+            onChange={(event) => setAutomatic(event.target.checked)}
+          />
+          Portas automáticas
+        </label>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="aspect-[4/3] overflow-hidden rounded-lg border">
-          <UnitPreview rooms={typology.rooms} />
+          <UnitPreview rooms={typology.rooms} plan={plan} />
         </div>
         <FloorPlanPreview rooms={typology.rooms} />
       </div>

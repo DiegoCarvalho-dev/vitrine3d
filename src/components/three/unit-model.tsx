@@ -13,8 +13,15 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import type { RoomType } from "@/lib/validacoes/comodo";
-import type { Point } from "@/lib/validacoes/planta";
-import { buildWalls, WALL_THICKNESS, wallLength } from "@/lib/planta/walls";
+import type { FloorPlan, Point } from "@/lib/validacoes/planta";
+import { DOOR_HEIGHT, planDoors } from "@/lib/planta/doors";
+import {
+  buildWalls,
+  type Opening,
+  WALL_THICKNESS,
+  wallLength,
+  wallPieces,
+} from "@/lib/planta/walls";
 
 // The apartment in 3D (issue #48): a floor per room (color by room type) and
 // walls along the room edges, shared walls only once. Everything merged into
@@ -66,7 +73,7 @@ function flatShape(points: readonly Point[], elevation: number) {
 /** Builds the merged geometries (pure: easy to reuse in other views). */
 export function buildUnitGeometry(
   rooms: readonly ModelRoom[],
-  { ceiling = false }: { ceiling?: boolean } = {},
+  { ceiling = false, plan }: { ceiling?: boolean; plan?: ModelPlan } = {},
 ) {
   const floors = rooms.map((room) =>
     paint(flatShape(room.points, 0), FLOOR_COLOR[room.type]),
@@ -75,17 +82,41 @@ export function buildUnitGeometry(
   const ceilings = ceiling
     ? rooms.map((room) => flatShape(room.points, room.height))
     : [];
-  const walls = buildWalls(rooms).map((wall) => {
-    const [ax, ay] = wall.a;
-    const [bx, by] = wall.b;
-    // A bit longer than the segment, so the corners close.
+  // Doors (saved or automatic, #49) and windows are holes in the walls.
+  const openings: Opening[] = [
+    ...planDoors(rooms, plan?.portas).map((door) => ({
+      ...door,
+      bottom: 0,
+      top: DOOR_HEIGHT,
+    })),
+    ...(plan?.janelas ?? []).map((w) => ({
+      a: w.de,
+      b: w.ate,
+      bottom: w.peitoril,
+      top: w.peitoril + w.altura,
+    })),
+  ];
+  const half = WALL_THICKNESS / 2;
+  const walls = wallPieces(buildWalls(rooms), openings).map((piece) => {
+    const [ax, ay] = piece.a;
+    const [bx, by] = piece.b;
+    const length = wallLength(piece);
+    // Corner ends grow half a thickness so the corners close; ends next to
+    // a door or window don't (the opening keeps its width).
+    const growA = piece.extendA ? half : 0;
+    const growB = piece.extendB ? half : 0;
+    const shift = (growB - growA) / 2 / length;
     const box = new BoxGeometry(
-      wallLength(wall) + WALL_THICKNESS,
-      wall.height,
+      length + growA + growB,
+      piece.top - piece.bottom,
       WALL_THICKNESS,
     );
     box.rotateY(Math.atan2(by - ay, bx - ax));
-    box.translate((ax + bx) / 2, wall.height / 2, -(ay + by) / 2);
+    box.translate(
+      (ax + bx) / 2 + (bx - ax) * shift,
+      (piece.bottom + piece.top) / 2,
+      -((ay + by) / 2 + (by - ay) * shift),
+    );
     return paint(box, WALL_COLOR);
   });
   const merge = (parts: BufferGeometry[]) => {
@@ -102,17 +133,22 @@ export function buildUnitGeometry(
   };
 }
 
+export type ModelPlan = Pick<FloorPlan, "portas" | "janelas">;
+
 export function UnitModel({
   rooms,
+  plan,
   showCeiling = false,
 }: {
   rooms: readonly ModelRoom[];
+  /** Saved doors and windows (tipologias.planta); no doors → automatic. */
+  plan?: ModelPlan;
   /** Hidden in the top view; from below it's seen only from inside anyway. */
   showCeiling?: boolean;
 }) {
   const geometry = useMemo(
-    () => buildUnitGeometry(rooms, { ceiling: showCeiling }),
-    [rooms, showCeiling],
+    () => buildUnitGeometry(rooms, { ceiling: showCeiling, plan }),
+    [rooms, showCeiling, plan],
   );
   useEffect(
     () => () => {

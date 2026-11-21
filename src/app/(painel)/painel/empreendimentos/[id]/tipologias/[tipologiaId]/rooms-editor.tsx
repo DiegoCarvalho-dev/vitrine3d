@@ -12,6 +12,7 @@ import {
   type PreviewRoom,
 } from "@/components/floor-plan-preview";
 import { describedBy, FormField } from "@/components/form-field";
+import type { ModelPlan } from "@/components/three/unit-model";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import {
@@ -112,11 +113,13 @@ export function RoomsEditor({
   typologyId,
   rooms,
   privateArea,
+  plan,
 }: {
   projectId: string;
   typologyId: string;
   rooms: EditorRoom[];
   privateArea: number | null;
+  plan?: ModelPlan;
 }) {
   const [selected, setSelected] = useState<EditorRoom | "new" | null>(
     rooms.length ? null : "new",
@@ -221,7 +224,7 @@ export function RoomsEditor({
                 className="aspect-[4/3] overflow-hidden rounded-lg border"
                 data-testid="unit-preview-3d"
               >
-                <UnitPreview rooms={modelRooms} />
+                <UnitPreview rooms={modelRooms} plan={plan} />
               </div>
             ) : (
               <FloorPlanPreview rooms={rooms} />
