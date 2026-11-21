@@ -10,6 +10,7 @@ import {
   statusCounts,
 } from "@/lib/tour/format";
 import { parseFilters } from "@/lib/tour/filters";
+import { parseUnitParam } from "@/lib/tour/unit-sheet";
 import { getPublishedProject } from "@/lib/tour/queries";
 import { publicImageUrl } from "@/lib/validacoes/midia";
 import { formatDecimal } from "@/lib/validacoes/numero";
@@ -48,7 +49,9 @@ export default async function TourPage({ params, searchParams }: Props) {
   if (!tour) notFound();
   const { project, broker, typologies, units } = tour;
   // Filters from the link (?quartos=3&ate=500000); invalid values are ignored.
-  const initialFilters = parseFilters(await searchParams);
+  const query = await searchParams;
+  const initialFilters = parseFilters(query);
+  const initialUnit = parseUnitParam(query.unidade); // ?unidade=902
   const bedroomsOf = new Map(typologies.map((t) => [t.id, t.quartos]));
 
   const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
@@ -135,6 +138,8 @@ export default async function TourPage({ params, searchParams }: Props) {
                 unitsPerFloor={project.unidades_por_andar!}
                 // Only what the 3D needs goes to the browser.
                 initialFilters={initialFilters}
+                initialUnit={initialUnit}
+                typologies={typologies}
                 units={units.map((unit) => ({
                   andar: unit.andar,
                   posicao_no_andar: unit.posicao_no_andar,
@@ -144,6 +149,7 @@ export default async function TourPage({ params, searchParams }: Props) {
                     ? (bedroomsOf.get(unit.tipologia_id) ?? null)
                     : null,
                   preco: unit.preco_publico,
+                  tipologiaId: unit.tipologia_id,
                 }))}
               />
             ) : (

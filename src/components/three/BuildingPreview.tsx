@@ -6,8 +6,13 @@ import {
   OrbitControls,
   useCursor,
 } from "@react-three/drei";
-import { Canvas, type ThreeEvent, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Canvas,
+  type ThreeEvent,
+  useFrame,
+  useThree,
+} from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BoxGeometry,
   MathUtils,
@@ -51,6 +56,8 @@ type BuildingPreviewProps = {
   accentColor?: string;
   /** true = unit outside the filters: drawn faded (still selectable). */
   isDimmed?: (floor: number, position: number) => boolean;
+  /** Floor "cut": floors above it disappear and the camera looks at it from above. */
+  cutFloor?: number | null;
 };
 
 const LOBBY_H = 1.3; // térreo mais alto que os andares
@@ -70,12 +77,22 @@ export function BuildingPreview({
   onSelectUnit,
   accentColor = SELECTED_EDGE,
   isDimmed,
+  cutFloor = null,
 }: BuildingPreviewProps) {
   // Térreo + andares + cobertura.
   const height = LOBBY_H + floors * (UNIT_H + GAP) + 1;
   const width = unitsPerFloor * (UNIT_W + GAP);
   // Raio da "esfera" que envolve o prédio: base para enquadrar e limitar o zoom.
   const radius = 0.5 * Math.hypot(width, height, UNIT_D);
+  const cut =
+    cutFloor !== null && cutFloor >= 1 && cutFloor <= floors ? cutFloor : null;
+  const view = cut
+    ? {
+        targetY: LOBBY_H + (cut - 1) * (UNIT_H + GAP) + UNIT_H / 2,
+        radius: 0.5 * Math.hypot(width, UNIT_D, UNIT_H * 2),
+        direction: TOP_DIRECTION,
+      }
+    : { targetY: height / 2, radius, direction: VIEW_DIRECTION };
 
   return (
     <Canvas
@@ -117,6 +134,7 @@ export function BuildingPreview({
         onSelectUnit={onSelectUnit}
         accentColor={accentColor}
         isDimmed={isDimmed}
+        cutFloor={cut}
       />
       {/* Sombra suave no chão, calculada uma vez (frames={1}): quase de graça. */}
       <ContactShadows
@@ -140,11 +158,15 @@ export function BuildingPreview({
         makeDefault // deixa os controles acessíveis ao FitCamera
         enableDamping
         enablePan={false} // no celular, arrastar com 2 dedos não "perde" o prédio
-        minDistance={radius * 1.2}
+        minDistance={view.radius * 1.2}
         maxDistance={radius * 8}
         maxPolarAngle={Math.PI / 2 - 0.05} // não deixa a câmera ir para baixo do chão
       />
-      <FitCamera targetY={height / 2} radius={radius} />
+      <FitCamera
+        targetY={view.targetY}
+        radius={view.radius}
+        direction={view.direction}
+      />
     </Canvas>
   );
 }
@@ -154,36 +176,89 @@ export function BuildingPreview({
 type OrbitControlsLike = { target: Vector3; update: () => void };
 
 const VIEW_DIRECTION = new Vector3(0.55, 0.3, 0.78).normalize();
+// Vendo um andar cortado: bem de cima, ainda um pouco de lado.
+const TOP_DIRECTION = new Vector3(0.3, 0.85, 0.45).normalize();
+const ANIMATION_SECONDS = 0.6;
 
 /**
- * Posiciona a câmera para o prédio inteiro caber na tela, em qualquer formato
- * (celular em pé, deitado, desktop). Recalcula só quando o tamanho muda.
+ * Posiciona a câmera para o que importa caber na tela (o prédio inteiro ou o
+ * andar cortado), em qualquer formato de tela. Entre uma vista e outra a
+ * câmera desliza (0,6 s) em vez de pular; a primeira vista é direta.
  */
-function FitCamera({ targetY, radius }: { targetY: number; radius: number }) {
+function FitCamera({
+  targetY,
+  radius,
+  direction,
+}: {
+  targetY: number;
+  radius: number;
+  direction: Vector3;
+}) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera;
   const size = useThree((state) => state.size);
   const controls = useThree(
     (state) => state.controls,
   ) as OrbitControlsLike | null;
   const invalidate = useThree((state) => state.invalidate);
+  const animation = useRef<{
+    fromPosition: Vector3;
+    fromTarget: Vector3;
+    toPosition: Vector3;
+    toTarget: Vector3;
+    progress: number;
+  } | null>(null);
+  const placed = useRef(false);
 
   useEffect(() => {
     const target = new Vector3(0, targetY, 0);
     const verticalFov = MathUtils.degToRad(camera.fov);
     const horizontalFov =
       2 * Math.atan(Math.tan(verticalFov / 2) * (size.width / size.height));
-    // O prédio cabe se a esfera que o envolve cabe no MENOR ângulo de visão.
+    // Cabe se a esfera que envolve o objeto cabe no MENOR ângulo de visão.
     const distance =
       (radius / Math.sin(Math.min(verticalFov, horizontalFov) / 2)) * 1.02;
+    const position = target.clone().addScaledVector(direction, distance);
 
-    camera.position.copy(target).addScaledVector(VIEW_DIRECTION, distance);
-    camera.lookAt(target);
-    if (controls) {
-      controls.target.copy(target);
-      controls.update();
+    if (!placed.current || !controls) {
+      camera.position.copy(position);
+      camera.lookAt(target);
+      if (controls) {
+        controls.target.copy(target);
+        controls.update();
+      }
+      placed.current = Boolean(controls);
+    } else {
+      animation.current = {
+        fromPosition: camera.position.clone(),
+        fromTarget: controls.target.clone(),
+        toPosition: position,
+        toTarget: target,
+        progress: 0,
+      };
     }
     invalidate();
-  }, [camera, controls, size.width, size.height, targetY, radius, invalidate]);
+  }, [
+    camera,
+    controls,
+    size.width,
+    size.height,
+    targetY,
+    radius,
+    direction,
+    invalidate,
+  ]);
+
+  useFrame((_, delta) => {
+    const anim = animation.current;
+    if (!anim || !controls) return;
+    anim.progress = Math.min(1, anim.progress + delta / ANIMATION_SECONDS);
+    const t = 1 - (1 - anim.progress) ** 3; // começa rápido, chega devagar
+    camera.position.lerpVectors(anim.fromPosition, anim.toPosition, t);
+    controls.target.lerpVectors(anim.fromTarget, anim.toTarget, t);
+    controls.update();
+    if (anim.progress < 1) invalidate();
+    else animation.current = null;
+  });
 
   return null;
 }
@@ -197,6 +272,7 @@ function Building({
   onSelectUnit,
   accentColor,
   isDimmed,
+  cutFloor,
 }: Required<
   Pick<
     BuildingPreviewProps,
@@ -205,7 +281,7 @@ function Building({
 > &
   Pick<
     BuildingPreviewProps,
-    "getNumber" | "selected" | "onSelectUnit" | "isDimmed"
+    "getNumber" | "selected" | "onSelectUnit" | "isDimmed" | "cutFloor"
   >) {
   const [hovered, setHovered] = useState<string | null>(null);
   useCursor(hovered !== null); // mãozinha no desktop ao passar sobre uma unidade
@@ -309,7 +385,14 @@ function Building({
   }
 
   const coreWidth = unitsPerFloor * (UNIT_W + GAP) - GAP;
-  const towerHeight = floors * (UNIT_H + GAP);
+  // With a cut, the tower ends at the cut floor (floors above disappear).
+  const visibleFloors = cutFloor ?? floors;
+  const towerHeight = visibleFloors * (UNIT_H + GAP);
+  // Seen from above with a cut, the concrete core stops at the floor of the
+  // cut floor, so the units of that floor are not covered.
+  const coreHeight = cutFloor
+    ? Math.max(0.05, (cutFloor - 1) * (UNIT_H + GAP) - GAP / 2)
+    : towerHeight;
   const floorHeights = useMemo(
     () => Array.from({ length: floors + 1 }, (_, i) => i * (UNIT_H + GAP)),
     [floors],
@@ -352,12 +435,12 @@ function Building({
 
       <group position={[0, LOBBY_H, 0]}>
         {/* Núcleo de concreto: aparece nos vãos entre os apartamentos. */}
-        <mesh position={[0, towerHeight / 2, -0.15]} raycast={() => null}>
-          <boxGeometry args={[coreWidth - 0.1, towerHeight, UNIT_D - 0.5]} />
+        <mesh position={[0, coreHeight / 2, -0.15]} raycast={() => null}>
+          <boxGeometry args={[coreWidth - 0.1, coreHeight, UNIT_D - 0.5]} />
           <meshStandardMaterial color={CONCRETE} roughness={0.95} />
         </mesh>
         {/* Lajes aparentes entre os andares, um pouco para fora da fachada. */}
-        {floorHeights.map((y) => (
+        {floorHeights.slice(0, visibleFloors + (cutFloor ? 0 : 1)).map((y) => (
           <mesh
             key={y}
             position={[0, y - GAP / 2, 0.05]}
@@ -367,59 +450,65 @@ function Building({
             raycast={() => null}
           />
         ))}
-        {/* Cobertura: platibanda e casa de máquinas. */}
-        <mesh position={[0, towerHeight + 0.2, 0]} raycast={() => null}>
-          <boxGeometry args={[coreWidth + 0.3, 0.4, UNIT_D + 0.1]} />
-          <meshStandardMaterial color={CONCRETE} roughness={0.9} />
-        </mesh>
-        <mesh position={[0, towerHeight + 0.7, -0.3]} raycast={() => null}>
-          <boxGeometry args={[Math.min(2.4, coreWidth * 0.4), 0.6, 1.4]} />
-          <meshStandardMaterial color="#b9b5ad" roughness={0.9} />
-        </mesh>
+        {/* Cobertura: platibanda e casa de máquinas (some com o corte). */}
+        {!cutFloor && (
+          <>
+            <mesh position={[0, towerHeight + 0.2, 0]} raycast={() => null}>
+              <boxGeometry args={[coreWidth + 0.3, 0.4, UNIT_D + 0.1]} />
+              <meshStandardMaterial color={CONCRETE} roughness={0.9} />
+            </mesh>
+            <mesh position={[0, towerHeight + 0.7, -0.3]} raycast={() => null}>
+              <boxGeometry args={[Math.min(2.4, coreWidth * 0.4), 0.6, 1.4]} />
+              <meshStandardMaterial color="#b9b5ad" roughness={0.9} />
+            </mesh>
+          </>
+        )}
 
-        {units.map(({ x, y, ...unit }) => {
-          const isSelected = unit.number === selected;
-          const isHovered = unit.number === hovered;
-          const dimmed = isDimmed?.(unit.floor, unit.position) ?? false;
-          return (
-            <group
-              key={unit.number}
-              position={[x, y, 0]}
-              onClick={(event) => handleClick(event, unit)}
-              onPointerOver={(event) => {
-                event.stopPropagation();
-                setHovered(unit.number);
-              }}
-              onPointerOut={() =>
-                setHovered((current) =>
-                  current === unit.number ? null : current,
-                )
-              }
-            >
-              {/* Janela de vidro (o apartamento). */}
-              <mesh
-                name={`unidade-${unit.number}`}
-                geometry={glassGeometry}
-                material={dimmed ? dimmedGlassMaterial : glassMaterial}
-              >
-                {(isSelected || isHovered) && (
-                  <Edges
-                    color={isSelected ? SELECTED_EDGE : "#17202b"}
-                    lineWidth={isSelected ? 3 : 1.5}
-                  />
-                )}
-              </mesh>
-              {/* Faixa da varanda na cor do status: lê-se de longe sem pintar o prédio. */}
-              <mesh
-                position={[0, -UNIT_H / 2 + 0.16, UNIT_D / 2 - 0.08]}
-                geometry={bandGeometry}
-                material={
-                  dimmed ? dimmedBandMaterial : bandMaterials[unit.status]
+        {units
+          .filter((unit) => !cutFloor || unit.floor <= cutFloor)
+          .map(({ x, y, ...unit }) => {
+            const isSelected = unit.number === selected;
+            const isHovered = unit.number === hovered;
+            const dimmed = isDimmed?.(unit.floor, unit.position) ?? false;
+            return (
+              <group
+                key={unit.number}
+                position={[x, y, 0]}
+                onClick={(event) => handleClick(event, unit)}
+                onPointerOver={(event) => {
+                  event.stopPropagation();
+                  setHovered(unit.number);
+                }}
+                onPointerOut={() =>
+                  setHovered((current) =>
+                    current === unit.number ? null : current,
+                  )
                 }
-              />
-            </group>
-          );
-        })}
+              >
+                {/* Janela de vidro (o apartamento). */}
+                <mesh
+                  name={`unidade-${unit.number}`}
+                  geometry={glassGeometry}
+                  material={dimmed ? dimmedGlassMaterial : glassMaterial}
+                >
+                  {(isSelected || isHovered) && (
+                    <Edges
+                      color={isSelected ? SELECTED_EDGE : "#17202b"}
+                      lineWidth={isSelected ? 3 : 1.5}
+                    />
+                  )}
+                </mesh>
+                {/* Faixa da varanda na cor do status: lê-se de longe sem pintar o prédio. */}
+                <mesh
+                  position={[0, -UNIT_H / 2 + 0.16, UNIT_D / 2 - 0.08]}
+                  geometry={bandGeometry}
+                  material={
+                    dimmed ? dimmedBandMaterial : bandMaterials[unit.status]
+                  }
+                />
+              </group>
+            );
+          })}
       </group>
     </group>
   );

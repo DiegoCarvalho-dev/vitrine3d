@@ -16,6 +16,7 @@ import {
 } from "@/components/building-illustration";
 import { NativeSelect } from "@/components/native-select";
 import type { SelectedUnit } from "@/components/three/BuildingPreview";
+import { Button } from "@/components/ui/button";
 import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
 import {
   filtersToSearch,
@@ -23,16 +24,24 @@ import {
   normalizeFilters,
   type TourFilters as Filters,
 } from "@/lib/tour/filters";
+import {
+  priceLabel,
+  type SheetTypology,
+  typologyRows,
+} from "@/lib/tour/unit-sheet";
 
 import { TourFilters } from "./tour-filters";
 
 export type TourUnit = BuildingUnit & {
   numero: string;
+  tipologiaId: string | null;
   /** Bedrooms of the typology (null = none). */
   quartos: number | null;
   /** Public price (null = "sob consulta"). */
   preco: number | null;
 };
+
+export type TourTypology = SheetTypology & { id: string };
 
 const BuildingPreview = dynamic(
   () =>
@@ -73,28 +82,51 @@ class Fallback3D extends Component<
   }
 }
 
+const toSelected = (unit: TourUnit): SelectedUnit => ({
+  floor: unit.andar,
+  position: unit.posicao_no_andar,
+  number: unit.numero,
+  status: unit.status,
+});
+
 /**
- * Prédio do tour (issue #44). O 3D só existe no navegador (WebGL): carregado
- * com ssr: false, fora do HTML inicial. Enquanto carrega, sem WebGL ou se o 3D
- * falhar, aparece o prédio em SVG com os mesmos dados. A lista "Escolher
- * unidade" faz o mesmo que tocar no 3D, para teclado e leitor de tela.
+ * Prédio do tour (issues #44 a #46). O 3D só existe no navegador (WebGL):
+ * carregado com ssr: false. Enquanto carrega, sem WebGL ou se o 3D falhar,
+ * aparece o prédio em SVG com os mesmos dados. Filtros, corte por andar e a
+ * ficha da unidade ficam na URL (?quartos=3&unidade=902) para compartilhar.
  */
 export function TourBuilding({
   floors,
   unitsPerFloor,
   units,
+  typologies,
   accentColor,
   initialFilters,
+  initialUnit,
 }: {
   floors: number;
   unitsPerFloor: number;
   units: TourUnit[];
+  typologies: TourTypology[];
   /** The broker's brand color (entrance canopy). */
   accentColor?: string;
   /** Filters from the link (?quartos=3&ate=500000). */
   initialFilters: Filters;
+  /** Unit from the link (?unidade=902). */
+  initialUnit: string | null;
 }) {
-  const [selected, setSelected] = useState<SelectedUnit | null>(null);
+  const byNumber = useMemo(
+    () => new Map(units.map((u) => [u.numero, u])),
+    [units],
+  );
+  const linkedUnit = initialUnit ? byNumber.get(initialUnit) : undefined;
+  const [selected, setSelected] = useState<SelectedUnit | null>(
+    linkedUnit ? toSelected(linkedUnit) : null,
+  );
+  // A unit from the link opens already on its floor.
+  const [cutFloor, setCutFloor] = useState<number | null>(
+    linkedUnit?.andar ?? null,
+  );
   const bedroomOptions = useMemo(
     () =>
       [
@@ -109,15 +141,26 @@ export function TourBuilding({
     normalizeFilters(initialFilters, { bedroomOptions, maxFloor: floors }),
   );
 
-  function changeFilters(next: Filters) {
-    setFilters(next);
-    // Keeps the link shareable without reloading the page.
-    const search = filtersToSearch(next);
+  /** Keeps the link shareable (filters + open unit) without reloading. */
+  function syncUrl(nextFilters: Filters, unit: SelectedUnit | null) {
+    const search = new URLSearchParams(filtersToSearch(nextFilters));
+    if (unit) search.set("unidade", unit.number);
+    const query = search.toString();
     window.history.replaceState(
       null,
       "",
-      `${window.location.pathname}${search ? `?${search}` : ""}`,
+      `${window.location.pathname}${query ? `?${query}` : ""}`,
     );
+  }
+
+  function changeFilters(next: Filters) {
+    setFilters(next);
+    syncUrl(next, selected);
+  }
+
+  function selectUnit(unit: SelectedUnit | null) {
+    setSelected(unit);
+    syncUrl(filters, unit);
   }
 
   // null on the server (no document); true/false in the browser.
@@ -129,10 +172,12 @@ export function TourBuilding({
   );
   const isDimmed = useCallback(
     (floor: number, position: number) => {
+      // In the drawing (no cut there), floors above the cut fade out too.
+      if (cutFloor !== null && floor > cutFloor) return true;
       const unit = byPosition.get(`${floor}-${position}`);
       return unit ? !matchesFilters(unit, filters) : false;
     },
-    [byPosition, filters],
+    [byPosition, filters, cutFloor],
   );
   const getStatus = useCallback(
     (floor: number, position: number): UnitStatus | null =>
@@ -156,19 +201,11 @@ export function TourBuilding({
     />
   );
 
-  function selectByNumber(numero: string) {
-    const unit = units.find((u) => u.numero === numero);
-    setSelected(
-      unit
-        ? {
-            floor: unit.andar,
-            position: unit.posicao_no_andar,
-            number: unit.numero,
-            status: unit.status,
-          }
-        : null,
-    );
-  }
+  const selectedUnit = selected ? byNumber.get(selected.number) : undefined;
+  const typology = selectedUnit?.tipologiaId
+    ? (typologies.find((t) => t.id === selectedUnit.tipologiaId) ?? null)
+    : null;
+  const floorOptions = Array.from({ length: floors }, (_, i) => floors - i);
 
   return (
     <div className="flex flex-col gap-3">
@@ -179,11 +216,41 @@ export function TourBuilding({
         bedroomOptions={bedroomOptions}
         maxFloor={floors}
       />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <label htmlFor="tour-floor" className="text-sm font-medium">
+          Ver andar
+        </label>
+        <NativeSelect
+          id="tour-floor"
+          className="h-10 w-44 md:h-8"
+          value={cutFloor ?? ""}
+          onChange={(event) =>
+            setCutFloor(
+              event.target.value === "" ? null : Number(event.target.value),
+            )
+          }
+        >
+          <option value="">Prédio inteiro</option>
+          {floorOptions.map((floor) => (
+            <option key={floor} value={floor}>
+              {floor}º andar
+            </option>
+          ))}
+        </NativeSelect>
+        {cutFloor !== null && (
+          <Button variant="ghost" size="sm" onClick={() => setCutFloor(null)}>
+            Ver o prédio inteiro
+          </Button>
+        )}
+      </div>
+
       <div
         role="region"
-        aria-label={`Prédio com ${floors} andares e ${unitsPerFloor} unidades por andar. Toque numa unidade ou use a lista "Escolher unidade" para ver o número e a situação.`}
+        aria-label={`Prédio com ${floors} andares e ${unitsPerFloor} unidades por andar${cutFloor ? `, mostrando o ${cutFloor}º andar visto de cima` : ""}. Toque numa unidade ou use a lista "Escolher unidade" para abrir a ficha.`}
         className="relative h-[60svh] max-h-[34rem] min-h-80 w-full overflow-hidden rounded-md"
         data-testid="tour-building-3d"
+        data-cut-floor={cutFloor ?? ""}
       >
         <span className="absolute top-3 left-3 z-10 rounded-full bg-background/90 px-2 py-0.5 text-xs text-muted-foreground">
           Imagem ilustrativa
@@ -207,9 +274,10 @@ export function TourBuilding({
                 getStatus={getStatus}
                 getNumber={getNumber}
                 selected={selected?.number ?? null}
-                onSelectUnit={setSelected}
+                onSelectUnit={selectUnit}
                 accentColor={accentColor}
                 isDimmed={isDimmed}
+                cutFloor={cutFloor}
               />
             </Fallback3D>
           </div>
@@ -222,9 +290,12 @@ export function TourBuilding({
         </label>
         <NativeSelect
           id="tour-unit"
-          className="w-36"
+          className="h-10 w-36 md:h-8"
           value={selected?.number ?? ""}
-          onChange={(event) => selectByNumber(event.target.value)}
+          onChange={(event) => {
+            const unit = byNumber.get(event.target.value);
+            selectUnit(unit ? toSelected(unit) : null);
+          }}
         >
           <option value="">—</option>
           {units.map((u) => (
@@ -248,11 +319,71 @@ export function TourBuilding({
             </>
           ) : (
             <span className="text-muted-foreground">
-              Toque numa unidade para ver o número e a situação.
+              Toque numa unidade para abrir a ficha.
             </span>
           )}
         </p>
       </div>
+
+      {selected && selectedUnit && (
+        <section
+          aria-labelledby="unit-sheet-title"
+          className="flex flex-col gap-4 rounded-lg border bg-card p-4"
+          data-testid="tour-unit-sheet"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3
+                id="unit-sheet-title"
+                className="font-heading text-xl font-semibold"
+              >
+                Unidade {selectedUnit.numero}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {selectedUnit.andar}º andar
+              </p>
+            </div>
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <span
+                aria-hidden
+                className="size-3 rounded-sm"
+                style={{ background: `var(--status-${selectedUnit.status})` }}
+              />
+              {STATUS_LABEL[selectedUnit.status]}
+            </span>
+          </div>
+
+          <p
+            className="text-2xl font-semibold tabular-nums"
+            data-testid="tour-unit-price"
+          >
+            {priceLabel(selectedUnit.preco)}
+          </p>
+
+          {typology ? (
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+              {typologyRows(typology).map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="font-medium">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Planta desta unidade ainda não informada.
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Inside the unit in 3D: Sprint 5. */}
+            <Button disabled>Ver por dentro (em breve)</Button>
+            <Button variant="ghost" onClick={() => selectUnit(null)}>
+              Fechar
+            </Button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
