@@ -18,4 +18,9 @@
 ## Próximas sprints (roteiro, a detalhar em ondas)
 - **Sprint 6 – Leads e analytics:** botão WhatsApp com mensagem pronta, formulário com consentimento LGPD, eventos de visita, e-mail ao corretor a cada lead (Resend), painel de leads e visualizações com resumo do mês; rate limit e dados do visitante sempre como texto.
 - **Sprint 7 – Qualidade e CI:** GitHub Actions nos PRs (lint, typecheck, testes, build), proteção da `main`, e2e dos fluxos principais, desempenho no celular.
-- **Sprint 8 – Editor de planta e polimento:** editor visual de cômodos em grade (portas e janelas), polimento visual do painel (textos de ajuda e ordem dos passos, do teste cronometrado da #34) e demo final para o portfólio.
+- **Sprint 8 – Editor de planta e polimento:** editor visual de cômodos em grade (portas e janelas), polimento visual do painel (textos de ajuda e ordem dos passos, do teste cronometrado da #34), **polimento visual do tour** (prédio 3D mais realista: materiais, guarda-corpos, entorno com calçada e árvores; página pública — feedback do usuário no teste da Sprint 4: "o prédio 3D está feio comparado à ilustração da home") e demo final para o portfólio. Antes, juntar a lista de melhorias do usuário.
+
+## Depois do MVP (fases, ver `docs/01`)
+- **Fase 2:** fotos 360° de cada cômodo (o dono/corretor fotografa; o cliente "olha em volta" dentro do cômodo real), links por campanha, simulador, mapa.
+- **Fase 3:** vídeo → 3D fotorrealista (Gaussian Splatting), com móveis e paredes reais. É a visão do usuário de "entrar na unidade e ver tudo em 3D com o que o dono fotografou".
+- No MVP (Sprint 5), a unidade em 3D vem da planta cadastrada (paredes, portas, piso, etiquetas), sem móveis nem fotos. Opção em aberto: móveis simples por tipo de cômodo na Sprint 5.
