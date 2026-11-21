@@ -2,7 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
+import { useMemo, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -40,6 +41,17 @@ import {
 import { formatDecimal, parseMeters } from "@/lib/validacoes/numero";
 
 import { createRoom, deleteRoom, moveRoom, updateRoom } from "./actions";
+
+// The 3D only exists in the browser (WebGL); loaded only when asked for.
+const UnitPreview = dynamic(
+  () => import("@/components/three/unit-preview").then((m) => m.UnitPreview),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="p-4 text-sm text-muted-foreground">Carregando o 3D…</p>
+    ),
+  },
+);
 
 export type EditorRoom = PreviewRoom & {
   type: RoomType;
@@ -112,6 +124,19 @@ export function RoomsEditor({
   const [formKey, setFormKey] = useState(0);
   const [pending, startTransition] = useTransition();
   const [deleting, setDeleting] = useState<EditorRoom | null>(null);
+  const [show3d, setShow3d] = useState(false);
+  // No rooms left: back to the 2D plan (the toggle is hidden).
+  if (show3d && !rooms.length) setShow3d(false);
+  const modelRooms = useMemo(
+    () =>
+      rooms.map((room) => ({
+        id: room.id,
+        type: room.type,
+        points: room.points,
+        height: room.ceilingHeight,
+      })),
+    [rooms],
+  );
 
   function open(room: EditorRoom | "new") {
     setSelected(room);
@@ -166,7 +191,42 @@ export function RoomsEditor({
             )}
           />
         ) : (
-          <FloorPlanPreview rooms={rooms} />
+          <>
+            {rooms.length > 0 && (
+              <div
+                role="group"
+                aria-label="Tipo de prévia"
+                className="flex gap-2 self-start"
+              >
+                <Button
+                  size="sm"
+                  variant={show3d ? "outline" : "secondary"}
+                  aria-pressed={!show3d}
+                  onClick={() => setShow3d(false)}
+                >
+                  Planta
+                </Button>
+                <Button
+                  size="sm"
+                  variant={show3d ? "secondary" : "outline"}
+                  aria-pressed={show3d}
+                  onClick={() => setShow3d(true)}
+                >
+                  Ver em 3D
+                </Button>
+              </div>
+            )}
+            {show3d && rooms.length > 0 ? (
+              <div
+                className="aspect-[4/3] overflow-hidden rounded-lg border"
+                data-testid="unit-preview-3d"
+              >
+                <UnitPreview rooms={modelRooms} />
+              </div>
+            ) : (
+              <FloorPlanPreview rooms={rooms} />
+            )}
+          </>
         )}
         <p
           className="text-sm text-muted-foreground tabular-nums"
