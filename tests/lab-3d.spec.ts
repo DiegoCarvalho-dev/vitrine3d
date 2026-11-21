@@ -68,3 +68,16 @@ test.describe("Lab: prédio 3D", () => {
     );
   });
 });
+
+test("Lab: planta 3D do Residencial Demo carrega sem erros", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (err) => errors.push(err.message));
+  await page.goto("/lab/planta");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Tipo B" }).click();
+  await expect(page.locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("floor-plan-room")).toHaveCount(10);
+  expect(errors).toEqual([]);
+});

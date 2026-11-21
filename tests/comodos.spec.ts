@@ -96,6 +96,14 @@ test.describe("Cômodos e prévia da planta", () => {
       "29 m² de 30 m²",
     );
 
+    // Prévia em 3D (#48): troca a planta pelo modelo e volta.
+    await page.getByRole("button", { name: "Ver em 3D" }).click();
+    await expect(
+      page.getByTestId("unit-preview-3d").locator("canvas"),
+    ).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Planta", exact: true }).click();
+    await expect(preview).toBeVisible();
+
     // Banheiro em cima da sala: recusado antes de salvar.
     await page.getByRole("button", { name: "Novo cômodo" }).click();
     form = await fillRoom(page, {
