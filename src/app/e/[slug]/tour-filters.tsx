@@ -10,6 +10,7 @@ import {
   type FilterUnit,
   foundLabel,
   hasActiveFilters,
+  hasInvertedRange,
   hasPriceFilter,
   NO_FILTERS,
   type TourFilters as Filters,
@@ -154,6 +155,11 @@ export function TourFilters({
           </div>
         </div>
 
+        {hasInvertedRange(filters) && (
+          <p role="alert" className="mt-3 text-xs text-destructive">
+            O valor inicial é maior que o final: nenhuma unidade vai aparecer.
+          </p>
+        )}
         {hasPriceFilter(filters) && someOnRequest && (
           <p
             className="mt-3 text-xs text-muted-foreground"
@@ -182,6 +188,8 @@ function PriceField({
     value === undefined ? "" : formatMoney(value),
   );
   const parsed = parseMoney(text);
+  // "Limpar filtros" empties the value from outside: empty the field too.
+  if (value === undefined && typeof parsed === "number") setText("");
   const invalid = parsed === "invalid";
 
   return (

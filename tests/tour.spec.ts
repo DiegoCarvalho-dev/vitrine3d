@@ -194,6 +194,7 @@ test.describe("Filtros do tour", () => {
     // Limpar volta ao começo e à URL sem filtros.
     await anon.getByRole("button", { name: "Limpar filtros" }).click();
     await expect(found).toHaveText("24 unidades encontradas");
+    await expect(anon.getByLabel("Preço até")).toHaveValue("");
     expect(new URL(anon.url()).search).toBe("");
     await visitor.close();
   });

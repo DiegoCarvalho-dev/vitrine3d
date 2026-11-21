@@ -118,3 +118,52 @@ export function foundLabel(n: number): string {
   if (n === 0) return "Nenhuma unidade encontrada";
   return n === 1 ? "1 unidade encontrada" : `${n} unidades encontradas`;
 }
+
+/**
+ * Cleans filters that came from a (possibly hand-edited) link: values with no
+ * matching option are dropped, and an inverted range is swapped.
+ */
+export function normalizeFilters(
+  filters: TourFilters,
+  limits: { bedroomOptions: readonly number[]; maxFloor: number },
+): TourFilters {
+  const next = { ...filters };
+  if (
+    next.bedrooms !== undefined &&
+    !limits.bedroomOptions.includes(next.bedrooms)
+  ) {
+    delete next.bedrooms;
+  }
+  for (const key of ["minFloor", "maxFloor"] as const) {
+    const value = next[key];
+    if (value !== undefined && (value < 1 || value > limits.maxFloor))
+      delete next[key];
+  }
+  if (
+    next.minPrice !== undefined &&
+    next.maxPrice !== undefined &&
+    next.minPrice > next.maxPrice
+  ) {
+    [next.minPrice, next.maxPrice] = [next.maxPrice, next.minPrice];
+  }
+  if (
+    next.minFloor !== undefined &&
+    next.maxFloor !== undefined &&
+    next.minFloor > next.maxFloor
+  ) {
+    [next.minFloor, next.maxFloor] = [next.maxFloor, next.minFloor];
+  }
+  return next;
+}
+
+/** A range typed with the start after the end (nothing can match). */
+export function hasInvertedRange(filters: TourFilters): boolean {
+  return (
+    (filters.minPrice !== undefined &&
+      filters.maxPrice !== undefined &&
+      filters.minPrice > filters.maxPrice) ||
+    (filters.minFloor !== undefined &&
+      filters.maxFloor !== undefined &&
+      filters.minFloor > filters.maxFloor)
+  );
+}

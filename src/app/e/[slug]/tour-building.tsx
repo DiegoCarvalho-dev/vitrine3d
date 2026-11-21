@@ -20,6 +20,7 @@ import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
 import {
   filtersToSearch,
   matchesFilters,
+  normalizeFilters,
   type TourFilters as Filters,
 } from "@/lib/tour/filters";
 
@@ -94,7 +95,19 @@ export function TourBuilding({
   initialFilters: Filters;
 }) {
   const [selected, setSelected] = useState<SelectedUnit | null>(null);
-  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const bedroomOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          units.map((u) => u.quartos).filter((n): n is number => n !== null),
+        ),
+      ].sort((a, b) => a - b),
+    [units],
+  );
+  // A link edited by hand may carry values with no matching option.
+  const [filters, setFilters] = useState<Filters>(() =>
+    normalizeFilters(initialFilters, { bedroomOptions, maxFloor: floors }),
+  );
 
   function changeFilters(next: Filters) {
     setFilters(next);
@@ -106,16 +119,6 @@ export function TourBuilding({
       `${window.location.pathname}${search ? `?${search}` : ""}`,
     );
   }
-
-  const bedroomOptions = useMemo(
-    () =>
-      [
-        ...new Set(
-          units.map((u) => u.quartos).filter((n): n is number => n !== null),
-        ),
-      ].sort((a, b) => a - b),
-    [units],
-  );
 
   // null on the server (no document); true/false in the browser.
   const webgl = useSyncExternalStore(noop, hasWebGL, () => null);

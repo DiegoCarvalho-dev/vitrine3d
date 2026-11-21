@@ -5,8 +5,10 @@ import {
   filtersToSearch,
   foundLabel,
   hasActiveFilters,
+  hasInvertedRange,
   matchesFilters,
   NO_FILTERS,
+  normalizeFilters,
   parseFilters,
   type FilterUnit,
 } from "./filters";
@@ -108,5 +110,38 @@ describe("contador", () => {
     expect(foundLabel(0)).toBe("Nenhuma unidade encontrada");
     expect(foundLabel(1)).toBe("1 unidade encontrada");
     expect(foundLabel(12)).toBe("12 unidades encontradas");
+  });
+});
+
+describe("normalizeFilters (link editado à mão)", () => {
+  const limits = { bedroomOptions: [2, 3], maxFloor: 10 };
+
+  it("descarta o que não tem opção e troca faixa invertida", () => {
+    expect(
+      normalizeFilters(
+        {
+          onlyAvailable: false,
+          bedrooms: 7,
+          minFloor: 50,
+          minPrice: 900000,
+          maxPrice: 300000,
+        },
+        limits,
+      ),
+    ).toEqual({ onlyAvailable: false, minPrice: 300000, maxPrice: 900000 });
+  });
+
+  it("mantém o que está certo", () => {
+    const ok = { onlyAvailable: true, bedrooms: 3, minFloor: 2, maxFloor: 8 };
+    expect(normalizeFilters(ok, limits)).toEqual(ok);
+  });
+
+  it("avisa quando a faixa digitada está invertida", () => {
+    expect(
+      hasInvertedRange({ onlyAvailable: false, minPrice: 5, maxPrice: 1 }),
+    ).toBe(true);
+    expect(
+      hasInvertedRange({ onlyAvailable: false, minFloor: 1, maxFloor: 5 }),
+    ).toBe(false);
   });
 });
