@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { BuildingIllustration } from "@/components/building-illustration";
 import { statusCountLabel, UNIT_STATUSES } from "@/lib/building";
 import { getPublicEnv } from "@/lib/env";
 import {
@@ -19,6 +18,8 @@ import {
   HEX_COLOR,
 } from "@/lib/validacoes/perfil";
 import { formatMoney } from "@/lib/validacoes/unidade";
+
+import { TourBuilding } from "./tour-building";
 
 type Props = PageProps<"/e/[slug]">;
 
@@ -124,8 +125,7 @@ export default async function TourPage({ params }: Props) {
             data-testid="tour-building"
           >
             {isBuilding ? (
-              <BuildingIllustration
-                className="mx-auto max-h-[28rem] w-full"
+              <TourBuilding
                 floors={project.numero_andares!}
                 unitsPerFloor={project.unidades_por_andar!}
                 units={units}

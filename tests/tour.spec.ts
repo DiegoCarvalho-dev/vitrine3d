@@ -50,12 +50,36 @@ test.describe("Tour público /e/[slug]", () => {
     expect(await page.content()).not.toMatch(/777[.,]?777/);
 
     // Visitante sem login.
-    const visitor = await browser.newContext();
+    // Same device as the project (iPhone 13 on "celular"), without the login.
+    const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } =
+      testInfo.project.use;
+    const visitor = await browser.newContext({
+      viewport,
+      userAgent,
+      deviceScaleFactor,
+      isMobile,
+      hasTouch,
+    });
     const anon = await visitor.newPage();
     const response = await anon.goto(url);
     expect(response?.status()).toBe(200);
     await expect(anon.getByRole("heading", { level: 1, name })).toBeVisible();
     expect(await anon.content()).not.toMatch(/777[.,]?777/);
+
+    // Prédio 3D (#44): tocar no meio do prédio escolhe uma unidade real.
+    const canvas = anon.getByTestId("tour-building-3d").locator("canvas");
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    const selectedUnit = anon.getByTestId("tour-selected-unit");
+    await expect(async () => {
+      if (testInfo.project.name === "celular") await canvas.tap();
+      else await canvas.click();
+      await expect(selectedUnit).toContainText(/Unidade \d{3}/, {
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 20_000 });
+    await expect(selectedUnit).toContainText(
+      /andar · (Disponível|Reservado|Vendido)/,
+    );
 
     // Rascunho, arquivado e slug inexistente: 404.
     for (const status of ["rascunho", "arquivado"]) {
