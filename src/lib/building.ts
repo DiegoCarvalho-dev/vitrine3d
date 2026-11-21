@@ -16,6 +16,16 @@ export const STATUS_LABEL: Record<UnitStatus, string> = {
   vendido: "Vendido",
 };
 
+/** "1 disponível", "2 disponíveis", "3 reservadas" (counting "unidades"). */
+const STATUS_COUNT: Record<UnitStatus, [string, string]> = {
+  disponivel: ["disponível", "disponíveis"],
+  reservado: ["reservada", "reservadas"],
+  vendido: ["vendida", "vendidas"],
+};
+export function statusCountLabel(status: UnitStatus, count: number): string {
+  return `${count} ${STATUS_COUNT[status][count === 1 ? 0 : 1]}`;
+}
+
 // Cores em hex para o WebGL, que não lê variáveis CSS.
 // Mantenha iguais aos tokens --status-* em src/app/globals.css.
 export const STATUS_HEX: Record<UnitStatus, string> = {

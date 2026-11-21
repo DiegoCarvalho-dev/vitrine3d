@@ -16,11 +16,16 @@ const monthYear = new Intl.DateTimeFormat("pt-BR", {
 
 const parse = (date: string) => new Date(`${date}T00:00:00Z`);
 
-/** Empty delivery date = ready to move in. */
-export function deliveryLabel(date: string | null): string {
-  return date
-    ? `Entrega prevista para ${monthYear.format(parse(date))}`
-    : "Pronto para morar";
+/**
+ * Empty delivery date = ready to move in. A date already in the past is
+ * "entregue", never an "overdue" forecast.
+ */
+export function deliveryLabel(date: string | null, today = new Date()): string {
+  if (!date) return "Pronto para morar";
+  const month = monthYear.format(parse(date));
+  return parse(date) <= today
+    ? `Pronto para morar (entregue em ${month})`
+    : `Entrega prevista para ${month}`;
 }
 
 export function checkedAtLabel(date: string | null): string | null {

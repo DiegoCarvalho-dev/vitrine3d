@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "cn";
 
 import { BuildingIllustration } from "@/components/building-illustration";
+import { statusCountLabel } from "@/lib/building";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -203,15 +204,14 @@ export function UnitsSection({
               className="flex flex-col gap-1.5 text-sm tabular-nums"
               data-testid="status-summary"
             >
-              {UNIT_STATUS.map(([status, label]) => (
+              {UNIT_STATUS.map(([status]) => (
                 <li key={status} className="flex items-center gap-2">
                   <span
                     aria-hidden
                     className="size-3 rounded-sm"
                     style={{ background: `var(--status-${status})` }}
                   />
-                  {count[status]} {label.toLowerCase()}
-                  {count[status] === 1 ? "" : "s"}
+                  {statusCountLabel(status, count[status])}
                 </li>
               ))}
             </ul>

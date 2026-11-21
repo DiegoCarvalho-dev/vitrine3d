@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { z } from "zod";
 
 import { createAnonClient } from "@/lib/supabase/anon";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -10,11 +11,14 @@ import { SLUG_PATTERN } from "@/lib/validacoes/empreendimento";
 // returns PUBLISHED projects (rascunho/arquivado → null → 404) and the column
 // GRANTs never return `preco`, only `preco_publico`.
 
+/** The link of the tour, from the URL (same format the DB checks). */
+const slugSchema = z.string().max(80).regex(SLUG_PATTERN);
+
 const PROJECT_COLUMNS =
   "id, dono_id, tipo, nome, slug, descricao, endereco, cidade, uf, numero_andares, unidades_por_andar, capa_url, construtora, registro_incorporacao, previsao_entrega, informacoes_conferidas_em";
 
 export const getPublishedProject = cache(async (slug: string) => {
-  if (!SLUG_PATTERN.test(slug) || slug.length > 80) return null;
+  if (!slugSchema.safeParse(slug).success) return null;
   const supabase = createAnonClient();
   const { data: project, error } = await supabase
     .from("empreendimentos")

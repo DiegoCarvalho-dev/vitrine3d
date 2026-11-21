@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { BuildingIllustration } from "@/components/building-illustration";
-import { STATUS_LABEL, UNIT_STATUSES } from "@/lib/building";
+import { statusCountLabel, UNIT_STATUSES } from "@/lib/building";
 import { getPublicEnv } from "@/lib/env";
 import {
   checkedAtLabel,
@@ -31,7 +31,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${project.nome}${place ? ` – ${place}` : ""}`,
     description:
-      project.descricao?.slice(0, 160) ?? `Conheça o ${project.nome} em 3D.`,
+      // One line, up to 160 chars; empty description → default text.
+      project.descricao?.replace(/\s+/g, " ").trim().slice(0, 160) ||
+      `Conheça o ${project.nome} em 3D.`,
   };
 }
 
@@ -130,12 +132,16 @@ export default async function TourPage({ params }: Props) {
               />
             ) : (
               <p className="p-8 text-center text-muted-foreground">
-                Casa: uma unidade só.
+                {project.tipo === "casa"
+                  ? "Casa: uma unidade só."
+                  : "A planta do prédio ainda não foi cadastrada."}
               </p>
             )}
-            <span className="absolute top-3 left-3 rounded-full bg-background/90 px-2 py-0.5 text-xs text-muted-foreground">
-              Imagem ilustrativa
-            </span>
+            {isBuilding && (
+              <span className="absolute top-3 left-3 rounded-full bg-background/90 px-2 py-0.5 text-xs text-muted-foreground">
+                Imagem ilustrativa
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col gap-4">
@@ -153,8 +159,7 @@ export default async function TourPage({ params }: Props) {
                     className="size-3 rounded-sm"
                     style={{ background: `var(--status-${status})` }}
                   />
-                  {count[status]} {STATUS_LABEL[status].toLowerCase()}
-                  {count[status] === 1 ? "" : "s"}
+                  {statusCountLabel(status, count[status])}
                 </li>
               ))}
             </ul>

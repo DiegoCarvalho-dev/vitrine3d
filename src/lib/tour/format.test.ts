@@ -10,8 +10,12 @@ import {
 describe("textos do tour", () => {
   it("sem data de entrega = pronto para morar", () => {
     expect(deliveryLabel(null)).toBe("Pronto para morar");
-    expect(deliveryLabel("2028-06-30")).toBe(
+    const today = new Date("2026-11-21T12:00:00Z");
+    expect(deliveryLabel("2028-06-30", today)).toBe(
       "Entrega prevista para junho de 2028",
+    );
+    expect(deliveryLabel("2024-03-01", today)).toBe(
+      "Pronto para morar (entregue em março de 2024)",
     );
   });
 

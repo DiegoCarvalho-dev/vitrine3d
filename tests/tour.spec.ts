@@ -40,7 +40,7 @@ test.describe("Tour público /e/[slug]", () => {
     await page.goto(url);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
     await expect(page.getByTestId("tour-from-price")).toHaveText(/450\.000,00/);
-    await expect(page.getByTestId("tour-status")).toContainText("1 vendido");
+    await expect(page.getByTestId("tour-status")).toContainText("1 vendida");
     await expect(page.getByTestId("tour-safety")).toContainText(
       "Construtora Exemplo",
     );
