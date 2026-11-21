@@ -80,6 +80,13 @@ test.describe("Tour público /e/[slug]", () => {
     await expect(selectedUnit).toContainText(
       /andar · (Disponível|Reservado|Vendido)/,
     );
+    // Sem mouse/toque (teclado, leitor de tela): a lista escolhe a mesma coisa.
+    await anon
+      .getByLabel("Escolher unidade", { exact: true })
+      .selectOption("103");
+    await expect(selectedUnit).toContainText(
+      "Unidade 103 · 1º andar · Vendido",
+    );
 
     // Rascunho, arquivado e slug inexistente: 404.
     for (const status of ["rascunho", "arquivado"]) {

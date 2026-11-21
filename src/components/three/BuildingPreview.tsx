@@ -42,8 +42,6 @@ type BuildingPreviewProps = {
   getNumber?: (floor: number, position: number) => string;
   selected?: string | null;
   onSelectUnit?: (unit: SelectedUnit) => void;
-  /** O que mostrar se o aparelho não tiver WebGL. */
-  fallback?: React.ReactNode;
 };
 // Se o dedo/mouse andou mais que isso entre apertar e soltar, foi para girar a
 // câmera, não para escolher uma unidade.
@@ -58,7 +56,6 @@ export function BuildingPreview({
   getNumber,
   selected = null,
   onSelectUnit,
-  fallback,
 }: BuildingPreviewProps) {
   const height = floors * (UNIT_H + GAP);
   const width = unitsPerFloor * (UNIT_W + GAP);
@@ -72,12 +69,12 @@ export function BuildingPreview({
       // Telas de celular têm densidade 3x; limitar a 2x evita renderizar 2,25x mais pixels.
       dpr={[1, 2]}
       camera={{ fov: 40 }}
+      // Quem usa este componente confere o WebGL antes (o fallback do Canvas
+      // não aparece quando o navegador tem <canvas> mas não tem WebGL).
       fallback={
-        fallback ?? (
-          <p className="p-4 text-sm text-muted-foreground">
-            Seu navegador não conseguiu abrir o 3D (WebGL indisponível).
-          </p>
-        )
+        <p className="p-4 text-sm text-muted-foreground">
+          Seu navegador não conseguiu abrir o 3D (WebGL indisponível).
+        </p>
       }
     >
       <color attach="background" args={["#f2f1ee"]} />

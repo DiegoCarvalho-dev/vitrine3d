@@ -128,7 +128,15 @@ export default async function TourPage({ params }: Props) {
               <TourBuilding
                 floors={project.numero_andares!}
                 unitsPerFloor={project.unidades_por_andar!}
-                units={units}
+                // Only what the 3D needs goes to the browser.
+                units={units.map(
+                  ({ andar, posicao_no_andar, status, numero }) => ({
+                    andar,
+                    posicao_no_andar,
+                    status,
+                    numero,
+                  }),
+                )}
               />
             ) : (
               <p className="p-8 text-center text-muted-foreground">
