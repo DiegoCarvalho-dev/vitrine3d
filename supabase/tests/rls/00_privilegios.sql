@@ -86,11 +86,18 @@ begin
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
       -- Liberadas de propósito (usadas dentro das policies):
-      and (ns.nspname, p.proname) not in (('privado', 'comodo_do_empreendimento'), ('privado', 'pode_gravar_midia'), ('privado', 'empreendimento_tem_leads'))
+      and (ns.nspname, p.proname) not in (('privado', 'comodo_do_empreendimento'), ('privado', 'pode_gravar_midia'), ('privado', 'empreendimento_tem_leads'), ('public', 'resumo_visitas'))
   loop
     r := r || format(E'\n[FALHOU] função %s executável pela API (faltou revoke execute)', t);
   end loop;
   r := r || E'\n[OK] varredura de funções do public e do privado concluída';
+
+  -- resumo_visitas (#72) é liberada só para o corretor logado, nunca para o anônimo.
+  r := r || format(E'
+[%s] resumo_visitas: corretor logado executa, anônimo não',
+    case when has_function_privilege('authenticated', 'public.resumo_visitas(timestamptz, timestamptz)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.resumo_visitas(timestamptz, timestamptz)', 'EXECUTE')
+      then 'OK' else 'FALHOU' end);
 
   -- Toda tabela do public tem RLS ligado.
   select count(*) into n
@@ -106,10 +113,12 @@ begin
   end loop;
   r := r || format(E'\n[%s] servidor NÃO lê leads (não precisa para o e-mail)',
     case when has_table_privilege('service_role', 'public.leads', 'SELECT') then 'FALHOU' else 'OK' end);
-  r := r || format(E'\n[%s] servidor NÃO escreve nas tabelas do e-mail',
+  r := r || format(E'\n[%s] servidor NÃO escreve nas tabelas do e-mail (só apaga eventos, LGPD)',
     case when has_table_privilege('service_role', 'public.empreendimentos', 'INSERT, UPDATE, DELETE')
-           or has_table_privilege('service_role', 'public.eventos', 'INSERT, UPDATE, DELETE')
+           or has_table_privilege('service_role', 'public.eventos', 'INSERT, UPDATE')
       then 'FALHOU' else 'OK' end);
+  r := r || format(E'\n[%s] servidor apaga eventos (histórico do lead apagado, LGPD)',
+    case when has_table_privilege('service_role', 'public.eventos', 'DELETE') then 'OK' else 'FALHOU' end);
 
   raise exception 'RELATORIO_RLS:total=%;ok=%;falhas=%;FIM',
     (length(r) - length(replace(r, E'\n[', ''))) / 2,

@@ -553,7 +553,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      resumo_visitas: { Args: { p_ate: string; p_de: string }; Returns: Json };
     };
     Enums: {
       status_lead:
