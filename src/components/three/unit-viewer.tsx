@@ -1,9 +1,9 @@
 "use client";
 
 import { OrbitControls } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { MathUtils } from "three";
+import { Canvas, useThree } from "@react-three/fiber";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { MathUtils, type Vector3 } from "three";
 
 import { bounds } from "@/lib/planta/geometry";
 
@@ -22,6 +22,36 @@ import { type ModelPlan, type ModelRoom, UnitModel } from "./unit-model";
 const TILT = MathUtils.degToRad(28); // from straight down
 
 export type ViewerRoom = ModelRoom & LabelRoom;
+
+type ControlsLike = { target: Vector3; update: () => void };
+
+/** The frame changed shape (phone turned, window resized): frame again. */
+function Reframe({
+  center,
+  distance,
+}: {
+  center: [number, number, number];
+  distance: number;
+}) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as ControlsLike | null;
+  const invalidate = useThree((state) => state.invalidate);
+  const framed = useRef(distance);
+  const [x, , z] = center;
+  useEffect(() => {
+    if (framed.current === distance) return; // the camera prop framed it
+    framed.current = distance;
+    camera.position.set(
+      x,
+      distance * Math.cos(TILT),
+      z + distance * Math.sin(TILT),
+    );
+    controls?.target.set(x, 0, z);
+    controls?.update();
+    invalidate();
+  }, [camera, controls, distance, x, z, invalidate]);
+  return null;
+}
 
 export function UnitViewer({
   rooms,
@@ -79,7 +109,7 @@ export function UnitViewer({
         <Canvas
           // The camera prop only applies on mount: a different plan mounts a
           // fresh view, framed again.
-          key={`${center.join()}|${size}|${aspect}`}
+          key={`${center.join()}|${size}`}
           frameloop="demand"
           dpr={[1, 2]}
           camera={{
@@ -105,7 +135,9 @@ export function UnitViewer({
             labels={labels}
             selectedIndex={rooms.findIndex((room) => room.id === selectedId)}
           />
+          <Reframe center={center} distance={distance} />
           <OrbitControls
+            makeDefault
             target={center}
             enablePan={false}
             enableDamping

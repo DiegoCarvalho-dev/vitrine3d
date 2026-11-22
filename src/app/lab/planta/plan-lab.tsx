@@ -44,7 +44,10 @@ export function PlanLab({ typologies }: { typologies: LabTypology[] }) {
             size="sm"
             variant={i === index ? "secondary" : "outline"}
             aria-pressed={i === index}
-            onClick={() => setIndex(i)}
+            onClick={() => {
+              setIndex(i);
+              setSelectedId(null);
+            }}
           >
             {t.name}
           </Button>
@@ -64,7 +67,9 @@ export function PlanLab({ typologies }: { typologies: LabTypology[] }) {
             rooms={typology.rooms}
             plan={plan}
             selectedId={selectedId}
-            onSelectRoom={setSelectedId}
+            onSelectRoom={(id) =>
+              setSelectedId((current) => (current === id ? null : id))
+            }
           />
         </div>
         <FloorPlanPreview rooms={typology.rooms} />

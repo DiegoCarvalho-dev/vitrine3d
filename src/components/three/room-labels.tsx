@@ -23,8 +23,13 @@ export function labelAnchors(rooms: readonly LabelRoom[]) {
     const box = bounds([room.points]);
     return {
       center: new Vector3(x, 0.05, -y), // plan y → 3D -z
-      left: new Vector3(box.x0, 0.05, -y),
-      right: new Vector3(box.x1, 0.05, -y),
+      // Corners of the room box: its width on screen, whatever the angle.
+      corners: [
+        [box.x0, box.y0],
+        [box.x1, box.y0],
+        [box.x1, box.y1],
+        [box.x0, box.y1],
+      ].map(([cx, cy]) => new Vector3(cx, 0.05, -cy)),
       area: room.area,
     };
   });
@@ -47,6 +52,20 @@ function showDetail(element: HTMLElement, show: boolean) {
   const detail = element.querySelector<HTMLElement>("[data-area]");
   if (detail) detail.style.display = show ? "" : "none";
 }
+/** Label size for a max width and mode, measured once and cached. */
+function measure(
+  cache: Map<string, { w: number; h: number }>,
+  element: HTMLElement,
+  key: string,
+) {
+  let size = cache.get(key);
+  if (!size) {
+    size = { w: element.offsetWidth, h: element.offsetHeight };
+    cache.set(key, size);
+  }
+  return size;
+}
+
 type Box = { x0: number; y0: number; x1: number; y1: number };
 const GAP = 2; // px between labels
 const overlaps = (a: Box, b: Box) =>
@@ -85,11 +104,22 @@ export function LabelProjector({
         .map(({ i }) => i),
     [anchors, selectedIndex],
   );
+  // Sizes by (label, max width, mode): the DOM is measured only on a miss,
+  // not on every frame while the view turns. A new selection changes how
+  // the labels look, so they are measured again.
+  const sizes = useMemo(
+    () => new Map<string, { w: number; h: number }>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [anchors, selectedIndex],
+  );
   const invalidate = useThree((state) => state.invalidate);
   // A new selection changes the order: lay the labels out again.
   useEffect(() => invalidate(), [order, invalidate]);
 
   useFrame(({ camera, size }) => {
+    // The renderer updates this only while drawing; the controls may have
+    // just moved the camera.
+    camera.updateMatrixWorld();
     const toScreen = (v: Vector3) => {
       point.copy(v).project(camera);
       return {
@@ -108,15 +138,14 @@ export function LabelProjector({
         styleLabel(element, { visibility: "hidden" });
         continue;
       }
-      const roomWidth = Math.abs(
-        toScreen(anchor.right).x - toScreen(anchor.left).x,
-      );
-      styleLabel(element, {
-        maxWidth: `${Math.max(64, Math.min(112, roomWidth - 6))}px`,
-      });
-      const boxOf = (): Box => {
-        const w = element.offsetWidth;
-        const h = element.offsetHeight;
+      const xs = anchor.corners.map((corner) => toScreen(corner).x);
+      const roomWidth = Math.max(...xs) - Math.min(...xs);
+      // In steps of 8 px, so the cache gets hits while zooming.
+      const maxWidth =
+        Math.round(Math.max(64, Math.min(112, roomWidth - 6)) / 8) * 8;
+      styleLabel(element, { maxWidth: `${maxWidth}px` });
+      const boxOf = (mode: "full" | "name"): Box => {
+        const { w, h } = measure(sizes, element, `${i}|${maxWidth}|${mode}`);
         return {
           x0: at.x - w / 2,
           y0: at.y - h / 2,
@@ -125,10 +154,10 @@ export function LabelProjector({
         };
       };
       showDetail(element, true);
-      let box = boxOf();
+      let box = boxOf("full");
       if (placed.some((other) => overlaps(box, other))) {
         showDetail(element, false); // name only
-        box = boxOf();
+        box = boxOf("name");
       }
       const fits = !placed.some((other) => overlaps(box, other));
       styleLabel(element, {
@@ -169,8 +198,10 @@ export function RoomLabels({
             }}
             type="button"
             onClick={() => onSelect(room.id)}
-            aria-pressed={isSelected}
-            aria-label={`${room.name}, ${formatDecimal(room.area)} metros quadrados`}
+            // A shortcut for mouse and touch. Keyboard and screen readers use
+            // the room list under the 3D (same action): not read twice.
+            aria-hidden
+            tabIndex={-1}
             data-testid="room-label"
             // Starts hidden until the first frame places it.
             style={{ visibility: "hidden" }}

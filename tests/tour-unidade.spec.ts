@@ -79,11 +79,18 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     await expect(labels).toHaveCount(2);
     await expect(anon.getByText("Imagem ilustrativa")).toBeVisible();
     await expect(anon.getByText("Área privativa:")).toContainText("32 m²");
-    await anon.getByRole("button", { name: /^Sala,/ }).click();
+    // Etiqueta no 3D (toque); visível porque os dois cômodos têm espaço.
+    const salaLabel = labels.filter({ hasText: "Sala" });
+    await expect(salaLabel).toBeVisible();
+    await salaLabel.click();
     await expect(anon.getByTestId("room-details")).toContainText(
       "Sala ampla com luz da manhã.",
     );
-    await anon.getByRole("button", { name: /^Quarto,/ }).click();
+    // A lista de cômodos (teclado e leitor de tela) faz o mesmo.
+    await anon
+      .getByRole("list", { name: "Cômodos" })
+      .getByRole("button", { name: "Quarto" })
+      .click();
     await expect(anon.getByTestId("room-details")).toContainText(
       "Sem descrição para este cômodo.",
     );

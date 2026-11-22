@@ -145,8 +145,9 @@ export function labelPoint(points: readonly Point[]): Point {
     : [points[0][0], points[0][1]];
   if (isInside(points, centroid)) return centroid;
 
-  // Crossings of the horizontal line y = centroid y with the edges.
-  const y = centroid[1];
+  // Crossings of the horizontal line y = centroid y with the edges (nudged
+  // off a horizontal edge it could lie on, e.g. whole-meter coordinates).
+  const y = centroid[1] + 1e-4;
   const xs: number[] = [];
   for (let i = 0; i < points.length; i++) {
     const [x1, y1] = points[i];
