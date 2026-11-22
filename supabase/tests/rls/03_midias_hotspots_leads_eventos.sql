@@ -242,6 +242,35 @@ begin
   get diagnostics n = row_count;
   r := r || format(E'\n[%s] B NÃO altera leads de A (%s linhas)', case when n = 0 then 'OK' else 'FALHOU' end, n);
 
+  -- ===== Resumo de visitas (#72): cada corretor só vê os SEUS números =====
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  select count(*) into n from jsonb_array_elements(public.resumo_visitas(now() - interval '1 day', now() + interval '1 day')) x
+    where x->>'empreendimento_id' = emp_pub::text;
+  r := r || format(E'
+[%s] B NÃO vê o resumo de visitas do empreendimento de A (%s)', case when n = 0 then 'OK' else 'FALHOU' end, n);
+  select count(*) into n from jsonb_array_elements(public.resumo_visitas(now() - interval '1 day', now() + interval '1 day')) x
+    where x->>'empreendimento_id' = emp_b::text;
+  r := r || format(E'
+[%s] B vê o resumo do PRÓPRIO empreendimento', case when n = 1 then 'OK' else 'FALHOU' end);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  select (x->>'visitas')::int into n from jsonb_array_elements(public.resumo_visitas(now() - interval '1 day', now() + interval '1 day')) x
+    where x->>'empreendimento_id' = emp_pub::text;
+  -- sessões diferentes de A no teste: sessao_teste_123, sessao_limite_67, outra_sessao_67
+  r := r || format(E'
+[%s] A vê as visitas do próprio empreendimento (%s sessões)', case when n >= 3 then 'OK' else 'FALHOU' end, n);
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
+  begin
+    perform public.resumo_visitas(now() - interval '1 day', now());
+    r := r || E'
+[FALHOU] visitante executou resumo_visitas';
+  exception when insufficient_privilege then
+    r := r || E'
+[OK] visitante NÃO executa resumo_visitas';
+  end;
+  perform set_config('role', 'authenticated', true);
+
   -- ===== Corretor A (dono) =====
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   select count(*) into n from public.leads where empreendimento_id = emp_pub;

@@ -68,10 +68,13 @@ export async function notifyBrokerOfLead(lead: LeadForEmail): Promise<void> {
         sessionId: lead.sessionId,
         extraUnitId: lead.unitId,
       })
-    : { events: [], failed: false };
+    : { events: [], extraUnitNumber: null, failed: false };
   if (session.failed) fail("eventos", lead.projectId);
   const sessionEvents = session.events;
-  const unitNumber = await unitNumberOf(admin, lead.projectId, lead.unitId);
+  // One lookup when there is a session; otherwise just the unit's number.
+  const unitNumber = lead.sessionId
+    ? session.extraUnitNumber
+    : await unitNumberOf(admin, lead.projectId, lead.unitId);
 
   const email = buildNewLeadEmail({
     brokerName: profile.nome,

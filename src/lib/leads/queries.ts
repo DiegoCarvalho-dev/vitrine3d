@@ -21,6 +21,8 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return (Array.isArray(value) ? value[0] : value) ?? null;
 }
 
+export const LEADS_PAGE_LIMIT = 200;
+
 export type LeadFilters = {
   projectId: string | null;
   status: LeadStatus | null;
@@ -34,7 +36,7 @@ export async function listMyLeads({ projectId, status }: LeadFilters) {
     .select(`${LEAD_COLUMNS}, unidades(numero)`)
     .eq("empreendimentos.dono_id", userId)
     .order("criado_em", { ascending: false })
-    .limit(200);
+    .limit(LEADS_PAGE_LIMIT);
   if (projectId && isUuid(projectId))
     query = query.eq("empreendimento_id", projectId);
   if (status) query = query.eq("status", status);
@@ -83,7 +85,7 @@ export async function getMyLead(id: string) {
         sessionId: lead.sessao_id,
         extraUnitId: lead.unidade_id,
       })
-    : { events: [], failed: false };
+    : { events: [], extraUnitNumber: null, failed: false };
   return {
     ...lead,
     projectName: one(empreendimentos)?.nome ?? "",

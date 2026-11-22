@@ -16,7 +16,12 @@ export async function loadSessionEvents(
     sessionId,
     extraUnitId = null,
   }: { projectId: string; sessionId: string; extraUnitId?: string | null },
-): Promise<{ events: SessionEvent[]; failed: boolean }> {
+): Promise<{
+  events: SessionEvent[];
+  /** Number of `extraUnitId` (the lead's unit), from the same lookup. */
+  extraUnitNumber: string | null;
+  failed: boolean;
+}> {
   // The LATEST 500: what was seen right before the contact matters most.
   const { data, error } = await client
     .from("eventos")
@@ -25,7 +30,7 @@ export async function loadSessionEvents(
     .eq("sessao_id", sessionId)
     .order("criado_em", { ascending: false })
     .limit(500);
-  if (error) return { events: [], failed: true };
+  if (error) return { events: [], extraUnitNumber: null, failed: true };
 
   const unitIds = [
     ...new Set(
@@ -74,7 +79,11 @@ export async function loadSessionEvents(
           : null,
     };
   });
-  return { events, failed: false };
+  return {
+    events,
+    extraUnitNumber: extraUnitId ? (unitNumber.get(extraUnitId) ?? null) : null,
+    failed: false,
+  };
 }
 
 /** Unit number by id, among a project's units (null if it isn't there). */

@@ -3,7 +3,12 @@ import Link from "next/link";
 
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
-import { listMyLeads, listMyProjectOptions } from "@/lib/leads/queries";
+import { isUuid } from "@/lib/empreendimentos/queries";
+import {
+  LEADS_PAGE_LIMIT,
+  listMyLeads,
+  listMyProjectOptions,
+} from "@/lib/leads/queries";
 import {
   LEAD_STATUS_LABEL,
   LEAD_STATUSES,
@@ -29,7 +34,9 @@ export default async function LeadsPage({
   const query = await searchParams;
   const status = parseStatusFilter(query.status);
   const projectId =
-    typeof query.empreendimento === "string" ? query.empreendimento : null;
+    typeof query.empreendimento === "string" && isUuid(query.empreendimento)
+      ? query.empreendimento
+      : null;
   const [leads, projects] = await Promise.all([
     listMyLeads({ projectId, status }),
     listMyProjectOptions(),
@@ -106,37 +113,48 @@ export default async function LeadsPage({
             : "Ainda não chegou nenhum contato. Compartilhe o link do seu tour e os interessados aparecem aqui."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-3" data-testid="leads-list">
-          {leads.map((lead) => (
-            <li key={lead.id}>
-              <Link
-                href={`/painel/leads/${lead.id}`}
-                data-testid="lead-item"
-                className="flex flex-col gap-1 rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-              >
-                <span className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{lead.nome}</span>
-                  <LeadStatusBadge status={lead.status} />
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {[
-                    lead.telefone ? formatPhone(lead.telefone) : null,
-                    lead.email,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {lead.projectName}
-                  {lead.unitNumber ? ` · unidade ${lead.unitNumber}` : ""}
-                  {lead.origem ? ` · veio de ${lead.origem}` : ""}
-                  {" · "}
-                  {dateFormat.format(new Date(lead.criado_em))}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          {leads.length >= LEADS_PAGE_LIMIT && (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="leads-capped"
+            >
+              Mostrando os {LEADS_PAGE_LIMIT} contatos mais recentes. Use os
+              filtros para ver os mais antigos.
+            </p>
+          )}
+          <ul className="flex flex-col gap-3" data-testid="leads-list">
+            {leads.map((lead) => (
+              <li key={lead.id}>
+                <Link
+                  href={`/painel/leads/${lead.id}`}
+                  data-testid="lead-item"
+                  className="flex flex-col gap-1 rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                >
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{lead.nome}</span>
+                    <LeadStatusBadge status={lead.status} />
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {[
+                      lead.telefone ? formatPhone(lead.telefone) : null,
+                      lead.email,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {lead.projectName}
+                    {lead.unitNumber ? ` · unidade ${lead.unitNumber}` : ""}
+                    {lead.origem ? ` · veio de ${lead.origem}` : ""}
+                    {" · "}
+                    {dateFormat.format(new Date(lead.criado_em))}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );

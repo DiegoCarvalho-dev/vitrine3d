@@ -129,6 +129,20 @@ test.describe("Painel de leads", () => {
         `select count(*)::int as n from public.leads where nome = 'João ${tag}'`,
       )[0].n,
     ).toBe(0);
+    // Apagar a Maria (que tem visita registrada) leva o histórico junto.
+    const mariaSession = `sessao_painel_${testInfo.project.name}_71`;
+    const eventsOf = () =>
+      querySql<{ n: number }>(
+        `select count(*)::int as n from public.eventos where sessao_id = '${mariaSession}' and empreendimento_id = '${id}'`,
+      )[0].n;
+    expect(eventsOf()).toBe(3);
+    await page.getByTestId("lead-item").filter({ hasText: "Maria" }).click();
+    await page.getByRole("button", { name: "Apagar contato" }).click();
+    await page.getByRole("button", { name: "Apagar de vez" }).click();
+    await expect(page).toHaveURL(/\/painel\/leads$/, { timeout: 15_000 });
+    await expect(page.getByTestId("leads-empty")).toBeVisible();
+    await expect.poll(eventsOf, { timeout: 15_000 }).toBe(0);
+
     // O lead do outro corretor continua lá, intacto.
     expect(
       querySql<{ n: number }>(

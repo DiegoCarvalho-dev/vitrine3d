@@ -140,8 +140,8 @@ export function LeadActions({
           <DialogHeader>
             <DialogTitle>Apagar o contato de {name}?</DialogTitle>
             <DialogDescription>
-              O nome, o telefone, o e-mail e a mensagem são apagados de vez. Não
-              dá para desfazer.
+              O nome, o telefone, o e-mail, a mensagem e o histórico de visitas
+              dele no tour são apagados de vez. Não dá para desfazer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -153,14 +153,21 @@ export function LeadActions({
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
-                  const result = await deleteLead(leadId);
-                  if (!result.ok) {
-                    toast.error(result.error);
+                  try {
+                    const result = await deleteLead(leadId);
+                    if (!result.ok) {
+                      toast.error(result.error);
+                      setConfirming(false);
+                      return;
+                    }
+                    toast.success("Contato apagado.");
+                    router.push("/painel/leads");
+                  } catch {
+                    toast.error(
+                      "Não foi possível apagar agora. Verifique a internet e tente de novo.",
+                    );
                     setConfirming(false);
-                    return;
                   }
-                  toast.success("Contato apagado.");
-                  router.push("/painel/leads");
                 })
               }
             >
