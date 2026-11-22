@@ -44,11 +44,8 @@ export function typologyRows(
   return rows;
 }
 
-/** `?unidade=902` from the link (same limits as unidades.numero). */
-export const unitParamSchema = z
-  .string()
-  .trim()
-  .regex(/^[0-9A-Za-z-]{1,10}$/);
+/** `?unidade=902` from the link (same limit as unidades.numero: 1 to 10). */
+export const unitParamSchema = z.string().trim().min(1).max(10);
 
 export function parseUnitParam(
   value: string | string[] | undefined,

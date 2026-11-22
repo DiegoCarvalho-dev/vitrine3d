@@ -42,7 +42,9 @@ describe("ficha da unidade", () => {
   it("?unidade= do link", () => {
     expect(parseUnitParam("902")).toBe("902");
     expect(parseUnitParam(" 1004 ")).toBe("1004");
-    expect(parseUnitParam("<script>")).toBeNull();
+    expect(parseUnitParam("101 A")).toBe("101 A");
+    expect(parseUnitParam("12345678901")).toBeNull();
+    expect(parseUnitParam("  ")).toBeNull();
     expect(parseUnitParam(["1", "2"])).toBeNull();
     expect(parseUnitParam(undefined)).toBeNull();
   });
