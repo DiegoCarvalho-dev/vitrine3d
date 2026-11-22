@@ -1,3 +1,4 @@
+import { interestLine, interestOf } from "@/lib/leads/interest";
 import {
   durationLabel,
   type SessionSummary,
@@ -75,14 +76,17 @@ export function buildNewLeadEmail(input: NewLeadEmail) {
       ? ([["Telefone", formatPhone(lead.phone)]] as [string, string][])
       : []),
     ...(lead.email ? ([["E-mail", lead.email]] as [string, string][]) : []),
-    ["Interesse", where],
+    ["Interesse em", where],
     ...(lead.origin ? ([["Veio de", lead.origin]] as [string, string][]) : []),
   ];
+  // The thermometer: hot, warm or cold, with WHY (same rule as the panel).
+  const temperature = interestLine(interestOf(input.summary));
   const visit = summaryLines(input.summary);
 
   const text = [
     `Olá, ${input.brokerName}! Você tem um novo interessado pelo tour 3D.`,
     "",
+    `Termômetro: ${temperature}`,
     ...rows.map(([label, value]) => `${label}: ${value}`),
     ...(lead.message ? ["", "Mensagem:", lead.message] : []),
     ...(visit.length
@@ -104,7 +108,8 @@ export function buildNewLeadEmail(input: NewLeadEmail) {
 <div style="max-width:560px;margin:0 auto;padding:24px 16px">
 <div style="background:#ffffff;border-radius:12px;padding:24px">
 <p style="margin:0 0 4px;font-size:13px;color:#5b6573">Vitrine 3D</p>
-<h1 style="margin:0 0 16px;font-size:20px">Novo interessado: ${e(lead.name)}</h1>
+<h1 style="margin:0 0 8px;font-size:20px">Novo interessado: ${e(lead.name)}</h1>
+<p style="margin:0 0 16px;font-size:15px"><strong>Termômetro:</strong> ${e(temperature)}</p>
 <table role="presentation" style="border-collapse:collapse;width:100%;font-size:15px">${rows
     .map(
       ([label, value]) =>

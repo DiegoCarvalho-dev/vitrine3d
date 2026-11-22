@@ -42,6 +42,7 @@ describe("resumo da visita", () => {
       rooms: ["Sala", "Suíte"],
       seconds: 420,
       walked: true,
+      walkedIn: "902",
       days: 2,
     });
   });

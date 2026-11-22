@@ -8,6 +8,9 @@ import { summaryLines } from "@/lib/email/new-lead";
 import { whatsappLink } from "@/lib/tour/whatsapp";
 import { formatPhone } from "@/lib/validacoes/perfil";
 
+import { interestLine } from "@/lib/leads/interest";
+
+import { InterestBadge } from "../interest-badge";
 import { LeadActions } from "./lead-actions";
 
 export const metadata: Metadata = { title: "Lead | Vitrine 3D" };
@@ -53,6 +56,13 @@ export default async function LeadPage({
           {where} · {dateFormat.format(new Date(lead.criado_em))}
         </p>
       </div>
+
+      <p className="flex flex-wrap items-center gap-2 text-sm">
+        <InterestBadge level={lead.interest.level} />
+        <span data-testid="interest-reasons">
+          {interestLine(lead.interest, 5)}
+        </span>
+      </p>
 
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         {lead.telefone && (

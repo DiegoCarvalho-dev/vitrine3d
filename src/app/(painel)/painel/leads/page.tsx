@@ -16,6 +16,9 @@ import {
 } from "@/lib/leads/status";
 import { formatPhone } from "@/lib/validacoes/perfil";
 
+import { interestLine } from "@/lib/leads/interest";
+
+import { InterestBadge } from "./interest-badge";
 import { LeadStatusBadge } from "./lead-status-badge";
 
 export const metadata: Metadata = { title: "Leads | Vitrine 3D" };
@@ -37,11 +40,12 @@ export default async function LeadsPage({
     typeof query.empreendimento === "string" && isUuid(query.empreendimento)
       ? query.empreendimento
       : null;
+  const order = query.ordem === "interesse" ? "interesse" : "recentes";
   const [leads, projects] = await Promise.all([
-    listMyLeads({ projectId, status }),
+    listMyLeads({ projectId, status, order }),
     listMyProjectOptions(),
   ]);
-  const filtered = Boolean(status || projectId);
+  const filtered = Boolean(status || projectId || order === "interesse");
 
   return (
     <section className="flex flex-col gap-6">
@@ -90,6 +94,17 @@ export default async function LeadsPage({
             ))}
           </NativeSelect>
         </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Ordem
+          <NativeSelect
+            name="ordem"
+            defaultValue={order}
+            className="h-10 w-48 md:h-8"
+          >
+            <option value="recentes">Mais recentes</option>
+            <option value="interesse">Mais interessados</option>
+          </NativeSelect>
+        </label>
         <Button type="submit" variant="outline">
           Filtrar
         </Button>
@@ -133,7 +148,16 @@ export default async function LeadsPage({
                 >
                   <span className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-medium">{lead.nome}</span>
-                    <LeadStatusBadge status={lead.status} />
+                    <span className="flex items-center gap-2">
+                      <InterestBadge level={lead.interest.level} />
+                      <LeadStatusBadge status={lead.status} />
+                    </span>
+                  </span>
+                  <span
+                    className="text-sm text-muted-foreground"
+                    data-testid="interest-reasons"
+                  >
+                    {interestLine(lead.interest)}
                   </span>
                   <span className="text-sm text-muted-foreground">
                     {[
