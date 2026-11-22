@@ -5,7 +5,6 @@ import {
   createBuilding,
   hasSupabaseEnv,
   loggedInTest as test,
-  querySql,
   runSql,
 } from "./fixtures";
 
@@ -85,7 +84,7 @@ test.describe("Resumo do mês no painel", () => {
     );
     expect(visits).toBeGreaterThanOrEqual(3);
     await expect(page.getByTestId("summary-headline")).toContainText(
-      /^Seu tour gerou \d+ contatos? e \d+ visitas? em \w+\.$/,
+      /^Seu tour gerou [\d.]+ contatos? e [\d.]+ visitas? em \p{L}+\.$/u,
     );
     await expect(page.getByTestId("stat-Cliques no WhatsApp")).toBeVisible();
 

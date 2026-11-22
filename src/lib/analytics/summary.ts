@@ -37,10 +37,10 @@ const projectSummarySchema = z.object({
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
-/** The JSON of `resumo_visitas`; a malformed one means "no data", never a crash. */
-export function parseSummary(json: unknown): ProjectSummary[] {
+/** The JSON of `resumo_visitas`; a malformed one is null, never a crash. */
+export function parseSummary(json: unknown): ProjectSummary[] | null {
   const parsed = z.array(projectSummarySchema).safeParse(json);
-  return parsed.success ? parsed.data : [];
+  return parsed.success ? parsed.data : null;
 }
 
 export type Totals = {
@@ -74,16 +74,21 @@ export function compare(current: number, previous: number): Change {
   const difference = current - previous;
   if (previous === 0) return { difference, label: null };
   if (difference === 0) return { difference, label: "igual ao mês passado" };
-  const percent = Math.round((difference / previous) * 100);
+  const percent = Math.round((Math.abs(difference) / previous) * 100);
+  // Under 1%: "about the same" (never "−0%" for a growth, or "+0%").
+  if (percent === 0)
+    return { difference, label: "praticamente igual ao mês passado" };
   return {
     difference,
-    label: `${percent > 0 ? "+" : "−"}${Math.abs(percent)}% sobre o mês passado`,
+    label: `${difference > 0 ? "+" : "−"}${percent}% sobre o mês passado`,
   };
 }
 
 /** "Seu tour gerou 12 contatos e 340 visitas em novembro." */
+const pt = new Intl.NumberFormat("pt-BR");
+
 export function headline(totals: Totals, monthName: string): string {
-  const leads = `${totals.leads} ${totals.leads === 1 ? "contato" : "contatos"}`;
-  const visits = `${totals.visits} ${totals.visits === 1 ? "visita" : "visitas"}`;
+  const leads = `${pt.format(totals.leads)} ${totals.leads === 1 ? "contato" : "contatos"}`;
+  const visits = `${pt.format(totals.visits)} ${totals.visits === 1 ? "visita" : "visitas"}`;
   return `Seu tour gerou ${leads} e ${visits} em ${monthName}.`;
 }

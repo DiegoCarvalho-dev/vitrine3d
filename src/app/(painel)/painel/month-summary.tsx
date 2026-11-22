@@ -63,7 +63,11 @@ export function MonthSummary({
     ["Caminharam por dentro", now.walked, compare(now.walked, before.walked)],
   ];
   const withVisits = thisMonth.filter(
-    (project) => project.visitas > 0 || project.leads > 0,
+    (project) =>
+      project.visitas > 0 ||
+      project.leads > 0 ||
+      project.cliques_whatsapp > 0 ||
+      project.caminharam > 0,
   );
 
   return (

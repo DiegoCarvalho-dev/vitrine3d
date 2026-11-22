@@ -9,7 +9,7 @@ import {
 } from "./summary";
 
 const project = (
-  over: Partial<ReturnType<typeof parseSummary>[number]> = {},
+  over: Partial<NonNullable<ReturnType<typeof parseSummary>>[number]> = {},
 ) => ({
   empreendimento_id: "0d3e0000-0000-4000-8000-000000000001",
   nome: "Residencial A",
@@ -87,6 +87,9 @@ describe("resumo do mês", () => {
       difference: 0,
       label: "igual ao mês passado",
     });
+    // Mudança pequena: nunca "−0%" para um aumento (nem "+0%").
+    expect(compare(1001, 1000).label).toBe("praticamente igual ao mês passado");
+    expect(compare(999, 1000).label).toBe("praticamente igual ao mês passado");
     // Mês passado zerado: sem porcentagem (não dá para dividir por zero).
     expect(compare(7, 0)).toEqual({ difference: 7, label: null });
   });
@@ -106,10 +109,20 @@ describe("resumo do mês", () => {
     ).toBe("Seu tour gerou 1 contato e 1 visita em outubro.");
   });
 
-  it("JSON do banco: válido passa; lixo vira lista vazia", () => {
+  it("milhares no padrão brasileiro na frase", () => {
+    expect(
+      headline(
+        { visits: 1340, leads: 12, whatsappClicks: 0, walked: 0 },
+        "março",
+      ),
+    ).toBe("Seu tour gerou 12 contatos e 1.340 visitas em março.");
+  });
+
+  it("JSON do banco: válido passa; lixo vira null (não 'sem visitas')", () => {
     expect(parseSummary([project()])).toHaveLength(1);
-    expect(parseSummary(null)).toEqual([]);
-    expect(parseSummary([{ nome: "sem os campos" }])).toEqual([]);
-    expect(parseSummary("texto")).toEqual([]);
+    expect(parseSummary([])).toEqual([]);
+    expect(parseSummary(null)).toBeNull();
+    expect(parseSummary([{ nome: "sem os campos" }])).toBeNull();
+    expect(parseSummary("texto")).toBeNull();
   });
 });

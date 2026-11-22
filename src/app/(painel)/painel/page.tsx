@@ -20,11 +20,12 @@ const dateFormat = new Intl.DateTimeFormat("pt-BR", {
 export default async function PanelPage({
   searchParams,
 }: PageProps<"/painel">) {
-  const [profile, projects, summaries] = await Promise.all([
+  const [profile, projects] = await Promise.all([
     getCurrentProfile(),
     listMyProjects(),
-    getMonthSummaries(),
   ]);
+  // The summary only matters (and only runs) when there are projects.
+  const summaries = projects.length > 0 ? await getMonthSummaries() : null;
   const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
   const firstName = profile?.nome?.trim().split(/\s+/)[0];
   const { erro, excluido } = await searchParams;
@@ -66,9 +67,24 @@ export default async function PanelPage({
         )}
       </div>
 
-      {projects.length > 0 && (
+      {summaries && (
         <div className="mt-8">
-          <MonthSummary {...summaries} />
+          {summaries.thisMonth ? (
+            <MonthSummary
+              thisMonth={summaries.thisMonth}
+              lastMonth={summaries.lastMonth}
+              monthStart={summaries.monthStart}
+            />
+          ) : (
+            <p
+              role="status"
+              className="rounded-lg border p-4 text-sm text-muted-foreground"
+              data-testid="month-summary-unavailable"
+            >
+              Não foi possível carregar o resumo do mês agora. Seus
+              empreendimentos continuam abaixo.
+            </p>
+          )}
         </div>
       )}
 
