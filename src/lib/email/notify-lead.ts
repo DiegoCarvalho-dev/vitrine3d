@@ -1,10 +1,8 @@
 import "server-only";
 
 import { getEmailEnv } from "@/lib/env.server";
-import {
-  type SessionEvent,
-  summarizeSession,
-} from "@/lib/leads/session-summary";
+import { summarizeSession } from "@/lib/leads/session-summary";
+import { loadSessionEvents, unitNumberOf } from "@/lib/leads/load-session";
 import { siteUrl } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -63,74 +61,22 @@ export async function notifyBrokerOfLead(lead: LeadForEmail): Promise<void> {
   const to = owner.user?.email;
   if (!to) return;
 
-  // Plain queries (no embedded joins): the unit and room names are looked up
-  // by id, only those of this project.
-  const { data: events, error: eventsError } = lead.sessionId
-    ? await admin
-        .from("eventos")
-        .select("tipo, criado_em, dados, unidade_id, comodo_id")
-        .eq("empreendimento_id", lead.projectId)
-        .eq("sessao_id", lead.sessionId)
-        // The LATEST 500 (what was seen right before the form matters most).
-        .order("criado_em", { ascending: false })
-        .limit(500)
-    : { data: [], error: null };
-  // Without the summary the e-mail still goes (the lead is what matters).
-  if (eventsError) fail("eventos", lead.projectId);
-  const unitIds = [
-    ...new Set(
-      [lead.unitId, ...(events ?? []).map((e) => e.unidade_id)].filter(
-        (id): id is string => Boolean(id),
-      ),
-    ),
-  ];
-  const roomIds = [
-    ...new Set(
-      (events ?? [])
-        .map((e) => e.comodo_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const [units, rooms] = await Promise.all([
-    unitIds.length
-      ? admin
-          .from("unidades")
-          .select("id, numero")
-          .eq("empreendimento_id", lead.projectId)
-          .in("id", unitIds)
-      : Promise.resolve({ data: [] }),
-    roomIds.length
-      ? admin.from("comodos").select("id, nome").in("id", roomIds)
-      : Promise.resolve({ data: [] }),
-  ]);
-  const unitNumber = new Map((units.data ?? []).map((u) => [u.id, u.numero]));
-  const roomName = new Map((rooms.data ?? []).map((r) => [r.id, r.nome]));
-
-  const sessionEvents: SessionEvent[] = (events ?? []).map((event) => {
-    const dados = event.dados as { segundos?: unknown } | null;
-    // Events can be inserted straight through the public key: only a sane
-    // number of seconds counts (same bounds as the site's validation).
-    const seconds = dados?.segundos;
-    return {
-      tipo: event.tipo,
-      criado_em: event.criado_em,
-      unidade: event.unidade_id
-        ? (unitNumber.get(event.unidade_id) ?? null)
-        : null,
-      comodo: event.comodo_id ? (roomName.get(event.comodo_id) ?? null) : null,
-      segundos:
-        Number.isInteger(seconds) &&
-        (seconds as number) >= 0 &&
-        (seconds as number) <= 86_400
-          ? (seconds as number)
-          : null,
-    };
-  });
+  // The visit summary (without it the e-mail still goes: the lead matters).
+  const session = lead.sessionId
+    ? await loadSessionEvents(admin, {
+        projectId: lead.projectId,
+        sessionId: lead.sessionId,
+        extraUnitId: lead.unitId,
+      })
+    : { events: [], failed: false };
+  if (session.failed) fail("eventos", lead.projectId);
+  const sessionEvents = session.events;
+  const unitNumber = await unitNumberOf(admin, lead.projectId, lead.unitId);
 
   const email = buildNewLeadEmail({
     brokerName: profile.nome,
     projectName: project.nome,
-    unitNumber: lead.unitId ? (unitNumber.get(lead.unitId) ?? null) : null,
+    unitNumber,
     lead: {
       name: lead.name,
       phone: lead.phone,
