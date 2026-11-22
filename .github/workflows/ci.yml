@@ -1,0 +1,70 @@
+name: CI
+
+# Conferência automática de todo PR e de todo push na main (issue #82):
+# formato, lint, tipos, testes unitários e build. NÃO usa nenhuma chave real:
+# o build recebe valores de exemplo (só o formato é validado).
+# Os testes de banco (RLS) e de navegador entram na issue #85, com um banco
+# de teste descartável dentro do próprio CI.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Só o necessário: ler o código. Nenhum segredo, nenhuma escrita.
+permissions:
+  contents: read
+
+# Um push novo no mesmo PR cancela a rodada antiga (economiza minutos).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verificar:
+    # Este nome é o "check obrigatório" da proteção da main (issue #83).
+    name: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Valores de exemplo (nada real): o build só confere o formato.
+      NEXT_PUBLIC_SUPABASE_URL: https://exemplo.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_exemplo_para_o_ci
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar o Node 22 (com cache do npm)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar as dependências
+        run: npm ci
+
+      - name: Formato (Prettier)
+        run: npm run format:check
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Tipos (TypeScript)
+        run: npm run typecheck
+
+      - name: Testes unitários (Vitest)
+        run: npm run test
+
+      # O cache do Next deixa o build mais rápido nas rodadas seguintes.
+      - name: Cache do build do Next
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**', 'next.config.ts') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            nextjs-${{ runner.os }}-
+
+      - name: Build (Next.js)
+        run: npm run build

@@ -20,7 +20,7 @@ Plataforma para corretores apresentarem imóveis em 3D por link, com captação 
 - **Branches:** issues de ambiente/configuração/docs/testes vão **direto na `main`**. Funcionalidades, bugs e tudo que exige cuidado (banco, RLS, login, uploads, formulários públicos, 3D, label `seguranca`) vão em **branch a partir da `main` + PR** (`feat/<n>-descricao`, `fix/<n>-descricao`). Detalhes em `docs/04`. Proteção da `main` entra na Sprint 7.
 - **Sprint 6 – Leads e analytics: concluída** (#67 a #73). Eventos de visita (`/api/eventos`, `src/lib/tour/events.ts`, limite por sessão no banco), botão WhatsApp, formulário de interesse com LGPD (`sendLead`, `/privacidade`), e-mail ao corretor via Resend (`src/lib/email/*`, cliente admin só no servidor: `SUPABASE_SECRET_KEY` + `RESEND_API_KEY`; `service_role` só com os GRANTs necessários), painel de leads (`/painel/leads`, apagar leva o histórico junto), resumo do mês (`public.resumo_visitas`, contas no banco) e termômetro de interesse (`src/lib/leads/interest.ts`). **Limitação conhecida:** a chave pública ainda insere direto em `leads`/`eventos` (fecha na Sprint 7, issue 3).
 - **Sprint 7 – Qualidade e CI: aprovada e criada no GitHub** (`docs/sprints/sprint-7.md`); Sprint 8 só com objetivo (roteiro no fim do mesmo arquivo).
-- **Testes e2e:** rodam contra o site compilado (`build` + `start`); durante a issue, só os specs da parte mexida; a suíte inteira uma vez antes do merge (`docs/04`).
+- **Testes e CI:** o CI (`.github/workflows/ci.yml`, check `verificar`) roda formato, lint, tipos, testes unitários e build em todo PR; **todo PR espera o CI verde antes do merge** (`gh pr checks --watch`). Os e2e rodam contra o site compilado (`build` + `start`). **Até a issue #85** o CI não roda RLS nem e2e: localmente, só `test:rls` (se mexeu no banco) e o spec e2e da parte mexida, nunca a suíte inteira (`docs/04`).
 - **O usuário é júnior e está aprendendo:** explique o porquê das decisões, em linguagem simples, e mostre os comandos que ele mesmo pode rodar.
 
 ## Como planejar uma nova sprint
@@ -46,7 +46,7 @@ Ao fim de uma sprint (ou quando o usuário pedir o planejamento da próxima):
 2. Listar os arquivos que serão criados ou alterados.
 3. Registrar o ANTES (print/descrição no navegador; para bug, escrever um teste que falha).
 4. Implementar em passos pequenos.
-5. Verificar o DEPOIS: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e`, `npm run test:rls` (se mexeu no banco), `npm run build` e teste no navegador (desktop + 390 px), sem erros no console.
+5. Verificar o DEPOIS: `npm run lint`, `npm run typecheck`, `npm run test` e os testes da parte mexida (`test:rls` se mexeu no banco; o spec e2e da tela mexida, em desktop e 390 px). O resto (formato, build, suíte inteira) é do CI: abrir o PR e esperar ficar verde.
 6. Enviar ao usuário os prints e um **roteiro curto de teste visual**, e esperar o ok.
 7. Rodar `/code-review`, e `/security-review` quando mexer em auth, RLS, uploads, formulários públicos, env ou Server Actions.
 8. Commit em Conventional Commits citando a issue (`feat(tour): ... (#N)`).

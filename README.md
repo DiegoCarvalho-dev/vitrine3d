@@ -1,5 +1,7 @@
 # Vitrine 3D
 
+[![CI](https://github.com/DiegoCarvalho-dev/vitrine3d/actions/workflows/ci.yml/badge.svg)](https://github.com/DiegoCarvalho-dev/vitrine3d/actions/workflows/ci.yml)
+
 > Nome provisório. Plataforma web onde corretores de imóveis apresentam prédios, apartamentos e casas em **3D interativo**, por um **link que abre no WhatsApp**, com descrição de cada cômodo e **captação de leads** embutida.
 
 ## O problema
@@ -54,6 +56,10 @@ O site roda na **Vercel** (plano gratuito), ligada a este repositório no GitHub
 | `npm run test:e2e` | Navegador de verdade (Playwright), em desktop e iPhone 13 |
 | `npm run test:rls` | **Segurança do banco**: regras de acesso (RLS) e permissões |
 | `npm run lint` / `npm run typecheck` | Qualidade do código e tipos |
+
+### CI (GitHub Actions)
+
+Todo PR (e todo push na `main`) passa sozinho pelo workflow `.github/workflows/ci.yml`: formato (Prettier), lint, tipos, testes unitários e build, tudo com valores de exemplo, **sem nenhuma chave real**. Os testes de banco (RLS) e de navegador entram no CI com um banco descartável na issue #85. Para ver o resultado: aba **Checks** do PR, ou `gh pr checks`.
 
 ### Por que `test:rls` existe
 
