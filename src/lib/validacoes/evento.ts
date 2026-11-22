@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Visit events of the public tour (issue #67), checked in the browser and on
 // the server (/api/eventos) before going to `eventos` (docs/03). Only what
-// the tour sends; "clicou_whatsapp" and "enviou_lead" come with #68 and #69.
+// the tour sends; "enviou_lead" comes with #69.
 
 export const EVENT_TYPES = [
   "abriu_tour",
@@ -10,6 +10,7 @@ export const EVENT_TYPES = [
   "viu_comodo",
   "caminhou",
   "saiu",
+  "clicou_whatsapp",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

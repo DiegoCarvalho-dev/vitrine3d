@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import type { ModelPlan } from "@/components/three/unit-model";
 import type { ViewerRoom, ViewMode } from "@/components/three/unit-viewer";
@@ -32,6 +32,7 @@ const UnitViewer = dynamic(
 export function UnitTour({
   projectId,
   unitId,
+  whatsapp,
   rooms,
   plan,
   privateArea,
@@ -39,6 +40,8 @@ export function UnitTour({
   /** For the visit events (issue #67). */
   projectId: string;
   unitId: string;
+  /** The WhatsApp button (hidden while walking: it would cover the controls). */
+  whatsapp: ReactNode;
   rooms: UnitRoom[];
   plan?: ModelPlan;
   privateArea: number | null;
@@ -168,6 +171,7 @@ export function UnitTour({
           </div>
         )}
       </div>
+      {mode !== "walk" && whatsapp}
     </section>
   );
 }

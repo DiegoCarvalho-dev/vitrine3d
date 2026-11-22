@@ -18,6 +18,7 @@ import { formatMoney } from "@/lib/validacoes/unidade";
 
 import { TourBuilding } from "./tour-building";
 import { VisitTracker } from "./visit-tracker";
+import { WhatsAppButton } from "./whatsapp-button";
 import { brandColor, TourHeader } from "./tour-header";
 
 type Props = PageProps<"/e/[slug]">;
@@ -130,6 +131,8 @@ export default async function TourPage({ params, searchParams }: Props) {
             {isBuilding ? (
               <TourBuilding
                 projectId={project.id}
+                projectName={project.nome}
+                whatsapp={broker?.whatsapp ?? null}
                 accentColor={brand}
                 floors={project.numero_andares!}
                 unitsPerFloor={project.unidades_por_andar!}
@@ -300,7 +303,15 @@ export default async function TourPage({ params, searchParams }: Props) {
         )}
       </main>
 
-      <footer className="border-t px-4 py-6 text-center text-xs text-muted-foreground">
+      {!isBuilding && (
+        <WhatsAppButton
+          projectId={project.id}
+          projectName={project.nome}
+          phone={broker?.whatsapp}
+        />
+      )}
+      {/* Bottom space so the fixed WhatsApp button never covers the text. */}
+      <footer className="border-t px-4 pt-6 pb-24 text-center text-xs text-muted-foreground">
         Imagens ilustrativas. Valores e disponibilidade sujeitos a confirmação
         com o corretor.
         <br />
