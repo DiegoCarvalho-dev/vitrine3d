@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import type { ModelPlan } from "@/components/three/unit-model";
-import type { ViewerRoom } from "@/components/three/unit-viewer";
+import type { ViewerRoom, ViewMode } from "@/components/three/unit-viewer";
+import { Button } from "@/components/ui/button";
 import { formatDecimal } from "@/lib/validacoes/numero";
 
 export type UnitRoom = ViewerRoom & { description: string | null };
@@ -21,8 +22,9 @@ const UnitViewer = dynamic(
 );
 
 /**
- * The unit seen from above, with a label per room (issue #50). Tapping a
- * label shows the room's description under the 3D.
+ * The unit seen from above, with a label per room (issue #50); tapping a
+ * label shows the room's description under the 3D. "Caminhar por dentro"
+ * walks inside at eye height (issue #51).
  */
 export function UnitTour({
   rooms,
@@ -34,6 +36,7 @@ export function UnitTour({
   privateArea: number | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mode, setMode] = useState<ViewMode>("top");
   const selected = rooms.find((room) => room.id === selectedId) ?? null;
 
   return (
@@ -41,6 +44,15 @@ export function UnitTour({
       aria-label="Planta da unidade em 3D"
       className="flex flex-col gap-3"
     >
+      <div className="flex flex-wrap gap-2">
+        {mode === "top" ? (
+          <Button onClick={() => setMode("walk")}>Caminhar por dentro</Button>
+        ) : (
+          <Button variant="outline" onClick={() => setMode("top")}>
+            Voltar à vista de cima
+          </Button>
+        )}
+      </div>
       <div
         className="relative aspect-[4/5] overflow-hidden rounded-lg border sm:aspect-[16/10]"
         data-testid="unit-3d"
@@ -52,6 +64,7 @@ export function UnitTour({
           onSelectRoom={(id) =>
             setSelectedId((current) => (current === id ? null : id))
           }
+          mode={mode}
         />
         <span className="pointer-events-none absolute top-3 left-3 z-30 rounded-full bg-white/85 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
           Imagem ilustrativa

@@ -5,6 +5,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { MathUtils, type Vector3 } from "three";
 
+import { blockingSegments, startPoint } from "@/lib/planta/collision";
 import { bounds } from "@/lib/planta/geometry";
 
 import {
@@ -14,10 +15,15 @@ import {
   RoomLabels,
 } from "./room-labels";
 import { type ModelPlan, type ModelRoom, UnitModel } from "./unit-model";
+import { WalkControls, WalkInput } from "./walk-controls";
+import { WalkJoystick } from "./walk-joystick";
 
-// Top view of the unit ("dollhouse", issue #50): walls without a ceiling,
-// slightly tilted, a label per room. Drag to turn, pinch / wheel to zoom.
-// Load with dynamic(ssr: false).
+// The unit in 3D. "top" (issue #50): the "dollhouse", walls without a
+// ceiling, slightly tilted, a label per room; drag to turn, pinch / wheel to
+// zoom. "walk" (issue #51): inside, at eye height. Load with
+// dynamic(ssr: false).
+
+export type ViewMode = "top" | "walk";
 
 const TILT = MathUtils.degToRad(28); // from straight down
 
@@ -58,11 +64,13 @@ export function UnitViewer({
   plan,
   selectedId,
   onSelectRoom,
+  mode = "top",
 }: {
   rooms: readonly ViewerRoom[];
   plan?: ModelPlan;
   selectedId: string | null;
   onSelectRoom: (id: string) => void;
+  mode?: ViewMode;
 }) {
   const box = bounds(rooms.map((room) => room.points));
   const center: [number, number, number] = [
@@ -103,14 +111,50 @@ export function UnitViewer({
   const anchors = useMemo(() => labelAnchors(rooms), [rooms]);
   const labels = useRef<(HTMLElement | null)[]>([]);
 
+  // Walk mode: the walls that block, where it starts, and the touch input.
+  const walls = useMemo(() => blockingSegments(rooms, plan), [rooms, plan]);
+  const start = useMemo(() => startPoint(rooms, plan), [rooms, plan]);
+  const [walkInput] = useState(() => new WalkInput());
+  const isTouch = useMemo(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(pointer: coarse)").matches,
+    [],
+  );
+  const lastTouch = useRef<{ id: number; x: number; y: number } | null>(null);
+  const walking = mode === "walk";
+
   return (
-    <div ref={frame} className="relative size-full">
+    <div
+      ref={frame}
+      className={`relative size-full ${walking ? "touch-none" : ""}`}
+      data-mode={mode}
+      // Phone, walk mode: dragging on the 3D looks around.
+      onPointerDown={(event) => {
+        if (!walking || event.pointerType !== "touch") return;
+        lastTouch.current = {
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+        };
+      }}
+      onPointerMove={(event) => {
+        const last = lastTouch.current;
+        if (!walking || !last || last.id !== event.pointerId) return;
+        // Grabbing the scene: dragging right turns the view left.
+        walkInput.addLook(last.x - event.clientX, last.y - event.clientY);
+        lastTouch.current = { ...last, x: event.clientX, y: event.clientY };
+      }}
+      onPointerUp={() => (lastTouch.current = null)}
+      onPointerCancel={() => (lastTouch.current = null)}
+    >
       {aspect !== null && (
         <Canvas
           // The camera prop only applies on mount: a different plan mounts a
           // fresh view, framed again.
-          key={`${center.join()}|${size}`}
-          frameloop="demand"
+          key={`${center.join()}|${size}|${mode}`}
+          // Walking draws continuously; the top view only when it changes.
+          frameloop={walking ? "always" : "demand"}
           dpr={[1, 2]}
           camera={{
             fov: FOV,
@@ -129,31 +173,50 @@ export function UnitViewer({
           <color attach="background" args={["#f2f1ee"]} />
           <hemisphereLight args={["#f4f6fa", "#b9b5ad", 1.8]} />
           <directionalLight position={[6, 12, 8]} intensity={1.8} />
-          <UnitModel rooms={rooms} plan={plan} />
-          <LabelProjector
-            anchors={anchors}
-            labels={labels}
-            selectedIndex={rooms.findIndex((room) => room.id === selectedId)}
-          />
-          <Reframe center={center} distance={distance} />
-          <OrbitControls
-            makeDefault
-            target={center}
-            enablePan={false}
-            enableDamping
-            minDistance={size * 0.5}
-            maxDistance={distance * 2}
-            // From above down to a low angle; never under the floor.
-            maxPolarAngle={MathUtils.degToRad(70)}
-          />
+          <UnitModel rooms={rooms} plan={plan} showCeiling={walking} />
+          {walking ? (
+            <WalkControls walls={walls} start={start} input={walkInput} />
+          ) : (
+            <>
+              <LabelProjector
+                anchors={anchors}
+                labels={labels}
+                selectedIndex={rooms.findIndex(
+                  (room) => room.id === selectedId,
+                )}
+              />
+              <Reframe center={center} distance={distance} />
+              <OrbitControls
+                makeDefault
+                target={center}
+                enablePan={false}
+                enableDamping
+                minDistance={size * 0.5}
+                maxDistance={distance * 2}
+                // From above down to a low angle; never under the floor.
+                maxPolarAngle={MathUtils.degToRad(70)}
+              />
+            </>
+          )}
         </Canvas>
       )}
-      <RoomLabels
-        rooms={rooms}
-        selectedId={selectedId}
-        onSelect={onSelectRoom}
-        labels={labels}
-      />
+      {walking ? (
+        <>
+          {isTouch && <WalkJoystick input={walkInput} />}
+          <p className="pointer-events-none absolute right-3 bottom-3 left-36 z-30 rounded-md bg-black/55 px-2.5 py-1.5 text-xs text-white sm:left-auto sm:max-w-sm">
+            {isTouch
+              ? "Use o controle para andar e arraste a imagem para olhar."
+              : "Clique na imagem para olhar com o mouse. Ande com W A S D ou as setas. Esc solta o mouse."}
+          </p>
+        </>
+      ) : (
+        <RoomLabels
+          rooms={rooms}
+          selectedId={selectedId}
+          onSelect={onSelectRoom}
+          labels={labels}
+        />
+      )}
     </div>
   );
 }

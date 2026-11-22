@@ -1,7 +1,14 @@
 import type { RoomType } from "@/lib/validacoes/comodo";
 import type { Point } from "@/lib/validacoes/planta";
 
-import { buildWalls, type PlanRoom, type WallSegment } from "./walls";
+import type { FloorPlan } from "@/lib/validacoes/planta";
+
+import {
+  buildWalls,
+  type Opening,
+  type PlanRoom,
+  type WallSegment,
+} from "./walls";
 
 // Doors between rooms (issue #49). Until the plan editor (Sprint 8), a door is
 // opened automatically where two rooms share at least 0.9 m of wall, following
@@ -251,4 +258,30 @@ export function onSegment(a: Point, b: Point, p: Point): boolean {
     ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) /
     (length * length);
   return t >= -EPS && t <= 1 + EPS;
+}
+
+/**
+ * Every hole in the walls of a unit: doors (saved or automatic) and windows
+ * (planta.janelas). A window from the floor is a glass door: it already
+ * connects the rooms, so no other door goes there.
+ */
+export function unitOpenings(
+  rooms: readonly DoorRoom[],
+  plan?: Pick<FloorPlan, "portas" | "janelas">,
+): Opening[] {
+  const windows: Opening[] = (plan?.janelas ?? []).map((w) => ({
+    a: w.de,
+    b: w.ate,
+    bottom: w.peitoril,
+    top: w.peitoril + w.altura,
+  }));
+  const glassDoors = windows.filter((w) => w.bottom === 0);
+  return [
+    ...planDoors(rooms, plan?.portas, glassDoors).map((door) => ({
+      ...door,
+      bottom: 0,
+      top: DOOR_HEIGHT,
+    })),
+    ...windows,
+  ];
 }
