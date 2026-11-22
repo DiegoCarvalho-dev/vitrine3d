@@ -99,6 +99,18 @@ begin
   r := r || format(E'\n[%s] toda tabela do public tem RLS ligado (%s sem RLS)',
     case when n = 0 then 'OK' else 'FALHOU' end, n);
 
+  -- Servidor (service_role, e-mail de novo lead #70): só LÊ o que o e-mail usa.
+  foreach t in array array['empreendimentos', 'perfis', 'eventos', 'unidades', 'comodos'] loop
+    r := r || format(E'\n[%s] servidor lê %s',
+      case when has_table_privilege('service_role', 'public.' || t, 'SELECT') then 'OK' else 'FALHOU' end, t);
+  end loop;
+  r := r || format(E'\n[%s] servidor NÃO lê leads (não precisa para o e-mail)',
+    case when has_table_privilege('service_role', 'public.leads', 'SELECT') then 'FALHOU' else 'OK' end);
+  r := r || format(E'\n[%s] servidor NÃO escreve nas tabelas do e-mail',
+    case when has_table_privilege('service_role', 'public.empreendimentos', 'INSERT, UPDATE, DELETE')
+           or has_table_privilege('service_role', 'public.eventos', 'INSERT, UPDATE, DELETE')
+      then 'FALHOU' else 'OK' end);
+
   raise exception 'RELATORIO_RLS:total=%;ok=%;falhas=%;FIM',
     (length(r) - length(replace(r, E'\n[', ''))) / 2,
     (length(r) - length(replace(r, '[OK]', ''))) / 4,
