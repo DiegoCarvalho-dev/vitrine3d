@@ -3,6 +3,8 @@ import { Archivo } from "next/font/google";
 
 import { Toaster } from "@/components/ui/sonner";
 
+import { siteUrl } from "@/lib/site-url";
+
 import "./globals.css";
 
 // Archivo variável com eixo de largura (wdth): texto em largura normal,
@@ -14,15 +16,10 @@ const archivo = Archivo({
 });
 
 // Absolute base for the preview images (WhatsApp needs full URLs).
-// NEXT_PUBLIC_SITE_URL (custom domain) wins; then the Vercel production URL.
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "http://localhost:3000");
+// Absolute links (WhatsApp preview): own domain, Vercel or localhost.
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(siteUrl()),
   title: "Vitrine 3D",
   description:
     "Tours 3D interativos para corretores de imóveis: prédio, unidade e captação de leads em um link.",
