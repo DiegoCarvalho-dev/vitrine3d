@@ -1,7 +1,5 @@
 import type { RoomType } from "@/lib/validacoes/comodo";
-import type { Point } from "@/lib/validacoes/planta";
-
-import type { FloorPlan } from "@/lib/validacoes/planta";
+import type { FloorPlan, Point } from "@/lib/validacoes/planta";
 
 import {
   buildWalls,

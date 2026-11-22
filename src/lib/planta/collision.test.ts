@@ -88,6 +88,46 @@ describe("colisão do modo caminhar", () => {
     expect(collides([2, 0.2], withWindow)).toBe(true);
   });
 
+  it("a porta de entrada não deixa sair do apartamento", () => {
+    const withEntrance = blockingSegments(rooms, {
+      portas: [
+        { de: [0, 1], ate: [0, 2] }, // entrada (parede externa)
+        { de: [4, 1], ate: [4, 2] }, // sala → quarto
+      ],
+      janelas: [],
+    });
+    const end = walk([2, 1.5], [-3, 1.5], withEntrance);
+    expect(end[0]).toBeGreaterThan(0);
+  });
+
+  it("porta salva de 0,6 m (banheiro) ainda deixa passar", () => {
+    const narrow = blockingSegments(rooms, {
+      portas: [{ de: [4, 1.2], ate: [4, 1.8] }],
+      janelas: [],
+    });
+    const end = walk([2, 1.5], [6, 1.5], narrow);
+    expect(end[0]).toBeGreaterThan(5.9);
+  });
+
+  it("começo apertado contra a parede: sai para um ponto livre e anda", () => {
+    // Hall de 1 m de fundo: 0,8 m para dentro fica a 0,2 m da parede.
+    const tight = [
+      rect("hall", "outro", 0, 0, 4, 1),
+      rect("sala", "sala", 0, 1, 4, 3),
+    ];
+    const plan = {
+      portas: [{ de: [1.5, 0] as Point, ate: [2.5, 0] as Point }],
+      janelas: [],
+    };
+    const tightWalls = blockingSegments(tight, plan);
+    const { at } = startPoint(tight, plan);
+    expect(collides(at, tightWalls)).toBe(false);
+    // Mesmo encostado, um passo para longe da parede é aceito.
+    const stuck: Point = [0.6, 0.95]; // longe da porta hall → sala (no meio)
+    expect(collides(stuck, tightWalls)).toBe(true);
+    expect(step(stuck, [0, -0.05], tightWalls)[1]).toBeCloseTo(0.9);
+  });
+
   it("começa na porta de entrada, virado para dentro", () => {
     const tipoA = seed.tipologias[0];
     const seedRooms: DoorRoom[] = tipoA.comodos.map((c, i) => ({

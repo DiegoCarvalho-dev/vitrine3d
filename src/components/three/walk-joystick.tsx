@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import type { WalkInput } from "./walk-controls";
 
@@ -16,6 +16,8 @@ function placeKnob(knob: HTMLElement | null, dx: number, dy: number) {
 export function WalkJoystick({ input }: { input: WalkInput }) {
   const knob = useRef<HTMLSpanElement>(null);
   const origin = useRef<{ x: number; y: number } | null>(null);
+  // Leaving the walk mode while holding it: stop.
+  useEffect(() => () => input.setMove(0, 0), [input]);
 
   const moveTo = (x: number, y: number) => {
     const from = origin.current;
@@ -54,8 +56,15 @@ export function WalkJoystick({ input }: { input: WalkInput }) {
         event.stopPropagation();
         moveTo(event.clientX, event.clientY);
       }}
-      onPointerUp={release}
-      onPointerCancel={release}
+      // Not the frame's: a finger dragging to look keeps going.
+      onPointerUp={(event) => {
+        event.stopPropagation();
+        release();
+      }}
+      onPointerCancel={(event) => {
+        event.stopPropagation();
+        release();
+      }}
     >
       <span ref={knob} className="size-12 rounded-full bg-white/90 shadow-md" />
     </div>

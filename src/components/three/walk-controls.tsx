@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef } from "react";
 import type { Camera, PerspectiveCamera, PointLight } from "three";
 
 import { EYE_HEIGHT, type Segment, step } from "@/lib/planta/collision";
@@ -47,6 +47,13 @@ export class WalkInput {
   release(code?: string) {
     if (code) this.keys.delete(code);
     else this.keys.clear();
+  }
+
+  /** Everything back to rest (leaving the walk mode). */
+  reset() {
+    this.setMove(0, 0);
+    this.takeLook();
+    this.release();
   }
 
   /** The look since the last frame (then zero). */
@@ -104,10 +111,13 @@ export function WalkControls({
   walls,
   start,
   input,
+  keyTarget,
 }: {
   walls: readonly Segment[];
   start: { at: Point; facing: Point };
   input: WalkInput;
+  /** Keys only count while the focus is in here (or the mouse is locked). */
+  keyTarget: RefObject<HTMLElement | null>;
 }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera;
   const canvas = useThree((state) => state.gl.domElement);
@@ -122,13 +132,19 @@ export function WalkControls({
   // Keyboard (not while typing in a field).
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select")) return;
+      // Shortcuts (Cmd/Ctrl+A...) are the browser's; on a Mac the letter
+      // would never get its keyup and keep walking.
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (!ALL_KEYS.includes(event.code)) return;
+      const focused = keyTarget.current?.contains(document.activeElement);
+      if (!focused && document.pointerLockElement !== canvas) return;
       event.preventDefault(); // the arrows would scroll the page
       input.press(event.code);
     };
-    const up = (event: KeyboardEvent) => input.release(event.code);
+    const up = (event: KeyboardEvent) => {
+      if (event.key === "Meta") input.release();
+      else input.release(event.code);
+    };
     const clear = () => input.release();
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -137,14 +153,16 @@ export function WalkControls({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", clear);
-      clear();
+      input.reset(); // leaving: nothing keeps walking next time
     };
-  }, [input]);
+  }, [input, keyTarget, canvas]);
 
   // Mouse: a click on the 3D locks the pointer; moving it looks around.
   useEffect(() => {
     const lock = (event: PointerEvent) => {
-      if (event.pointerType === "mouse") void canvas.requestPointerLock?.();
+      if (event.pointerType !== "mouse") return;
+      // Chrome refuses (and rejects the promise) right after Esc.
+      Promise.resolve(canvas.requestPointerLock?.()).catch(() => {});
     };
     const move = (event: MouseEvent) => {
       if (document.pointerLockElement === canvas)

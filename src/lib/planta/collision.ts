@@ -2,7 +2,7 @@ import type { FloorPlan, Point } from "@/lib/validacoes/planta";
 
 import { type DoorRoom, unitOpenings } from "./doors";
 import { isInside, labelPoint } from "./geometry";
-import { buildWalls, WALL_THICKNESS, wallPieces } from "./walls";
+import { buildWalls, type Opening, WALL_THICKNESS, wallPieces } from "./walls";
 
 // Walking inside the unit (issue #51): the visitor is a circle on the plan
 // that can't cross the walls, only the doors (and floor-level glass doors).
@@ -13,14 +13,43 @@ const BODY_HEIGHT = 1.8; // a wall piece starting above this doesn't block
 
 export type Segment = { a: Point; b: Point };
 
-/** The wall parts that block a person (lintels above doors don't). */
+const CLEARANCE = BODY_RADIUS + WALL_THICKNESS / 2;
+/** A passage narrower than this is widened for walking (0.6 m doors). */
+const MIN_PASSAGE = 2 * CLEARANCE + 0.16;
+
+/** Widens a floor-level opening around its middle (walking only). */
+function widen(opening: Opening): Opening {
+  const dx = opening.b[0] - opening.a[0];
+  const dy = opening.b[1] - opening.a[1];
+  const length = Math.hypot(dx, dy);
+  if (!length || length >= MIN_PASSAGE || opening.bottom > 0) return opening;
+  const grow = (MIN_PASSAGE - length) / 2 / length;
+  return {
+    ...opening,
+    a: [opening.a[0] - dx * grow, opening.a[1] - dy * grow],
+    b: [opening.b[0] + dx * grow, opening.b[1] + dy * grow],
+  };
+}
+
+/**
+ * The wall parts that block a person: the walls between rooms minus their
+ * doors (lintels above don't block), and ALL exterior walls, even where the
+ * front door is (the walk stays inside the unit).
+ */
 export function blockingSegments(
   rooms: readonly DoorRoom[],
   plan?: Pick<FloorPlan, "portas" | "janelas">,
 ): Segment[] {
-  return wallPieces(buildWalls(rooms), unitOpenings(rooms, plan))
-    .filter((piece) => piece.bottom < BODY_HEIGHT)
-    .map(({ a, b }) => ({ a, b }));
+  const walls = buildWalls(rooms);
+  const inside = walls.filter((wall) => wall.rooms.length === 2);
+  const outside = walls.filter((wall) => wall.rooms.length === 1);
+  const openings = unitOpenings(rooms, plan).map(widen);
+  return [
+    ...wallPieces(inside, openings)
+      .filter((piece) => piece.bottom < BODY_HEIGHT)
+      .map(({ a, b }) => ({ a, b })),
+    ...outside.map(({ a, b }) => ({ a, b })),
+  ];
 }
 
 function distanceToSegment(p: Point, { a, b }: Segment): number {
@@ -35,8 +64,6 @@ function distanceToSegment(p: Point, { a, b }: Segment): number {
     : 0;
   return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
 }
-
-const CLEARANCE = BODY_RADIUS + WALL_THICKNESS / 2;
 
 export function collides(p: Point, walls: readonly Segment[]): boolean {
   return walls.some((wall) => distanceToSegment(p, wall) < CLEARANCE);
@@ -56,7 +83,31 @@ export function step(
     [from[0] + delta[0], from[1]],
     [from[0], from[1] + delta[1]],
   ];
-  return candidates.find((p) => !collides(p, walls)) ?? from;
+  const free = candidates.find((p) => !collides(p, walls));
+  if (free) return free;
+  // Already touching a wall (e.g. a tight start): any move away is allowed.
+  const target = candidates[0];
+  return nearestWall(target, walls) > nearestWall(from, walls) ? target : from;
+}
+
+function nearestWall(p: Point, walls: readonly Segment[]): number {
+  return Math.min(...walls.map((wall) => distanceToSegment(p, wall)));
+}
+
+/** The closest free spot to `p` (rings of 10 cm around it), or `p`. */
+function freeSpotNear(p: Point, walls: readonly Segment[]): Point {
+  if (!collides(p, walls)) return p;
+  for (let ring = 1; ring <= 15; ring++) {
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2;
+      const q: Point = [
+        p[0] + Math.cos(angle) * ring * 0.1,
+        p[1] + Math.sin(angle) * ring * 0.1,
+      ];
+      if (!collides(q, walls)) return q;
+    }
+  }
+  return p;
 }
 
 /**
@@ -69,6 +120,7 @@ export function startPoint(
   plan?: Pick<FloorPlan, "portas" | "janelas">,
 ): { at: Point; facing: Point } {
   const exterior = buildWalls(rooms).filter((wall) => wall.rooms.length === 1);
+  const walls = blockingSegments(rooms, plan);
   const doors = (plan?.portas ?? []).map((d) => ({ a: d.de, b: d.ate }));
   for (const door of doors) {
     const mid: Point = [
@@ -85,16 +137,20 @@ export function startPoint(
     const length = Math.hypot(dx, dy);
     for (const sign of [1, -1]) {
       const normal: Point = [(-dy / length) * sign, (dx / length) * sign];
-      const at: Point = [mid[0] + normal[0] * 0.8, mid[1] + normal[1] * 0.8];
-      if (isInside(room.points, at)) return { at, facing: normal };
+      const inward: Point = [
+        mid[0] + normal[0] * 0.8,
+        mid[1] + normal[1] * 0.8,
+      ];
+      if (isInside(room.points, inward))
+        return { at: freeSpotNear(inward, walls), facing: normal };
     }
   }
   const living =
     rooms.find((r) => r.type === "sala") ??
     rooms.find((r) => r.type === "outro") ??
     rooms[0];
-  const at = labelPoint(living.points);
-  return { at, facing: widestView(at, blockingSegments(rooms, plan)) };
+  const at = freeSpotNear(labelPoint(living.points), walls);
+  return { at, facing: widestView(at, walls) };
 }
 
 /** How far a ray from `from` along `dir` goes before hitting a wall. */

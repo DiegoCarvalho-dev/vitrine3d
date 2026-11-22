@@ -29,6 +29,11 @@ const TILT = MathUtils.degToRad(28); // from straight down
 
 export type ViewerRoom = ModelRoom & LabelRoom;
 
+/** The look-drag ends only when ITS finger lifts. */
+function endLook(last: { current: { id: number } | null }, pointerId: number) {
+  if (last.current?.id === pointerId) last.current = null;
+}
+
 type ControlsLike = { target: Vector3; update: () => void };
 
 /** The frame changed shape (phone turned, window resized): frame again. */
@@ -123,6 +128,9 @@ export function UnitViewer({
   );
   const lastTouch = useRef<{ id: number; x: number; y: number } | null>(null);
   const walking = mode === "walk";
+  useEffect(() => {
+    if (walking) frame.current?.focus({ preventScroll: true });
+  }, [walking]);
 
   return (
     <div
@@ -132,6 +140,7 @@ export function UnitViewer({
       // Phone, walk mode: dragging on the 3D looks around.
       onPointerDown={(event) => {
         if (!walking || event.pointerType !== "touch") return;
+        if (lastTouch.current) return; // one finger looks; others are ignored
         lastTouch.current = {
           id: event.pointerId,
           x: event.clientX,
@@ -145,8 +154,10 @@ export function UnitViewer({
         walkInput.addLook(last.x - event.clientX, last.y - event.clientY);
         lastTouch.current = { ...last, x: event.clientX, y: event.clientY };
       }}
-      onPointerUp={() => (lastTouch.current = null)}
-      onPointerCancel={() => (lastTouch.current = null)}
+      onPointerUp={(event) => endLook(lastTouch, event.pointerId)}
+      onPointerCancel={(event) => endLook(lastTouch, event.pointerId)}
+      // Focusable, so the walk keys work only while it has the focus.
+      tabIndex={walking ? -1 : undefined}
     >
       {aspect !== null && (
         <Canvas
@@ -175,7 +186,12 @@ export function UnitViewer({
           <directionalLight position={[6, 12, 8]} intensity={1.8} />
           <UnitModel rooms={rooms} plan={plan} showCeiling={walking} />
           {walking ? (
-            <WalkControls walls={walls} start={start} input={walkInput} />
+            <WalkControls
+              walls={walls}
+              start={start}
+              input={walkInput}
+              keyTarget={frame}
+            />
           ) : (
             <>
               <LabelProjector
