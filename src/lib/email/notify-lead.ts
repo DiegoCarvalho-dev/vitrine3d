@@ -26,6 +26,13 @@ export type LeadForEmail = {
   origin: string | null;
 };
 
+/** Logs WHAT failed (never personal data or keys). */
+function fail(step: string, projectId: string) {
+  console.error(
+    `E-mail de novo lead: falha ao ler ${step} – empreendimento ${projectId}`,
+  );
+}
+
 export async function notifyBrokerOfLead(lead: LeadForEmail): Promise<void> {
   const env = getEmailEnv();
   if (!env) return; // keys not configured: e-mail off
@@ -33,35 +40,43 @@ export async function notifyBrokerOfLead(lead: LeadForEmail): Promise<void> {
 
   // Only a PUBLISHED project's owner is notified (the lead could only be
   // saved for one anyway).
-  const { data: project } = await admin
+  const { data: project, error: projectError } = await admin
     .from("empreendimentos")
     .select("nome, dono_id, status")
     .eq("id", lead.projectId)
     .maybeSingle();
+  if (projectError) return fail("empreendimento", lead.projectId);
   if (!project || project.status !== "publicado") return;
 
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("perfis")
     .select("nome, notificar_leads_email")
     .eq("id", project.dono_id)
     .maybeSingle();
+  if (profileError) return fail("perfil", lead.projectId);
   if (!profile?.notificar_leads_email) return; // turned off in the profile
 
-  const { data: owner } = await admin.auth.admin.getUserById(project.dono_id);
+  const { data: owner, error: ownerError } = await admin.auth.admin.getUserById(
+    project.dono_id,
+  );
+  if (ownerError) return fail("e-mail do corretor", lead.projectId);
   const to = owner.user?.email;
   if (!to) return;
 
   // Plain queries (no embedded joins): the unit and room names are looked up
   // by id, only those of this project.
-  const { data: events } = lead.sessionId
+  const { data: events, error: eventsError } = lead.sessionId
     ? await admin
         .from("eventos")
         .select("tipo, criado_em, dados, unidade_id, comodo_id")
         .eq("empreendimento_id", lead.projectId)
         .eq("sessao_id", lead.sessionId)
-        .order("criado_em")
+        // The LATEST 500 (what was seen right before the form matters most).
+        .order("criado_em", { ascending: false })
         .limit(500)
-    : { data: [] };
+    : { data: [], error: null };
+  // Without the summary the e-mail still goes (the lead is what matters).
+  if (eventsError) fail("eventos", lead.projectId);
   const unitIds = [
     ...new Set(
       [lead.unitId, ...(events ?? []).map((e) => e.unidade_id)].filter(
@@ -93,6 +108,9 @@ export async function notifyBrokerOfLead(lead: LeadForEmail): Promise<void> {
 
   const sessionEvents: SessionEvent[] = (events ?? []).map((event) => {
     const dados = event.dados as { segundos?: unknown } | null;
+    // Events can be inserted straight through the public key: only a sane
+    // number of seconds counts (same bounds as the site's validation).
+    const seconds = dados?.segundos;
     return {
       tipo: event.tipo,
       criado_em: event.criado_em,
@@ -100,7 +118,12 @@ export async function notifyBrokerOfLead(lead: LeadForEmail): Promise<void> {
         ? (unitNumber.get(event.unidade_id) ?? null)
         : null,
       comodo: event.comodo_id ? (roomName.get(event.comodo_id) ?? null) : null,
-      segundos: typeof dados?.segundos === "number" ? dados.segundos : null,
+      segundos:
+        Number.isInteger(seconds) &&
+        (seconds as number) >= 0 &&
+        (seconds as number) <= 86_400
+          ? (seconds as number)
+          : null,
     };
   });
 
@@ -134,6 +157,8 @@ export async function notifyBrokerOfLead(lead: LeadForEmail): Promise<void> {
       html: email.html,
       text: email.text,
     }),
+    // Resend hanging never keeps the server busy for long.
+    signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
     // Status only: the body could echo addresses.

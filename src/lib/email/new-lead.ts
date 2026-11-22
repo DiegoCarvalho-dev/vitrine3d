@@ -42,7 +42,9 @@ export function summaryLines(summary: SessionSummary | null): string[] {
       `Unidades abertas: ${summary.units.slice(0, 5).join(", ")}${summary.units.length > 5 ? "…" : ""}`,
     );
   if (summary.rooms.length)
-    lines.push(`Cômodos vistos: ${summary.rooms.slice(0, 8).join(", ")}`);
+    lines.push(
+      `Cômodos vistos: ${summary.rooms.slice(0, 8).join(", ")}${summary.rooms.length > 8 ? "…" : ""}`,
+    );
   if (summary.seconds)
     lines.push(`Tempo no tour: ${durationLabel(summary.seconds)}`);
   if (summary.walked) lines.push("Caminhou por dentro da unidade em 3D");
@@ -56,7 +58,12 @@ export function buildNewLeadEmail(input: NewLeadEmail) {
   const where = unitNumber
     ? `${projectName}, unidade ${unitNumber}`
     : projectName;
-  const subject = `Novo interessado: ${lead.name} – ${where}`.slice(0, 200);
+  // One line, cut by characters (an emoji is never split in half).
+  const subject = Array.from(
+    `Novo interessado: ${lead.name} – ${where}`.replace(/\s+/g, " "),
+  )
+    .slice(0, 200)
+    .join("");
   // Answer on WhatsApp, already greeting by name.
   const reply = whatsappLink(
     lead.phone,
@@ -108,7 +115,7 @@ ${lead.message ? `<p style="margin:16px 0 4px;color:#5b6573;font-size:13px">Mens
 ${visit.length ? `<p style="margin:16px 0 4px;color:#5b6573;font-size:13px">O que a pessoa viu</p><ul style="margin:0;padding-left:20px">${visit.map((l) => `<li>${e(l)}</li>`).join("")}</ul>` : ""}
 <p style="margin:20px 0 0">${reply ? button(reply, "Responder no WhatsApp", true) : ""}${button(input.panelUrl, "Abrir no painel", !reply)}</p>
 </div>
-<p style="font-size:12px;color:#5b6573;margin:12px 4px 0">Você recebe este e-mail porque ativou o aviso de novos interessados no seu perfil da Vitrine 3D. Para desligar, abra o perfil no painel.</p>
+<p style="font-size:12px;color:#5b6573;margin:12px 4px 0">O aviso de novos interessados está ligado no seu perfil da Vitrine 3D. Para desligar, abra o perfil no painel.</p>
 </div></body></html>`;
   return { subject, text, html };
 }

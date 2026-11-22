@@ -15,7 +15,6 @@ const archivo = Archivo({
   axes: ["wdth"],
 });
 
-// Absolute base for the preview images (WhatsApp needs full URLs).
 // Absolute links (WhatsApp preview): own domain, Vercel or localhost.
 
 export const metadata: Metadata = {

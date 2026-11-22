@@ -18,6 +18,11 @@ export type SessionSummary = {
   days: number; // different days with a visit
 };
 
+/** "2026-11-21" in Brasília time (a visit at 21:00 is not the next day). */
+const brazilDay = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+});
+
 export function summarizeSession(
   events: readonly SessionEvent[],
 ): SessionSummary {
@@ -27,7 +32,7 @@ export function summarizeSession(
   let walked = false;
   const days = new Set<string>();
   for (const event of events) {
-    days.add(event.criado_em.slice(0, 10));
+    days.add(brazilDay.format(new Date(event.criado_em)));
     if (event.unidade && event.tipo === "abriu_unidade")
       unitCount.set(event.unidade, (unitCount.get(event.unidade) ?? 0) + 1);
     if (

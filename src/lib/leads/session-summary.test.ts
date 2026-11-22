@@ -46,6 +46,15 @@ describe("resumo da visita", () => {
     });
   });
 
+  it('visita às 21 h de Brasília não vira "2 dias" (dia contado no fuso do Brasil)', () => {
+    expect(
+      summarizeSession([
+        event("abriu_tour", "2026-11-20T23:50:00Z"), // 20:50 em Brasília
+        event("abriu_tour", "2026-11-21T00:10:00Z"), // 21:10 em Brasília
+      ]).days,
+    ).toBe(1);
+  });
+
   it("duração em linguagem simples", () => {
     expect(durationLabel(45)).toBe("45 s");
     expect(durationLabel(480)).toBe("8 min");

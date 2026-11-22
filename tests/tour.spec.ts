@@ -118,7 +118,9 @@ test.describe("Tour público /e/[slug]", () => {
 // custa n × R$ 100 mil; o 6º andar é "sob consulta"; a 101 está vendida.
 test.describe("Filtros do tour", () => {
   test.skip(!hasSupabaseEnv, "Sem .env.local com as chaves do Supabase.");
-  test.setTimeout(150_000);
+  // Long flow with many database calls: with the whole suite in parallel it
+  // passed the 150 s limit on the phone project.
+  test.setTimeout(240_000);
 
   test("filtra, mostra o contador, vale pelo link e limpa", async ({
     page,
