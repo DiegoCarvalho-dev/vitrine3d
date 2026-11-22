@@ -38,7 +38,7 @@ export function WhatsAppButton({
           dados: { pagina: unit ? "unidade" : "predio" },
         })
       }
-      className="fixed right-4 bottom-4 z-40 inline-flex h-12 items-center gap-2 rounded-full bg-[#1a7f4b] px-5 text-sm font-medium text-white shadow-lg ring-1 ring-black/10 hover:bg-[#15683d] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none sm:right-6 sm:bottom-6"
+      className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 inline-flex h-12 items-center gap-2 rounded-full bg-[#1a7f4b] px-5 text-sm font-medium text-white shadow-lg ring-1 ring-black/10 hover:bg-[#15683d] focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:outline-none sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
     >
       <svg
         aria-hidden

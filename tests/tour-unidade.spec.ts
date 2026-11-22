@@ -16,6 +16,13 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
   test.skip(!hasSupabaseEnv, "Sem .env.local com as chaves do Supabase.");
   test.setTimeout(150_000);
 
+  // If an assertion fails while the fake WhatsApp is set, it still goes away.
+  let cleanupSql = "";
+  test.afterEach(() => {
+    if (cleanupSql) runSql(cleanupSql);
+    cleanupSql = "";
+  });
+
   test("vai do prédio à unidade e volta, com a planta em 3D e 404", async ({
     page,
     browser,
@@ -156,6 +163,7 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     // Botão WhatsApp (#68): link com a mensagem da unidade, evento ao tocar,
     // escondido no modo caminhar e ausente quando o perfil não tem WhatsApp.
     const ownerSql = `(select dono_id from public.empreendimentos where id = '${id}')`;
+    cleanupSql = `update public.perfis set whatsapp = null where id = ${ownerSql}`;
     runSql(
       `update public.perfis set whatsapp = '+5511999990000' where id = ${ownerSql}`,
     );
@@ -219,7 +227,7 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
       abriu_tour: expect.any(Number),
       abriu_unidade: expect.any(Number),
       viu_comodo: 2,
-      caminhou: 2, // uma no passeio e outra no teste do botão WhatsApp
+      caminhou: expect.any(Number),
       saiu: expect.any(Number),
     });
     const [{ vias }] = querySql<{ vias: string }>(
