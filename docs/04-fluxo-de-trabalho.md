@@ -120,7 +120,9 @@ Regras do CI:
 - **Para ver o resultado:** aba *Checks* do PR ou `gh pr checks <número>` (`--watch` espera terminar).
 - **Vermelho = corrigir.** Nunca fazer merge com o CI vermelho; abrir o log do passo que falhou, corrigir, dar push (o CI roda de novo).
 
-**Divisão do trabalho (a partir da Sprint 7):** o CI roda a suíte automática; no computador, durante a issue, rodamos só `lint`, `typecheck` e os testes da parte mexida. `/code-review` e `/security-review` continuam sendo feitos antes do merge: o CI confere se funciona, não se está bem feito ou seguro. Os testes de RLS e de navegador entram no CI na issue #85.
+**Divisão do trabalho (a partir da Sprint 7):** o CI roda a suíte automática; no computador, durante a issue, rodamos só `lint`, `typecheck` e os testes da parte mexida. `/code-review` e `/security-review` continuam sendo feitos antes do merge: o CI confere se funciona, não se está bem feito ou seguro.
+
+**Até a issue #85:** o CI ainda NÃO roda os testes de RLS nem os de navegador (e2e). Por isso, enquanto ela não existir, quem mexer em banco/RLS roda `npm run test:rls` e quem mexer em telas roda o spec e2e **dessa parte** no computador. Não precisa da suíte completa, mas não dá para pular esses testes. Depois da #85 o CI faz tudo isso sozinho.
 
 ## Branches
 
