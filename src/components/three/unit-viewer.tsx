@@ -8,6 +8,8 @@ import { MathUtils, type Vector3 } from "three";
 import { blockingSegments, startPoint } from "@/lib/planta/collision";
 import { bounds } from "@/lib/planta/geometry";
 
+import { AdaptiveQuality } from "./adaptive-quality";
+
 import {
   type LabelRoom,
   LabelProjector,
@@ -182,6 +184,7 @@ export function UnitViewer({
           }
         >
           <color attach="background" args={["#f2f1ee"]} />
+          <AdaptiveQuality />
           <hemisphereLight args={["#f4f6fa", "#b9b5ad", 1.8]} />
           <directionalLight position={[6, 12, 8]} intensity={1.8} />
           <UnitModel rooms={rooms} plan={plan} showCeiling={walking} />

@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 
 import { bounds } from "@/lib/planta/geometry";
 
+import { AdaptiveQuality } from "./adaptive-quality";
 import { type ModelPlan, type ModelRoom, UnitModel } from "./unit-model";
 
 /**
@@ -45,6 +46,7 @@ export function UnitPreview({
       }
     >
       <color attach="background" args={["#f2f1ee"]} />
+      <AdaptiveQuality />
       <hemisphereLight args={["#f4f6fa", "#b9b5ad", 1.8]} />
       <directionalLight position={[6, 12, 8]} intensity={1.8} />
       <UnitModel rooms={rooms} plan={plan} />

@@ -11,7 +11,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 
 import {
@@ -22,6 +21,7 @@ import { NativeSelect } from "@/components/native-select";
 import type { SelectedUnit } from "@/components/three/BuildingPreview";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
+import { useWebGL } from "@/lib/webgl";
 import {
   filtersToSearch,
   matchesFilters,
@@ -54,23 +54,6 @@ const BuildingPreview = dynamic(
     ),
   { ssr: false }, // while loading, the SVG underneath is what shows
 );
-
-/** Does this browser give us a WebGL context? (checked once, in the browser) */
-let webglSupport: boolean | undefined;
-function hasWebGL(): boolean {
-  if (webglSupport === undefined) {
-    try {
-      const canvas = document.createElement("canvas");
-      webglSupport = Boolean(
-        canvas.getContext("webgl2") ?? canvas.getContext("webgl"),
-      );
-    } catch {
-      webglSupport = false;
-    }
-  }
-  return webglSupport;
-}
-const noop = () => () => {};
 
 /** If the 3D still crashes (e.g. the GPU process dies), show the SVG. */
 class Fallback3D extends Component<
@@ -188,7 +171,7 @@ export function TourBuilding({
   const floorSelectRef = useRef<HTMLSelectElement>(null);
 
   // null on the server (no document); true/false in the browser.
-  const webgl = useSyncExternalStore(noop, hasWebGL, () => null);
+  const webgl = useWebGL();
   const pathname = usePathname();
 
   // The heavy 3D code only starts after the page content is up (and the
