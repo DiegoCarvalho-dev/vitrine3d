@@ -268,6 +268,7 @@ export type Database = {
           mensagem: string | null;
           nome: string;
           origem: string | null;
+          sessao_id: string | null;
           status: Database["public"]["Enums"]["status_lead"];
           telefone: string | null;
           unidade_id: string | null;
@@ -282,6 +283,7 @@ export type Database = {
           mensagem?: string | null;
           nome: string;
           origem?: string | null;
+          sessao_id?: string | null;
           status?: Database["public"]["Enums"]["status_lead"];
           telefone?: string | null;
           unidade_id?: string | null;
@@ -296,6 +298,7 @@ export type Database = {
           mensagem?: string | null;
           nome?: string;
           origem?: string | null;
+          sessao_id?: string | null;
           status?: Database["public"]["Enums"]["status_lead"];
           telefone?: string | null;
           unidade_id?: string | null;

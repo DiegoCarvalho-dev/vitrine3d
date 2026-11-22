@@ -133,6 +133,7 @@ erDiagram
     text email
     text mensagem
     text origem "utm_source / campanha"
+    text sessao_id "mesmo id anônimo dos eventos (opcional)"
     boolean consentimento_lgpd
     timestamptz consentimento_em
     status_lead status "novo | em_contato | visita_agendada | ganho | perdido"
@@ -220,6 +221,8 @@ O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) 
 **Escrita do visitante** (`leads` e `eventos`, issue #15): só `INSERT`, só nas colunas de dados (nunca `status`, datas ou `id`), só em empreendimento publicado e **sem nenhum `SELECT`** (nem o próprio lead volta). Os inserts públicos usam o cliente **anônimo** (sem cookies de login), como as demais leituras públicas. O corretor lê os seus, muda só o `status` do lead e pode apagá-lo (pedido de exclusão LGPD); eventos são imutáveis.
 
 **Anti-spam** (leads e eventos): limite de tamanho dos campos (no banco), `sessao_id` com formato fixo, `dados` com até ~2 KB, validação Zod no servidor e, se precisar, rate limit simples por sessão (Sprint 6). ⚠️ É ponto obrigatório de `/security-review`.
+
+**Formulário de interesse (issue #69).** Server Action `sendLead` (`src/app/e/[slug]/actions.ts`) com o mesmo schema Zod do navegador (`src/lib/validacoes/lead.ts`), gravando com o cliente anônimo e **sem ler de volta**. Contra spam: campo isca escondido e envio rápido demais (menos de 3 s desde que a página abriu) fingem sucesso sem salvar; limite em memória por IP e sessão; e no banco o trigger `privado.limitar_leads` aceita até **5 leads por sessão a cada 10 minutos** (erro `PT429`). `leads.sessao_id` liga o lead aos eventos daquela visita (e-mail ao corretor, termômetro). A página `/privacidade` explica o uso dos dados.
 
 **Eventos de visita (issue #67).** O tour manda os eventos para `POST /api/eventos` (validação Zod em `src/lib/validacoes/evento.ts`, limite por IP e por sessão em memória) e a rota grava com o cliente anônimo, então o RLS continua decidindo. Como a chave pública também permite inserir direto, o banco tem o próprio limite: trigger `privado.limitar_eventos` com até **60 eventos por sessão a cada minuto** (erro `PT429`; não há teto por empreendimento, que deixaria qualquer um bloquear as visitas reais de um empreendimento) (índice `eventos(sessao_id, criado_em desc)`). `sessao_id` é um id aleatório guardado no `localStorage` (sem cookie, sem dado pessoal). Tipos: `abriu_tour`, `abriu_unidade` (`dados.via`: `ficha` ou `pagina`), `viu_comodo` (`dados.via`: `etiqueta` ou `lista`), `caminhou` e `saiu` (`dados.segundos` com a página visível, `dados.pagina`).
 

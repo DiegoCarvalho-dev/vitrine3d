@@ -17,6 +17,7 @@ import { formatDecimal } from "@/lib/validacoes/numero";
 import { formatMoney } from "@/lib/validacoes/unidade";
 
 import { TourBuilding } from "./tour-building";
+import { LeadForm } from "./lead-form";
 import { VisitTracker } from "./visit-tracker";
 import { WhatsAppButton } from "./whatsapp-button";
 import { brandColor, TourHeader } from "./tour-header";
@@ -60,6 +61,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: { card: "summary_large_image", title, description, images },
   };
+}
+
+/** ?utm_source=instagram → "instagram" (validated again on the server). */
+function utmSource(value: string | string[] | undefined): string | null {
+  return typeof value === "string" ? value.slice(0, 100) : null;
 }
 
 const plural = (n: number, one: string, many: string) =>
@@ -212,6 +218,16 @@ export default async function TourPage({ params, searchParams }: Props) {
             )}
           </div>
         </section>
+
+        <div className="max-w-2xl">
+          <LeadForm
+            projectId={project.id}
+            projectName={project.nome}
+            brokerName={broker?.nome ?? "O corretor"}
+            brokerPhone={broker?.whatsapp}
+            origin={utmSource(query.utm_source)}
+          />
+        </div>
 
         {(project.descricao || project.endereco) && (
           <section
