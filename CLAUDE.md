@@ -18,7 +18,7 @@ Plataforma para corretores apresentarem imóveis em 3D por link, com captação 
 - Desenvolvimento em `localhost`; celular testa pela Wi-Fi em `http://<ip-do-pc>:3000` ou direto no site publicado.
 - **Supabase CLI v3:** local por padrão; use `--remote` para o projeto na nuvem (ver `docs/03`). Alterações no banco hospedado pedem confirmação do usuário.
 - **Branches:** issues de ambiente/configuração/docs/testes vão **direto na `main`**. Funcionalidades, bugs e tudo que exige cuidado (banco, RLS, login, uploads, formulários públicos, 3D, label `seguranca`) vão em **branch a partir da `main` + PR** (`feat/<n>-descricao`, `fix/<n>-descricao`). Detalhes em `docs/04`. Proteção da `main` entra na Sprint 7.
-- **Próximas:** Sprint 6 (Leads e analytics) a detalhar com o usuário; Sprints 7 e 8 só com objetivo (roteiro no fim de `docs/sprints/sprint-5.md`); polimento visual do painel e do tour fica na Sprint 8.
+- **Sprint 6 – Leads e analytics: aprovada e criada no GitHub** (#67 a #73, `docs/sprints/sprint-6.md`); Sprints 7 e 8 só com objetivo (roteiro no fim de `docs/sprints/sprint-5.md`); polimento visual do painel e do tour fica na Sprint 8.
 - **Testes e2e:** rodam contra o site compilado (`build` + `start`); durante a issue, só os specs da parte mexida; a suíte inteira uma vez antes do merge (`docs/04`).
 - **O usuário é júnior e está aprendendo:** explique o porquê das decisões, em linguagem simples, e mostre os comandos que ele mesmo pode rodar.
 
