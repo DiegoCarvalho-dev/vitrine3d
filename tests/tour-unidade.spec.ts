@@ -167,6 +167,47 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     expect(description).not.toContain("R$");
     expect(await anon.content()).not.toMatch(/876[.,]?543/);
 
+    // Visitas registradas (#67): prédio, ficha, página da unidade, cômodos
+    // (etiqueta e lista), modo caminhar e o tempo ao sair de cada página.
+    const counts = () =>
+      Object.fromEntries(
+        querySql<{ tipo: string; n: number }>(
+          `select tipo::text, count(*)::int as n from public.eventos where empreendimento_id = '${id}' group by tipo`,
+        ).map(({ tipo, n }) => [tipo, n]),
+      );
+    await expect.poll(counts, { timeout: 20_000 }).toMatchObject({
+      abriu_tour: expect.any(Number),
+      abriu_unidade: expect.any(Number),
+      viu_comodo: 2,
+      caminhou: 1,
+      saiu: expect.any(Number),
+    });
+    const [{ vias }] = querySql<{ vias: string }>(
+      `select string_agg(distinct dados->>'via', ',' order by dados->>'via') as vias from public.eventos where empreendimento_id = '${id}' and tipo in ('abriu_unidade', 'viu_comodo')`,
+    );
+    expect(vias).toBe("etiqueta,ficha,lista,pagina");
+
+    // A rota recusa lixo, outro site e empreendimento em rascunho.
+    const api = anon.request;
+    const event = {
+      empreendimentoId: id,
+      sessaoId: "teste_e2e_sessao",
+      tipo: "abriu_tour",
+    };
+    expect(
+      (
+        await api.post("/api/eventos", { data: { ...event, tipo: "x" } })
+      ).status(),
+    ).toBe(400);
+    expect(
+      (
+        await api.post("/api/eventos", {
+          data: event,
+          headers: { origin: "https://outro-site.example" },
+        })
+      ).status(),
+    ).toBe(403);
+
     // Unidade inexistente, número inválido e empreendimento em rascunho: 404.
     expect((await anon.goto(`/e/${slug}/u/999`))?.status()).toBe(404);
     expect((await anon.goto(`/e/${slug}/u/12345678901`))?.status()).toBe(404);
@@ -176,6 +217,9 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
       `update public.empreendimentos set status = 'rascunho' where id = '${id}'`,
     );
     expect((await anon.goto(`/e/${slug}/u/101`))?.status()).toBe(404);
+    expect((await api.post("/api/eventos", { data: event })).status()).toBe(
+      400,
+    );
     await visitor.close();
   });
 });

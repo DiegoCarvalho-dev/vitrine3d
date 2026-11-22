@@ -145,7 +145,7 @@ erDiagram
     uuid unidade_id FK "opcional"
     uuid comodo_id FK "opcional"
     text sessao_id "id anônimo do navegador"
-    tipo_evento tipo "abriu_tour | abriu_unidade | viu_comodo | clicou_whatsapp | enviou_lead"
+    tipo_evento tipo "abriu_tour | abriu_unidade | viu_comodo | caminhou | saiu | clicou_whatsapp | enviou_lead"
     jsonb dados
     timestamptz criado_em
   }
@@ -220,6 +220,8 @@ O RLS fica **ativo em todas as tabelas**. A chave pública do Supabase (`anon`) 
 **Escrita do visitante** (`leads` e `eventos`, issue #15): só `INSERT`, só nas colunas de dados (nunca `status`, datas ou `id`), só em empreendimento publicado e **sem nenhum `SELECT`** (nem o próprio lead volta). Os inserts públicos usam o cliente **anônimo** (sem cookies de login), como as demais leituras públicas. O corretor lê os seus, muda só o `status` do lead e pode apagá-lo (pedido de exclusão LGPD); eventos são imutáveis.
 
 **Anti-spam** (leads e eventos): limite de tamanho dos campos (no banco), `sessao_id` com formato fixo, `dados` com até ~2 KB, validação Zod no servidor e, se precisar, rate limit simples por sessão (Sprint 6). ⚠️ É ponto obrigatório de `/security-review`.
+
+**Eventos de visita (issue #67).** O tour manda os eventos para `POST /api/eventos` (validação Zod em `src/lib/validacoes/evento.ts`, limite por IP e por sessão em memória) e a rota grava com o cliente anônimo, então o RLS continua decidindo. Como a chave pública também permite inserir direto, o banco tem o próprio limite: trigger `privado.limitar_eventos` com até **60 eventos por sessão e 2000 por empreendimento a cada minuto** (índice `eventos(sessao_id, criado_em desc)`). `sessao_id` é um id aleatório guardado no `localStorage` (sem cookie, sem dado pessoal). Tipos: `abriu_tour`, `abriu_unidade` (`dados.via`: `ficha` ou `pagina`), `viu_comodo` (`dados.via`: `etiqueta` ou `lista`), `caminhou` e `saiu` (`dados.segundos` com a página visível, `dados.pagina`).
 
 **Auth** – pendência para o plano pago: a proteção contra senhas vazadas (HaveIBeenPwned) do Supabase Auth só existe no plano Pro (aviso `auth_leaked_password_protection` do advisor).
 

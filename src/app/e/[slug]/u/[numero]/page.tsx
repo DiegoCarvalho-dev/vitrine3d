@@ -14,6 +14,7 @@ import { formatDecimal } from "@/lib/validacoes/numero";
 import { floorPlanSchema, roomGeometrySchema } from "@/lib/validacoes/planta";
 
 import { brandColor, TourHeader } from "../../tour-header";
+import { VisitTracker } from "../../visit-tracker";
 import { type UnitRoom, UnitTour } from "./unit-tour";
 
 // Inside one unit (issue #52): its own link for the broker to send ("olha a
@@ -99,6 +100,7 @@ export default async function UnitPage({ params, searchParams }: Props) {
       style={{ "--brand": brandColor(broker) } as React.CSSProperties}
     >
       <TourHeader broker={broker} />
+      <VisitTracker empreendimentoId={project.id} unidadeId={unit.id} />
       <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6">
         <Link
           href={`/e/${slug}?${back}`}
@@ -132,6 +134,8 @@ export default async function UnitPage({ params, searchParams }: Props) {
 
         {rooms.length ? (
           <UnitTour
+            projectId={project.id}
+            unitId={unit.id}
             rooms={rooms}
             plan={plan}
             privateArea={typology?.area_privativa_m2 ?? null}
@@ -160,6 +164,9 @@ export default async function UnitPage({ params, searchParams }: Props) {
       <footer className="border-t px-4 py-6 text-center text-xs text-muted-foreground">
         Imagens ilustrativas. Valores e disponibilidade sujeitos a confirmação
         com o corretor.
+        <br />
+        Registramos as páginas vistas neste tour, sem dados pessoais, para o
+        corretor saber o que mais interessou.
       </footer>
     </div>
   );
