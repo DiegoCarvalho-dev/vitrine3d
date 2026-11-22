@@ -104,6 +104,24 @@ Os problemas encontrados são corrigidos (volta ao passo 4) ou viram uma nova is
 - [ ] Documentação atualizada, se mudou algo de banco, stack ou fluxo
 - [ ] Nenhum segredo (`.env`, chaves) no commit
 
+## Como o CI funciona (GitHub Actions)
+
+A cada PR e a cada push na `main`, o GitHub roda sozinho o workflow `.github/workflows/ci.yml` (check **`verificar`**), nesta ordem:
+
+1. `npm ci` (instala exatamente o que está no `package-lock.json`);
+2. `npm run format:check` (Prettier), `npm run lint`, `npm run typecheck`;
+3. `npm run test` (Vitest);
+4. `npm run build` (Next.js).
+
+Regras do CI:
+
+- **Nenhum segredo:** o build usa valores de exemplo para as variáveis públicas; o workflow só tem permissão de leitura (`contents: read`). Chave real nunca entra no CI.
+- **Rodada nova cancela a antiga** no mesmo PR (economiza minutos grátis).
+- **Para ver o resultado:** aba *Checks* do PR ou `gh pr checks <número>` (`--watch` espera terminar).
+- **Vermelho = corrigir.** Nunca fazer merge com o CI vermelho; abrir o log do passo que falhou, corrigir, dar push (o CI roda de novo).
+
+**Divisão do trabalho (a partir da Sprint 7):** o CI roda a suíte automática; no computador, durante a issue, rodamos só `lint`, `typecheck` e os testes da parte mexida. `/code-review` e `/security-review` continuam sendo feitos antes do merge: o CI confere se funciona, não se está bem feito ou seguro. Os testes de RLS e de navegador entram no CI na issue #85.
+
 ## Branches
 
 **Regra atual:** depende do risco da issue.
