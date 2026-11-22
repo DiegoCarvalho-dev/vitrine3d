@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { STATUS_LABEL } from "@/lib/building";
 import { getPublicEnv } from "@/lib/env";
 import { roundArea } from "@/lib/planta/geometry";
-import { filtersToSearch, parseFilters } from "@/lib/tour/filters";
+import { filtersToSearch, parseFilters, utmSource } from "@/lib/tour/filters";
 import { getPublishedUnit } from "@/lib/tour/queries";
 import { priceLabel, typologyRows } from "@/lib/tour/unit-sheet";
 import { roomTypeSchema } from "@/lib/validacoes/comodo";
@@ -15,6 +15,7 @@ import { floorPlanSchema, roomGeometrySchema } from "@/lib/validacoes/planta";
 
 import { brandColor, TourHeader } from "../../tour-header";
 import { VisitTracker } from "../../visit-tracker";
+import { LeadForm } from "../../lead-form";
 import { WhatsAppButton } from "../../whatsapp-button";
 import { type UnitRoom, UnitTour } from "./unit-tour";
 
@@ -72,9 +73,8 @@ export default async function UnitPage({ params, searchParams }: Props) {
   const { project, broker, unit, typology } = data;
 
   // "Voltar ao prédio" keeps the filters and reopens this unit's sheet.
-  const back = new URLSearchParams(
-    filtersToSearch(parseFilters(await searchParams)),
-  );
+  const query = await searchParams;
+  const back = new URLSearchParams(filtersToSearch(parseFilters(query)));
   back.set("unidade", unit.numero);
 
   const rooms: UnitRoom[] = data.rooms.flatMap((room) => {
@@ -171,6 +171,16 @@ export default async function UnitPage({ params, searchParams }: Props) {
             ))}
           </dl>
         )}
+        <div className="max-w-2xl">
+          <LeadForm
+            projectId={project.id}
+            projectName={project.nome}
+            brokerName={broker?.nome ?? "O corretor"}
+            brokerPhone={broker?.whatsapp}
+            unit={{ id: unit.id, number: unit.numero }}
+            origin={utmSource(query.utm_source)}
+          />
+        </div>
       </main>
       {!rooms.length && whatsapp}
       {/* Bottom space so the fixed WhatsApp button never covers the text. */}

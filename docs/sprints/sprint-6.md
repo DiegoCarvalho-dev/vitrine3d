@@ -19,7 +19,7 @@
 **Antes da issue 4:** o usuário cria uma conta gratuita no Resend e gera a chave da API (o Claude explica o passo a passo); a chave vai só no `.env.local` e nas variáveis da Vercel.
 
 ## Próximas sprints (roteiro, a detalhar em ondas)
-- **Sprint 7 – Qualidade e CI:** GitHub Actions nos PRs (lint, typecheck, testes, build), proteção da `main`, e2e dos fluxos principais (prédio → unidade → lead), revisão de segurança dos formulários públicos, medição num Android médio.
+- **Sprint 7 – Qualidade e CI:** GitHub Actions nos PRs (lint, typecheck, testes, build), proteção da `main`, e2e dos fluxos principais (prédio → unidade → lead), revisão de segurança dos formulários públicos (inclui tirar o INSERT direto do visitante em `leads` e `eventos`: gravar só pelo servidor, fechando o spam pela API crua), medição num Android médio.
 - **Sprint 8 – Editor de planta e polimento:** editor visual de cômodos em grade (portas e janelas), móveis simples por tipo de cômodo (cama, sofá, mesa: dão escala), outro jeito de andar (tocar no chão para ir até lá), polimento visual do painel e do tour (prédio 3D mais realista) e demo final para o portfólio. Antes, juntar a lista de melhorias do usuário.
 
 ## Depois do MVP (fases, ver `docs/01`)

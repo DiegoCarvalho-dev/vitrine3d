@@ -9,7 +9,7 @@ import {
   lowestPublicPrice,
   statusCounts,
 } from "@/lib/tour/format";
-import { parseFilters } from "@/lib/tour/filters";
+import { parseFilters, utmSource } from "@/lib/tour/filters";
 import { parseUnitParam } from "@/lib/tour/unit-sheet";
 import { getPublishedProject } from "@/lib/tour/queries";
 import { publicImageUrl } from "@/lib/validacoes/midia";
@@ -17,6 +17,7 @@ import { formatDecimal } from "@/lib/validacoes/numero";
 import { formatMoney } from "@/lib/validacoes/unidade";
 
 import { TourBuilding } from "./tour-building";
+import { LeadForm } from "./lead-form";
 import { VisitTracker } from "./visit-tracker";
 import { WhatsAppButton } from "./whatsapp-button";
 import { brandColor, TourHeader } from "./tour-header";
@@ -212,6 +213,16 @@ export default async function TourPage({ params, searchParams }: Props) {
             )}
           </div>
         </section>
+
+        <div className="max-w-2xl">
+          <LeadForm
+            projectId={project.id}
+            projectName={project.nome}
+            brokerName={broker?.nome ?? "O corretor"}
+            brokerPhone={broker?.whatsapp}
+            origin={utmSource(query.utm_source)}
+          />
+        </div>
 
         {(project.descricao || project.endereco) && (
           <section

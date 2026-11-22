@@ -101,6 +101,21 @@ begin
     r := r || E'\n[OK] visitante NÃO lê leads (nem o que acabou de enviar)';
   end;
 
+  -- Lead com a sessão do tour (#69) e limite de 5 por sessão em 10 minutos
+  -- (no empreendimento de B, para não mexer nas contas de A abaixo).
+  for i in 1..5 loop
+    insert into public.leads (empreendimento_id, nome, email, consentimento_lgpd, sessao_id)
+    values (emp_b, 'Sessão ' || i, 'pessoa' || i || '@exemplo.test', true, 'sessao_lead_69');
+  end loop;
+  r := r || E'\n[OK] visitante envia lead com sessao_id';
+  begin
+    insert into public.leads (empreendimento_id, nome, email, consentimento_lgpd, sessao_id)
+    values (emp_b, 'Sexto', 'sexto@exemplo.test', true, 'sessao_lead_69');
+    r := r || E'\n[FALHOU] 6º lead da sessão em 10 minutos foi aceito';
+  exception when sqlstate 'PT429' then
+    r := r || E'\n[OK] 6º lead da sessão em 10 minutos é recusado';
+  end;
+
   begin
     insert into public.leads (empreendimento_id, nome, telefone, consentimento_lgpd) values (emp_pub, 'Sem consentimento', '11999990000', false);
     r := r || E'\n[FALHOU] lead sem consentimento foi aceito';

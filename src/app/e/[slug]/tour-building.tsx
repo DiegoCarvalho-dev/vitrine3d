@@ -447,6 +447,12 @@ export function TourBuilding({
             >
               Ver por dentro
             </Link>
+            <Link
+              href={`${pathname}/u/${encodeURIComponent(selectedUnit.numero)}#interesse`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              Tenho interesse
+            </Link>
             <Button
               variant="ghost"
               onClick={() => {

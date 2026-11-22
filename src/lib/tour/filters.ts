@@ -58,6 +58,11 @@ export function parseFilters(params: Params): TourFilters {
 }
 
 /** The query string for the filters ("" when there are none). */
+/** ?utm_source=instagram → "instagram" (validated again on the server). */
+export function utmSource(value: string | string[] | undefined): string | null {
+  return typeof value === "string" ? value.slice(0, 100) : null;
+}
+
 export function filtersToSearch(filters: TourFilters): string {
   const search = new URLSearchParams();
   if (filters.bedrooms !== undefined)
