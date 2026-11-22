@@ -54,7 +54,8 @@ test.describe("Painel de leads", () => {
     const foreignLead = leadId("Segredo");
 
     // Lista: só os meus (2), mais novos primeiro; contador no menu.
-    await page.goto("/painel/leads");
+    const mine = `/painel/leads?empreendimento=${id}`;
+    await page.goto(mine);
     await expect(page.getByTestId("lead-item")).toHaveCount(2);
     await expect(page.getByText(`Segredo ${tag}`)).toHaveCount(0);
     await expect(page.getByTestId("menu-leads-count")).toBeVisible();
@@ -66,7 +67,7 @@ test.describe("Painel de leads", () => {
     expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 
     // Filtros pelo link: situação e empreendimento.
-    await page.goto(`/painel/leads?status=em_contato`);
+    await page.goto(`${mine}&status=em_contato`);
     await expect(page.getByTestId("leads-empty")).toBeVisible();
     await page.goto(`/painel/leads?empreendimento=${id}&status=novo`);
     await expect(page.getByTestId("lead-item")).toHaveCount(2);
@@ -77,7 +78,7 @@ test.describe("Painel de leads", () => {
     await expect(page.getByTestId("leads-empty")).toBeVisible();
 
     // Detalhe da Maria: contato, mensagem como TEXTO, resumo da visita.
-    await page.goto("/painel/leads");
+    await page.goto(mine);
     await page.getByTestId("lead-item").filter({ hasText: "Maria" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       "Maria",
@@ -108,7 +109,7 @@ test.describe("Painel de leads", () => {
         `select status::text from public.leads where id = '${leadId("Maria")}'`,
       )[0].status,
     ).toBe("em_contato");
-    await page.goto("/painel/leads?status=em_contato");
+    await page.goto(`${mine}&status=em_contato`);
     await expect(page.getByTestId("lead-item")).toHaveCount(1);
 
     // Lead de outro corretor: 404 (nunca "proibido").
@@ -118,11 +119,12 @@ test.describe("Painel de leads", () => {
     expect((await page.goto("/painel/leads/nao-e-um-id"))?.status()).toBe(404);
 
     // Apagar a pedido do cliente (LGPD), com confirmação.
-    await page.goto("/painel/leads");
+    await page.goto(mine);
     await page.getByTestId("lead-item").filter({ hasText: "João" }).click();
     await page.getByRole("button", { name: "Apagar contato" }).click();
     await page.getByRole("button", { name: "Apagar de vez" }).click();
     await expect(page).toHaveURL(/\/painel\/leads$/, { timeout: 15_000 });
+    await page.goto(mine); // só os do meu empreendimento (outros testes também deixam leads)
     await expect(page.getByTestId("lead-item")).toHaveCount(1);
     expect(
       querySql<{ n: number }>(
@@ -140,6 +142,7 @@ test.describe("Painel de leads", () => {
     await page.getByRole("button", { name: "Apagar contato" }).click();
     await page.getByRole("button", { name: "Apagar de vez" }).click();
     await expect(page).toHaveURL(/\/painel\/leads$/, { timeout: 15_000 });
+    await page.goto(mine); // só os do meu empreendimento (outros testes também deixam leads)
     await expect(page.getByTestId("leads-empty")).toBeVisible();
     await expect.poll(eventsOf, { timeout: 15_000 }).toBe(0);
 
