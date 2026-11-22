@@ -99,7 +99,9 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
 
     // Unidade inexistente, número inválido e empreendimento em rascunho: 404.
     expect((await anon.goto(`/e/${slug}/u/999`))?.status()).toBe(404);
-    expect((await anon.goto(`/e/${slug}/u/%3Cscript%3E`))?.status()).toBe(404);
+    expect((await anon.goto(`/e/${slug}/u/12345678901`))?.status()).toBe(404);
+    // Espaço em volta e minúsculas ainda acham a unidade.
+    expect((await anon.goto(`/e/${slug}/u/%20101%20`))?.status()).toBe(200);
     runSql(
       `update public.empreendimentos set status = 'rascunho' where id = '${id}'`,
     );

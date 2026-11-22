@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { createAnonClient } from "@/lib/supabase/anon";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import { unitParamSchema } from "@/lib/tour/unit-sheet";
 import { SLUG_PATTERN } from "@/lib/validacoes/empreendimento";
 
 // Data of the public tour. ALWAYS through the anonymous client: the RLS only
@@ -14,6 +13,9 @@ import { SLUG_PATTERN } from "@/lib/validacoes/empreendimento";
 
 /** The link of the tour, from the URL (same format the DB checks). */
 const slugSchema = z.string().max(80).regex(SLUG_PATTERN);
+
+/** A unit number from the URL (unidades.numero: 1 to 10 characters). */
+const unitNumberSchema = z.string().trim().min(1).max(10);
 
 const PROJECT_COLUMNS =
   "id, dono_id, tipo, nome, slug, descricao, endereco, cidade, uf, numero_andares, unidades_por_andar, capa_url, construtora, registro_incorporacao, previsao_entrega, informacoes_conferidas_em";
@@ -74,10 +76,23 @@ export type TourData = NonNullable<
  * /e/[slug]/u/[numero] (issue #52). null → 404.
  */
 export const getPublishedUnit = cache(async (slug: string, number: string) => {
-  if (!unitParamSchema.safeParse(number).success) return null;
+  // Same limit as the DB (1 to 10 characters); "101 A" or "Loja 1" are valid.
+  let decoded = number;
+  try {
+    decoded = decodeURIComponent(number); // the route param may keep "%20"
+  } catch {
+    return null; // broken escape ("%E0%A4%A")
+  }
+  const wanted = unitNumberSchema.safeParse(decoded);
+  if (!wanted.success) return null;
   const tour = await getPublishedProject(slug);
   if (!tour) return null;
-  const unit = tour.units.find((u) => u.numero === number);
+  // Exact match first; a link typed as "101a" still finds "101A".
+  const unit =
+    tour.units.find((u) => u.numero === wanted.data) ??
+    tour.units.find(
+      (u) => u.numero.toLowerCase() === wanted.data.toLowerCase(),
+    );
   if (!unit) return null;
   const typology = unit.tipologia_id
     ? (tour.typologies.find((t) => t.id === unit.tipologia_id) ?? null)

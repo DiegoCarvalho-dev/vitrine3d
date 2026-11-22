@@ -29,7 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `Unidade ${unit.numero} – ${project.nome}`;
   const description = [
     typology?.nome,
-    typology
+    // No "0 quartos" (studio): the typology name already says it.
+    typology?.quartos
       ? `${typology.quartos} ${typology.quartos === 1 ? "quarto" : "quartos"}`
       : null,
     typology?.area_privativa_m2
