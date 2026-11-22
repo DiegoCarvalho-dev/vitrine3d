@@ -170,6 +170,17 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     await anon.context().route("https://wa.me/**", (route) => route.abort());
     await anon.goto(`/e/${slug}`);
     const whats = anon.getByTestId("whatsapp-button");
+    if (isMobile) {
+      // O botão fica ABAIXO da gaveta de filtros: os botões dela continuam
+      // tocáveis (o clique de teste falha se algo estiver por cima).
+      await expect(
+        anon.getByTestId("tour-building-3d").locator("canvas"),
+      ).toBeVisible({ timeout: 30_000 });
+      await anon.getByRole("button", { name: /^Filtros/ }).click();
+      const seeUnits = anon.getByRole("button", { name: /^Ver \d+ unidades?/ });
+      await seeUnits.click({ trial: true, timeout: 5_000 });
+      await seeUnits.click();
+    }
     await expect(whats).toHaveAttribute(
       "href",
       /^https:\/\/wa\.me\/5511999990000\?text=Ol%C3%A1!%20Vi%20o%20Unidade.*no%20tour%203D\.%20Pode/,

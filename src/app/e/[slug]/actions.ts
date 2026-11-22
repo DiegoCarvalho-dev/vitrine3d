@@ -1,6 +1,9 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
+
+import { notifyBrokerOfLead } from "@/lib/email/notify-lead";
 
 import { createRateLimiter } from "@/lib/rate-limit";
 import { createAnonClient } from "@/lib/supabase/anon";
@@ -81,6 +84,27 @@ export async function sendLead(
           : "Não foi possível enviar agora. Tente de novo em instantes.",
     };
   }
+
+  // E-mail to the broker AFTER answering the visitor (issue #70): a slow or
+  // failed e-mail never delays or loses the lead.
+  after(async () => {
+    try {
+      await notifyBrokerOfLead({
+        projectId,
+        unitId: lead.unitId,
+        sessionId,
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email,
+        message: lead.message,
+        origin,
+      });
+    } catch {
+      console.error(
+        `Falha no e-mail de novo lead – empreendimento ${projectId}`,
+      );
+    }
+  });
 
   // The visit event (best effort: the lead is what matters).
   if (sessionId) {
