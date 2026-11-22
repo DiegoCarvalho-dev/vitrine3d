@@ -3,9 +3,12 @@ import Link from "next/link";
 import { ProjectStatusBadge } from "@/components/project-status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentProfile } from "@/lib/auth/session";
+import { getMonthSummaries } from "@/lib/analytics/queries";
 import { listMyProjects } from "@/lib/empreendimentos/queries";
 import { getPublicEnv } from "@/lib/env";
 import { publicImageUrl } from "@/lib/validacoes/midia";
+
+import { MonthSummary } from "./month-summary";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
@@ -21,6 +24,8 @@ export default async function PanelPage({
     getCurrentProfile(),
     listMyProjects(),
   ]);
+  // The summary only matters (and only runs) when there are projects.
+  const summaries = projects.length > 0 ? await getMonthSummaries() : null;
   const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
   const firstName = profile?.nome?.trim().split(/\s+/)[0];
   const { erro, excluido } = await searchParams;
@@ -61,6 +66,27 @@ export default async function PanelPage({
           </Link>
         )}
       </div>
+
+      {summaries && (
+        <div className="mt-8">
+          {summaries.thisMonth ? (
+            <MonthSummary
+              thisMonth={summaries.thisMonth}
+              lastMonth={summaries.lastMonth}
+              monthStart={summaries.monthStart}
+            />
+          ) : (
+            <p
+              role="status"
+              className="rounded-lg border p-4 text-sm text-muted-foreground"
+              data-testid="month-summary-unavailable"
+            >
+              Não foi possível carregar o resumo do mês agora. Seus
+              empreendimentos continuam abaixo.
+            </p>
+          )}
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <div className="mt-8 rounded-lg border border-dashed p-8 text-center">
