@@ -4,6 +4,7 @@ import Link from "next/link";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { isUuid } from "@/lib/empreendimentos/queries";
+import { interestLine } from "@/lib/leads/interest";
 import {
   LEADS_PAGE_LIMIT,
   listMyLeads,
@@ -15,8 +16,6 @@ import {
   parseStatusFilter,
 } from "@/lib/leads/status";
 import { formatPhone } from "@/lib/validacoes/perfil";
-
-import { interestLine } from "@/lib/leads/interest";
 
 import { InterestBadge } from "./interest-badge";
 import { LeadStatusBadge } from "./lead-status-badge";
@@ -45,7 +44,7 @@ export default async function LeadsPage({
     listMyLeads({ projectId, status, order }),
     listMyProjectOptions(),
   ]);
-  const filtered = Boolean(status || projectId || order === "interesse");
+  const filtered = Boolean(status || projectId);
 
   return (
     <section className="flex flex-col gap-6">
@@ -134,8 +133,10 @@ export default async function LeadsPage({
               className="text-sm text-muted-foreground"
               data-testid="leads-capped"
             >
-              Mostrando os {LEADS_PAGE_LIMIT} contatos mais recentes. Use os
-              filtros para ver os mais antigos.
+              {order === "interesse"
+                ? `Entre os ${LEADS_PAGE_LIMIT} contatos mais recentes, os mais interessados primeiro.`
+                : `Mostrando os ${LEADS_PAGE_LIMIT} contatos mais recentes.`}{" "}
+              Use os filtros para ver os mais antigos.
             </p>
           )}
           <ul className="flex flex-col gap-3" data-testid="leads-list">

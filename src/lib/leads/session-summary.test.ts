@@ -56,6 +56,20 @@ describe("resumo da visita", () => {
     ).toBe(1);
   });
 
+  it("caminhou em duas unidades: sempre a mesma, em qualquer ordem dos eventos", () => {
+    const events = [
+      event("caminhou", "2026-11-20T10:00:00Z", { unidade: "101" }),
+      event("caminhou", "2026-11-20T10:05:00Z", { unidade: "902" }),
+      event("caminhou", "2026-11-20T10:09:00Z", { unidade: "902" }),
+    ];
+    expect(summarizeSession(events).walkedIn).toBe("902"); // a mais caminhada
+    expect(summarizeSession([...events].reverse()).walkedIn).toBe("902");
+    // Empate: o menor número, sempre.
+    const tie = [events[0], events[1]];
+    expect(summarizeSession(tie).walkedIn).toBe("101");
+    expect(summarizeSession([...tie].reverse()).walkedIn).toBe("101");
+  });
+
   it("duração em linguagem simples", () => {
     expect(durationLabel(45)).toBe("45 s");
     expect(durationLabel(480)).toBe("8 min");

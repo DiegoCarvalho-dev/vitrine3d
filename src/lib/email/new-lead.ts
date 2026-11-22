@@ -76,7 +76,7 @@ export function buildNewLeadEmail(input: NewLeadEmail) {
       ? ([["Telefone", formatPhone(lead.phone)]] as [string, string][])
       : []),
     ...(lead.email ? ([["E-mail", lead.email]] as [string, string][]) : []),
-    ["Interesse em", where],
+    ["Interesse", where],
     ...(lead.origin ? ([["Veio de", lead.origin]] as [string, string][]) : []),
   ];
   // The thermometer: hot, warm or cold, with WHY (same rule as the panel).

@@ -3,12 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getMyLead } from "@/lib/leads/queries";
-import { summarizeSession } from "@/lib/leads/session-summary";
 import { summaryLines } from "@/lib/email/new-lead";
+import { interestLine } from "@/lib/leads/interest";
+import { summarizeSession } from "@/lib/leads/session-summary";
 import { whatsappLink } from "@/lib/tour/whatsapp";
 import { formatPhone } from "@/lib/validacoes/perfil";
-
-import { interestLine } from "@/lib/leads/interest";
 
 import { InterestBadge } from "../interest-badge";
 import { LeadActions } from "./lead-actions";

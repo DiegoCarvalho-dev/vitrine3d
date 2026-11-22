@@ -32,7 +32,7 @@ export function summarizeSession(
   const rooms: string[] = [];
   let seconds = 0;
   let walked = false;
-  let walkedIn: string | null = null;
+  const walks = new Map<string, number>();
   const days = new Set<string>();
   for (const event of events) {
     days.add(brazilDay.format(new Date(event.criado_em)));
@@ -47,13 +47,20 @@ export function summarizeSession(
     if (event.tipo === "saiu" && event.segundos) seconds += event.segundos;
     if (event.tipo === "caminhou") {
       walked = true;
-      // Events come latest-first or oldest-first: keep any unit found.
-      walkedIn ??= event.unidade;
+      if (event.unidade)
+        walks.set(event.unidade, (walks.get(event.unidade) ?? 0) + 1);
     }
   }
   const units = [...unitCount.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([unit]) => unit);
+  // The unit with the most walks (ties: the smaller number): the same answer
+  // whatever the order the events arrive in.
+  const walkedIn =
+    [...walks.entries()].sort(
+      (a, b) =>
+        b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR", { numeric: true }),
+    )[0]?.[0] ?? null;
   return { units, rooms, seconds, walked, walkedIn, days: days.size };
 }
 

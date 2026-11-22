@@ -6,7 +6,7 @@ import { requireUserId } from "@/lib/auth/session";
 import { isUuid } from "@/lib/empreendimentos/queries";
 import { createClient } from "@/lib/supabase/server";
 
-import { type Interest, interestOf } from "./interest";
+import { type Interest, interestOf, unavailableInterest } from "./interest";
 import { loadSessionEvents, loadSessionsEvents } from "./load-session";
 import { summarizeSession } from "./session-summary";
 import type { LeadStatus } from "./status";
@@ -53,21 +53,25 @@ export async function listMyLeads({
   if (error)
     throw new Error(`Não foi possível carregar os leads: ${error.message}`);
   // The interest thermometer (#73): one batch of events for all the leads.
-  const sessions = await loadSessionsEvents(
-    supabase,
-    data.flatMap((lead) =>
-      lead.sessao_id
-        ? [{ projectId: lead.empreendimento_id, sessionId: lead.sessao_id }]
-        : [],
-    ),
-  );
+  const { bySession: sessions, failed: sessionsFailed } =
+    await loadSessionsEvents(
+      supabase,
+      data.flatMap((lead) =>
+        lead.sessao_id
+          ? [{ projectId: lead.empreendimento_id, sessionId: lead.sessao_id }]
+          : [],
+      ),
+    );
   const leads = data.map(({ empreendimentos, unidades, ...lead }) => {
     const events = lead.sessao_id ? sessions.get(lead.sessao_id) : undefined;
     return {
       ...lead,
       projectName: one(empreendimentos)?.nome ?? "",
       unitNumber: one(unidades)?.numero ?? null,
-      interest: interestOf(events?.length ? summarizeSession(events) : null),
+      interest:
+        sessionsFailed && lead.sessao_id && !events?.length
+          ? unavailableInterest()
+          : interestOf(events?.length ? summarizeSession(events) : null),
     };
   });
   // "Most interested first": hotter first, newer first among equals.

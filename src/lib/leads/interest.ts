@@ -97,6 +97,15 @@ export function interestOf(summary: SessionSummary | null): Interest {
   };
 }
 
+/** The visit could not be loaded now: not a verdict (it says so). */
+export function unavailableInterest(): Interest {
+  return {
+    level: "frio",
+    points: 0,
+    reasons: ["não foi possível carregar a visita agora"],
+  };
+}
+
 /** "Quente: voltou em 3 dias diferentes, caminhou por dentro da unidade 902" */
 export function interestLine(interest: Interest, max = 3): string {
   const reasons = interest.reasons.slice(0, max).join(", ");
