@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { STATUS_LABEL } from "@/lib/building";
 import { getPublicEnv } from "@/lib/env";
 import { roundArea } from "@/lib/planta/geometry";
-import { filtersToSearch, parseFilters } from "@/lib/tour/filters";
+import { filtersToSearch, parseFilters, utmSource } from "@/lib/tour/filters";
 import { getPublishedUnit } from "@/lib/tour/queries";
 import { priceLabel, typologyRows } from "@/lib/tour/unit-sheet";
 import { roomTypeSchema } from "@/lib/validacoes/comodo";
@@ -178,11 +178,7 @@ export default async function UnitPage({ params, searchParams }: Props) {
             brokerName={broker?.nome ?? "O corretor"}
             brokerPhone={broker?.whatsapp}
             unit={{ id: unit.id, number: unit.numero }}
-            origin={
-              typeof query.utm_source === "string"
-                ? query.utm_source.slice(0, 100)
-                : null
-            }
+            origin={utmSource(query.utm_source)}
           />
         </div>
       </main>

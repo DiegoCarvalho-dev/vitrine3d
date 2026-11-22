@@ -18,7 +18,8 @@ export type LeadResult = { ok: true } | { ok: false; error: string };
 
 const TOO_MANY =
   "Muitos envios em pouco tempo. Tente de novo em alguns minutos.";
-const perIp = createRateLimiter(10, 10 * 60_000);
+// Generous per IP: phone carriers (CGNAT) and launch events share one IP.
+const perIp = createRateLimiter(30, 10 * 60_000);
 const perSession = createRateLimiter(5, 10 * 60_000);
 
 export async function sendLead(
@@ -50,7 +51,7 @@ export async function sendLead(
     requestHeaders.get("x-real-ip") ??
     requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
   if (
-    (ip && !perIp(`ip:${ip}`)) ||
+    (ip && !perIp(`ip:${ip}:${projectId}`)) ||
     (sessionId && !perSession(`s:${sessionId}`))
   ) {
     return { ok: false, error: TOO_MANY };

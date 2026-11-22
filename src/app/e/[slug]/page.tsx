@@ -9,7 +9,7 @@ import {
   lowestPublicPrice,
   statusCounts,
 } from "@/lib/tour/format";
-import { parseFilters } from "@/lib/tour/filters";
+import { parseFilters, utmSource } from "@/lib/tour/filters";
 import { parseUnitParam } from "@/lib/tour/unit-sheet";
 import { getPublishedProject } from "@/lib/tour/queries";
 import { publicImageUrl } from "@/lib/validacoes/midia";
@@ -61,11 +61,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: { card: "summary_large_image", title, description, images },
   };
-}
-
-/** ?utm_source=instagram → "instagram" (validated again on the server). */
-function utmSource(value: string | string[] | undefined): string | null {
-  return typeof value === "string" ? value.slice(0, 100) : null;
 }
 
 const plural = (n: number, one: string, many: string) =>

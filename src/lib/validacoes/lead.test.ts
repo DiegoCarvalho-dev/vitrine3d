@@ -37,6 +37,22 @@ describe("formulário de interesse", () => {
     expect(result.error?.issues[0]?.message).toContain("telefone ou um e-mail");
   });
 
+  it("mostra o consentimento junto com outros erros", () => {
+    const result = leadSchema.safeParse({ ...valid, name: "", consent: false });
+    const paths = result.error?.issues.map((issue) => issue.path[0]);
+    expect(paths).toEqual(expect.arrayContaining(["name", "consent"]));
+  });
+
+  it("aba aberta há dias: tempo grande não vira robô", () => {
+    const context = leadContextSchema.parse({
+      projectId: "0d3e0000-0000-4000-8000-000000000001",
+      origin: null,
+      sessionId: null,
+      fillMs: 172_800_000,
+    });
+    expect(context.fillMs).toBe(86_400_000);
+  });
+
   it("sem consentimento não envia", () => {
     const result = leadSchema.safeParse({ ...valid, consent: false });
     expect(result.success).toBe(false);
