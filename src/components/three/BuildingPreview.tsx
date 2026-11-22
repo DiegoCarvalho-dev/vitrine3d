@@ -12,10 +12,14 @@ import {
   useFrame,
   useThree,
 } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   BoxGeometry,
+  type BufferGeometry,
+  type InstancedMesh,
   MathUtils,
+  type Material,
+  Matrix4,
   MeshStandardMaterial,
   type PerspectiveCamera,
   Vector3,
@@ -288,6 +292,82 @@ function FitCamera({
   return null;
 }
 
+type PlacedUnit = SelectedUnit;
+type BandKind = UnitStatus | "dimmed";
+type Placement<T = undefined> = {
+  x: number;
+  y: number;
+  z: number;
+  scaleX?: number;
+  item?: T;
+};
+
+/** Writes the instance positions (three.js objects, outside React). */
+function placeInstances(
+  mesh: InstancedMesh,
+  items: readonly Placement<unknown>[],
+) {
+  const matrix = new Matrix4();
+  items.forEach((item, i) => {
+    matrix.makeScale(item.scaleX ?? 1, 1, 1);
+    matrix.setPosition(item.x, item.y, item.z);
+    mesh.setMatrixAt(i, matrix);
+  });
+  mesh.count = items.length; // the rest of the buffer isn't drawn
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere(); // so taps hit the right instance
+}
+
+/**
+ * Many copies of one box in ONE draw call (instancing). `onPick` / `onHover`
+ * make it tappable: the tapped copy is found by its index.
+ */
+function Instances<T>({
+  items,
+  geometry,
+  material,
+  capacity,
+  onPick,
+  onHover,
+}: {
+  items: readonly Placement<T>[];
+  geometry: BufferGeometry;
+  material: Material;
+  /** The most copies it will ever hold (allocated once). */
+  capacity: number;
+  onPick?: (item: T, event: ThreeEvent<MouseEvent>) => void;
+  onHover?: (item: T | null) => void;
+}) {
+  const mesh = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    if (mesh.current) placeInstances(mesh.current, items);
+  }, [items]);
+  const itemAt = (index: number | undefined) =>
+    index === undefined ? undefined : items[index]?.item;
+  const interactive = Boolean(onPick || onHover);
+  return (
+    <instancedMesh
+      // Allocated once for `capacity`; changes only set how many are drawn.
+      key={capacity}
+      ref={mesh}
+      args={[geometry, material, Math.max(1, capacity)]}
+      {...(interactive
+        ? {
+            onClick: (event: ThreeEvent<MouseEvent>) => {
+              const item = itemAt(event.instanceId);
+              if (item !== undefined) onPick?.(item, event);
+            },
+            onPointerMove: (event: ThreeEvent<PointerEvent>) => {
+              event.stopPropagation();
+              onHover?.(itemAt(event.instanceId) ?? null);
+            },
+            onPointerOut: () => onHover?.(null),
+          }
+        : { raycast: () => null })}
+    />
+  );
+}
+
 function Building({
   floors,
   unitsPerFloor,
@@ -416,6 +496,32 @@ function Building({
     onSelectUnit?.(unit);
   }
 
+  const visibleUnits = useMemo(
+    () => units.filter((unit) => !cutFloor || unit.floor <= cutFloor),
+    [units, cutFloor],
+  );
+  const { glass, bands } = useMemo(() => {
+    const glass: Record<"normal" | "dimmed", Placement<PlacedUnit>[]> = {
+      normal: [],
+      dimmed: [],
+    };
+    const bands = Object.fromEntries(
+      [...UNIT_STATUSES, "dimmed"].map((kind) => [kind, []]),
+    ) as unknown as Record<BandKind, Placement<PlacedUnit>[]>;
+    for (const { x, y, ...unit } of visibleUnits) {
+      const dimmed = isDimmed?.(unit.floor, unit.position) ?? false;
+      glass[dimmed ? "dimmed" : "normal"].push({ x, y, z: 0, item: unit });
+      // The balcony band in the status color: readable from afar.
+      bands[dimmed ? "dimmed" : unit.status].push({
+        x,
+        y: y - UNIT_H / 2 + 0.16,
+        z: UNIT_D / 2 - 0.08,
+        item: unit,
+      });
+    }
+    return { glass, bands };
+  }, [visibleUnits, isDimmed]);
+
   const coreWidth = unitsPerFloor * (UNIT_W + GAP) - GAP;
   // With a cut, the tower ends at the cut floor (floors above disappear).
   const visibleFloors = cutFloor ?? floors;
@@ -425,9 +531,19 @@ function Building({
   const coreHeight = cutFloor
     ? Math.max(0.05, (cutFloor - 1) * (UNIT_H + GAP) - GAP / 2)
     : towerHeight;
-  const floorHeights = useMemo(
-    () => Array.from({ length: floors + 1 }, (_, i) => i * (UNIT_H + GAP)),
-    [floors],
+  // Exposed slabs between floors, a bit out of the facade.
+  const slabs = useMemo(
+    () =>
+      Array.from(
+        { length: visibleFloors + (cutFloor ? 0 : 1) },
+        (_, i): Placement => ({
+          x: 0,
+          y: i * (UNIT_H + GAP) - GAP / 2,
+          z: 0.05,
+          scaleX: coreWidth + 0.3,
+        }),
+      ),
+    [visibleFloors, cutFloor, coreWidth],
   );
 
   return (
@@ -472,16 +588,12 @@ function Building({
           <meshStandardMaterial color={CONCRETE} roughness={0.95} />
         </mesh>
         {/* Lajes aparentes entre os andares, um pouco para fora da fachada. */}
-        {floorHeights.slice(0, visibleFloors + (cutFloor ? 0 : 1)).map((y) => (
-          <mesh
-            key={y}
-            position={[0, y - GAP / 2, 0.05]}
-            geometry={slabGeometry}
-            material={slabMaterial}
-            scale={[coreWidth + 0.3, 1, 1]}
-            raycast={() => null}
-          />
-        ))}
+        <Instances
+          items={slabs}
+          geometry={slabGeometry}
+          material={slabMaterial}
+          capacity={floors + 1}
+        />
         {/* Cobertura: platibanda e casa de máquinas (some com o corte). */}
         {!cutFloor && (
           <>
@@ -496,51 +608,51 @@ function Building({
           </>
         )}
 
-        {units
-          .filter((unit) => !cutFloor || unit.floor <= cutFloor)
-          .map(({ x, y, ...unit }) => {
-            const isSelected = unit.number === selected;
-            const isHovered = unit.number === hoveredUnit;
-            const dimmed = isDimmed?.(unit.floor, unit.position) ?? false;
-            return (
-              <group
-                key={unit.number}
-                position={[x, y, 0]}
-                onClick={(event) => handleClick(event, unit)}
-                onPointerOver={(event) => {
-                  event.stopPropagation();
-                  setHovered(unit.number);
-                }}
-                onPointerOut={() =>
-                  setHovered((current) =>
-                    current === unit.number ? null : current,
-                  )
-                }
-              >
-                {/* Janela de vidro (o apartamento). */}
-                <mesh
-                  name={`unidade-${unit.number}`}
-                  geometry={glassGeometry}
-                  material={dimmed ? dimmedGlassMaterial : glassMaterial}
-                >
-                  {(isSelected || isHovered) && (
-                    <Edges
-                      color={isSelected ? SELECTED_EDGE : "#17202b"}
-                      lineWidth={isSelected ? 3 : 1.5}
-                    />
-                  )}
-                </mesh>
-                {/* Faixa da varanda na cor do status: lê-se de longe sem pintar o prédio. */}
-                <mesh
-                  position={[0, -UNIT_H / 2 + 0.16, UNIT_D / 2 - 0.08]}
-                  geometry={bandGeometry}
-                  material={
-                    dimmed ? dimmedBandMaterial : bandMaterials[unit.status]
-                  }
-                />
-              </group>
-            );
-          })}
+        {/* Glass (the apartments) and status bands: a few instanced meshes,
+            one draw call each, whatever the size of the building (#53). */}
+        {(["normal", "dimmed"] as const).map((kind) => (
+          <Instances
+            key={kind}
+            items={glass[kind]}
+            geometry={glassGeometry}
+            material={kind === "dimmed" ? dimmedGlassMaterial : glassMaterial}
+            capacity={units.length}
+            onPick={(unit, event) => handleClick(event, unit)}
+            onHover={(unit) => setHovered(unit?.number ?? null)}
+          />
+        ))}
+        {(Object.keys(bands) as BandKind[]).map((kind) => (
+          <Instances
+            key={kind}
+            items={bands[kind]}
+            geometry={bandGeometry}
+            material={
+              kind === "dimmed" ? dimmedBandMaterial : bandMaterials[kind]
+            }
+            capacity={units.length}
+            onPick={(unit, event) => handleClick(event, unit)}
+            onHover={(unit) => setHovered(unit?.number ?? null)}
+          />
+        ))}
+        {/* Outline of the selected and the hovered unit. */}
+        {visibleUnits
+          .filter(
+            (unit) => unit.number === selected || unit.number === hoveredUnit,
+          )
+          .map((unit) => (
+            <mesh
+              key={unit.number}
+              position={[unit.x, unit.y, 0]}
+              geometry={glassGeometry}
+              raycast={() => null}
+            >
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              <Edges
+                color={unit.number === selected ? SELECTED_EDGE : "#17202b"}
+                lineWidth={unit.number === selected ? 3 : 1.5}
+              />
+            </mesh>
+          ))}
       </group>
     </group>
   );

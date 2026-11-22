@@ -136,6 +136,23 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     expect(back.searchParams.get("quartos")).toBe("2");
     expect(back.searchParams.get("unidade")).toBe("101");
 
+    // Aparelho sem WebGL (#53): mensagem amigável e a planta em 2D.
+    const noWebgl = await visitor.newPage();
+    await noWebgl.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      // @ts-expect-error -- test double: no WebGL in this "phone"
+      HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+        if (String(type).startsWith("webgl")) return null;
+        return original.call(this, type, ...rest);
+      };
+    });
+    await noWebgl.goto(`/e/${slug}/u/101`);
+    await expect(noWebgl.getByTestId("unit-no-webgl")).toContainText(
+      "não conseguiu abrir o 3D",
+    );
+    await expect(noWebgl.getByTestId("floor-plan-room")).toHaveCount(2);
+    await noWebgl.close();
+
     // Sem tipologia: mensagem clara no lugar do 3D.
     await anon.goto(`/e/${slug}/u/102`);
     await expect(anon.getByTestId("unit-no-plan")).toBeVisible();

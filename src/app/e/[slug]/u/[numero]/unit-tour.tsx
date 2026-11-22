@@ -5,7 +5,9 @@ import { useState } from "react";
 
 import type { ModelPlan } from "@/components/three/unit-model";
 import type { ViewerRoom, ViewMode } from "@/components/three/unit-viewer";
+import { FloorPlanPreview } from "@/components/floor-plan-preview";
 import { Button } from "@/components/ui/button";
+import { useWebGL } from "@/lib/webgl";
 import { formatDecimal } from "@/lib/validacoes/numero";
 
 export type UnitRoom = ViewerRoom & { description: string | null };
@@ -37,41 +39,63 @@ export function UnitTour({
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("top");
+  const webgl = useWebGL(); // null on the server, then true/false
   const selected = rooms.find((room) => room.id === selectedId) ?? null;
 
   return (
     <section
-      aria-label="Planta da unidade em 3D"
+      aria-label={
+        webgl === false ? "Planta da unidade" : "Planta da unidade em 3D"
+      }
       className="flex flex-col gap-3"
     >
-      <div className="flex flex-wrap gap-2">
-        {mode === "top" ? (
-          <Button onClick={() => setMode("walk")}>Caminhar por dentro</Button>
-        ) : (
-          <Button variant="outline" onClick={() => setMode("top")}>
-            Voltar à vista de cima
-          </Button>
-        )}
-      </div>
-      <div
-        className="relative aspect-[4/5] overflow-hidden rounded-lg border sm:aspect-[16/10]"
-        data-testid="unit-3d"
-      >
-        <UnitViewer
-          rooms={rooms}
-          plan={plan}
-          selectedId={selectedId}
-          onSelectRoom={(id) =>
-            setSelectedId((current) => (current === id ? null : id))
-          }
-          mode={mode}
-        />
-        <span className="pointer-events-none absolute top-3 left-3 z-30 rounded-full bg-white/85 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
-          Imagem ilustrativa
-        </span>
-      </div>
+      {webgl === false ? (
+        <div className="flex flex-col gap-3" data-testid="unit-no-webgl">
+          <p className="rounded-lg border bg-card p-4 text-sm">
+            Este aparelho não conseguiu abrir o 3D. Veja abaixo a planta da
+            unidade; no computador ou em outro celular, o passeio em 3D funciona
+            normalmente.
+          </p>
+          <FloorPlanPreview
+            rooms={rooms.map((room) => ({ ...room, points: [...room.points] }))}
+            highlightId={selectedId}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {mode === "top" ? (
+              <Button onClick={() => setMode("walk")}>
+                Caminhar por dentro
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setMode("top")}>
+                Voltar à vista de cima
+              </Button>
+            )}
+          </div>
+          <div
+            className="relative aspect-[4/5] overflow-hidden rounded-lg border sm:aspect-[16/10]"
+            data-testid="unit-3d"
+          >
+            <UnitViewer
+              rooms={rooms}
+              plan={plan}
+              selectedId={selectedId}
+              onSelectRoom={(id) =>
+                setSelectedId((current) => (current === id ? null : id))
+              }
+              mode={mode}
+            />
+            <span className="pointer-events-none absolute top-3 left-3 z-30 rounded-full bg-white/85 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
+              Imagem ilustrativa
+            </span>
+          </div>
+        </>
+      )}
       <p className="text-sm text-muted-foreground">
-        Arraste para girar e use dois dedos (ou a roda do mouse) para aproximar.
+        {webgl !== false &&
+          "Arraste para girar e use dois dedos (ou a roda do mouse) para aproximar. "}
         Toque no nome de um cômodo para ver a descrição.
         {privateArea ? (
           <>
