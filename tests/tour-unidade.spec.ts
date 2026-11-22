@@ -74,6 +74,31 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
       timeout: 30_000,
     });
 
+    // Vista de cima (#50): etiqueta por cômodo; tocar mostra a descrição.
+    const labels = anon.getByTestId("room-label");
+    await expect(labels).toHaveCount(2);
+    await expect(anon.getByText("Imagem ilustrativa")).toBeVisible();
+    await expect(anon.getByText("Área privativa:")).toContainText("32 m²");
+    // Etiqueta no 3D (toque); visível porque os dois cômodos têm espaço.
+    const salaLabel = labels.filter({ hasText: "Sala" });
+    await expect(salaLabel).toBeVisible();
+    await salaLabel.click();
+    await expect(anon.getByTestId("room-details")).toContainText(
+      "Sala ampla com luz da manhã.",
+    );
+    // A lista de cômodos (teclado e leitor de tela) faz o mesmo.
+    await anon
+      .getByRole("list", { name: "Cômodos" })
+      .getByRole("button", { name: "Quarto" })
+      .click();
+    await expect(anon.getByTestId("room-details")).toContainText(
+      "Sem descrição para este cômodo.",
+    );
+    await anon.screenshot({
+      path: testInfo.outputPath("vista-de-cima.png"),
+      fullPage: true,
+    });
+
     // Voltar ao prédio: mesmos filtros e a ficha da 101 aberta.
     await anon.getByRole("link", { name: "← Voltar ao prédio" }).click();
     await expect(anon.getByTestId("tour-unit-sheet")).toContainText(
