@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createAnonClient } from "@/lib/supabase/anon";
 import { fetchAll } from "@/lib/supabase/fetch-all";
+import { unitParamSchema } from "@/lib/tour/unit-sheet";
 import { SLUG_PATTERN } from "@/lib/validacoes/empreendimento";
 
 // Data of the public tour. ALWAYS through the anonymous client: the RLS only
@@ -67,3 +68,44 @@ export const getPublishedProject = cache(async (slug: string) => {
 export type TourData = NonNullable<
   Awaited<ReturnType<typeof getPublishedProject>>
 >;
+
+/**
+ * One unit of a published project, with its typology (plan) and rooms, for
+ * /e/[slug]/u/[numero] (issue #52). null → 404.
+ */
+export const getPublishedUnit = cache(async (slug: string, number: string) => {
+  if (!unitParamSchema.safeParse(number).success) return null;
+  const tour = await getPublishedProject(slug);
+  if (!tour) return null;
+  const unit = tour.units.find((u) => u.numero === number);
+  if (!unit) return null;
+  const typology = unit.tipologia_id
+    ? (tour.typologies.find((t) => t.id === unit.tipologia_id) ?? null)
+    : null;
+  if (!typology)
+    return { ...tour, unit, typology: null, plan: null, rooms: [] };
+
+  const supabase = createAnonClient();
+  const [plan, rooms] = await Promise.all([
+    supabase
+      .from("tipologias")
+      .select("planta")
+      .eq("id", typology.id)
+      .maybeSingle(),
+    supabase
+      .from("comodos")
+      .select("id, nome, tipo, descricao, area_m2, geometria")
+      .eq("tipologia_id", typology.id)
+      .order("ordem"),
+  ]);
+  const failure = plan.error ?? rooms.error;
+  if (failure)
+    throw new Error(`Não foi possível carregar a unidade: ${failure.message}`);
+  return {
+    ...tour,
+    unit,
+    typology,
+    plan: plan.data?.planta ?? null,
+    rooms: rooms.data ?? [],
+  };
+});

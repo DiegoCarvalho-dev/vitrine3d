@@ -1,0 +1,109 @@
+import { expect } from "@playwright/test";
+
+import {
+  createBuilding,
+  hasSupabaseEnv,
+  loggedInTest as test,
+  querySql,
+  runSql,
+} from "./fixtures";
+
+// Inside the unit (issues #52 and #50). Prédio 2 × 2 montado no banco:
+// a 101 tem planta (sala + quarto) e preço público; a 102 não tem tipologia;
+// a 201 tem planta e é "sob consulta".
+
+test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
+  test.skip(!hasSupabaseEnv, "Sem .env.local com as chaves do Supabase.");
+  test.setTimeout(150_000);
+
+  test("vai do prédio à unidade e volta, com a planta em 3D e 404", async ({
+    page,
+    browser,
+  }, testInfo) => {
+    const id = await createBuilding(
+      page,
+      `Unidade ${Date.now()} ${testInfo.project.name}`,
+    );
+    runSql(
+      `insert into public.tipologias (empreendimento_id, nome, quartos, area_privativa_m2) values ('${id}', 'Tipo A', 2, 32)`,
+    );
+    const [{ id: typeA }] = querySql<{ id: string }>(
+      `select id from public.tipologias where empreendimento_id = '${id}'`,
+    );
+    runSql(
+      `insert into public.comodos (tipologia_id, nome, tipo, descricao, area_m2, geometria, ordem) values
+         ('${typeA}', 'Sala', 'sala', 'Sala ampla com luz da manhã.', 20, '{"tipo":"poligono","pontos":[[0,0],[5,0],[5,4],[0,4]],"pe_direito":2.7}', 1),
+         ('${typeA}', 'Quarto', 'quarto', null, 12, '{"tipo":"poligono","pontos":[[5,0],[8,0],[8,4],[5,4]],"pe_direito":2.7}', 2);
+       insert into public.unidades (empreendimento_id, andar, numero, posicao_no_andar, tipologia_id, preco, exibir_preco) values
+         ('${id}', 1, '101', 1, '${typeA}', 300000, true),
+         ('${id}', 1, '102', 2, null, null, false),
+         ('${id}', 2, '201', 1, '${typeA}', 876543, false),
+         ('${id}', 2, '202', 2, null, null, false);
+       update public.empreendimentos set status = 'publicado', numero_andares = 2, unidades_por_andar = 2 where id = '${id}'`,
+    );
+    const [{ slug }] = querySql<{ slug: string }>(
+      `select slug from public.empreendimentos where id = '${id}'`,
+    );
+
+    const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } =
+      testInfo.project.use;
+    const visitor = await browser.newContext({
+      viewport,
+      userAgent,
+      deviceScaleFactor,
+      isMobile,
+      hasTouch,
+    });
+    const anon = await visitor.newPage();
+
+    // Da ficha (com filtro de 2 quartos) para dentro da 101.
+    await anon.goto(`/e/${slug}?quartos=2&unidade=101`);
+    await expect(
+      anon.getByTestId("tour-building-3d").locator("canvas"),
+    ).toBeVisible({ timeout: 30_000 });
+    await anon
+      .getByTestId("tour-unit-sheet")
+      .getByRole("link", { name: "Ver por dentro" })
+      .click();
+    await expect(anon).toHaveURL(new RegExp(`/e/${slug}/u/101\\?quartos=2$`));
+    await expect(
+      anon.getByRole("heading", { level: 1, name: "Unidade 101" }),
+    ).toBeVisible();
+    await expect(anon.getByTestId("unit-price")).toHaveText(/300\.000,00/);
+    await expect(anon.getByTestId("unit-3d").locator("canvas")).toBeVisible({
+      timeout: 30_000,
+    });
+
+    // Voltar ao prédio: mesmos filtros e a ficha da 101 aberta.
+    await anon.getByRole("link", { name: "← Voltar ao prédio" }).click();
+    await expect(anon.getByTestId("tour-unit-sheet")).toContainText(
+      "Unidade 101",
+    );
+    const back = new URL(anon.url());
+    expect(back.searchParams.get("quartos")).toBe("2");
+    expect(back.searchParams.get("unidade")).toBe("101");
+
+    // Sem tipologia: mensagem clara no lugar do 3D.
+    await anon.goto(`/e/${slug}/u/102`);
+    await expect(anon.getByTestId("unit-no-plan")).toBeVisible();
+
+    // Sob consulta: sem valor na página nem na prévia do WhatsApp.
+    await anon.goto(`/e/${slug}/u/201`);
+    await expect(anon.getByTestId("unit-price")).toHaveText("Sob consulta");
+    const description = await anon
+      .locator('meta[property="og:description"]')
+      .getAttribute("content");
+    expect(description).toContain("Tipo A");
+    expect(description).not.toContain("R$");
+    expect(await anon.content()).not.toMatch(/876[.,]?543/);
+
+    // Unidade inexistente, número inválido e empreendimento em rascunho: 404.
+    expect((await anon.goto(`/e/${slug}/u/999`))?.status()).toBe(404);
+    expect((await anon.goto(`/e/${slug}/u/%3Cscript%3E`))?.status()).toBe(404);
+    runSql(
+      `update public.empreendimentos set status = 'rascunho' where id = '${id}'`,
+    );
+    expect((await anon.goto(`/e/${slug}/u/101`))?.status()).toBe(404);
+    await visitor.close();
+  });
+});

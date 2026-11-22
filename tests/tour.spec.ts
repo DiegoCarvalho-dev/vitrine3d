@@ -229,8 +229,8 @@ test.describe("Filtros do tour", () => {
       "Sob consulta",
     );
     await expect(
-      sheet.getByRole("button", { name: /Ver por dentro/ }),
-    ).toBeDisabled();
+      sheet.getByRole("link", { name: "Ver por dentro" }),
+    ).toHaveAttribute("href", `/e/${slug}/u/601`);
     await expect(region).toHaveAttribute("data-cut-floor", "6");
 
     // Escolher o 2º andar e abrir a 202 pela lista: preço público e link com a unidade.

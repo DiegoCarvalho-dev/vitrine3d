@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 import { getPublicEnv } from "@/lib/env";
+import type { Database } from "@/types/database";
 
 /**
  * Cliente ANÔNIMO para as páginas públicas (tour `/e/[slug]`): não lê nem
@@ -13,7 +14,7 @@ import { getPublicEnv } from "@/lib/env";
  */
 export function createAnonClient() {
   const env = getPublicEnv();
-  return createClient(
+  return createClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {

@@ -14,13 +14,10 @@ import { parseUnitParam } from "@/lib/tour/unit-sheet";
 import { getPublishedProject } from "@/lib/tour/queries";
 import { publicImageUrl } from "@/lib/validacoes/midia";
 import { formatDecimal } from "@/lib/validacoes/numero";
-import {
-  DEFAULT_BRAND_COLOR,
-  HEX_COLOR,
-} from "@/lib/validacoes/perfil";
 import { formatMoney } from "@/lib/validacoes/unidade";
 
 import { TourBuilding } from "./tour-building";
+import { brandColor, TourHeader } from "./tour-header";
 
 type Props = PageProps<"/e/[slug]">;
 
@@ -34,15 +31,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // "A partir de" uses the PUBLIC price only: "sob consulta" never appears.
   const fromPrice = lowestPublicPrice(units);
   const about = project.descricao?.replace(/\s+/g, " ").trim().slice(0, 160);
-  const description =
-    [
-      fromPrice !== null ? `A partir de ${formatMoney(fromPrice)}` : null,
-      broker?.nome ? `Corretor: ${broker.nome}` : null,
-      about || `Conheça o ${project.nome} em 3D.`,
-    ]
-      .filter(Boolean)
-      .join(" · ")
-      .slice(0, 200);
+  const description = [
+    fromPrice !== null ? `A partir de ${formatMoney(fromPrice)}` : null,
+    broker?.nome ? `Corretor: ${broker.nome}` : null,
+    about || `Conheça o ${project.nome} em 3D.`,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, 200);
   // Cover when there is one; otherwise the generated image (./og).
   const cover = publicImageUrl(
     getPublicEnv().NEXT_PUBLIC_SUPABASE_URL,
@@ -81,11 +77,7 @@ export default async function TourPage({ params, searchParams }: Props) {
   const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
   const cover = publicImageUrl(supabaseUrl, project.capa_url);
   const avatar = publicImageUrl(supabaseUrl, broker?.avatar_url);
-  const logo = publicImageUrl(supabaseUrl, broker?.logo_url);
-  const brand =
-    broker?.cor_marca && HEX_COLOR.test(broker.cor_marca)
-      ? broker.cor_marca
-      : DEFAULT_BRAND_COLOR;
+  const brand = brandColor(broker);
   const count = statusCounts(units);
   const fromPrice = lowestPublicPrice(units);
   const place = [project.cidade, project.uf].filter(Boolean).join(" / ");
@@ -100,28 +92,7 @@ export default async function TourPage({ params, searchParams }: Props) {
       className="min-h-dvh bg-background"
       style={{ "--brand": brand } as React.CSSProperties}
     >
-      {/* Broker's brand on top: the tour is "theirs" */}
-      <header className="border-b">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          {logo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- already compressed WebP
-            <img
-              src={logo}
-              alt={broker?.nome ?? "Logo"}
-              className="h-9 w-auto max-w-40 object-contain"
-            />
-          ) : (
-            <span className="font-heading font-semibold">
-              {broker?.nome ?? "Vitrine 3D"}
-            </span>
-          )}
-          {broker?.creci && (
-            <span className="text-sm text-muted-foreground">
-              CRECI {broker.creci}
-            </span>
-          )}
-        </div>
-      </header>
+      <TourHeader broker={broker} />
 
       <section className="relative">
         {cover ? (
@@ -316,7 +287,9 @@ export default async function TourPage({ params, searchParams }: Props) {
                 {broker.nome}
               </h2>
               {broker.creci && (
-                <p className="text-sm text-muted-foreground">CRECI {broker.creci}</p>
+                <p className="text-sm text-muted-foreground">
+                  CRECI {broker.creci}
+                </p>
               )}
             </div>
           </section>

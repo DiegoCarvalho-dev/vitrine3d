@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Component,
   type ReactNode,
@@ -18,7 +20,7 @@ import {
 } from "@/components/building-illustration";
 import { NativeSelect } from "@/components/native-select";
 import type { SelectedUnit } from "@/components/three/BuildingPreview";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
 import {
   filtersToSearch,
@@ -187,6 +189,7 @@ export function TourBuilding({
 
   // null on the server (no document); true/false in the browser.
   const webgl = useSyncExternalStore(noop, hasWebGL, () => null);
+  const pathname = usePathname();
 
   // The heavy 3D code only starts after the page content is up (and the
   // browser is idle), so the text, cover and SVG show first on slow phones.
@@ -420,8 +423,15 @@ export function TourBuilding({
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Inside the unit in 3D: Sprint 5. */}
-            <Button disabled>Ver por dentro (em breve)</Button>
+            {/* Inside the unit in 3D (#52), keeping the filters for the way back. */}
+            <Link
+              href={`${pathname}/u/${encodeURIComponent(selectedUnit.numero)}${
+                filtersToSearch(filters) ? `?${filtersToSearch(filters)}` : ""
+              }`}
+              className={buttonVariants()}
+            >
+              Ver por dentro
+            </Link>
             <Button
               variant="ghost"
               onClick={() => {
