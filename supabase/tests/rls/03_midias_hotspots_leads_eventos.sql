@@ -189,7 +189,7 @@ begin
     insert into public.eventos (empreendimento_id, sessao_id, tipo)
     values (emp_pub, 'sessao_limite_67', 'abriu_tour');
     r := r || E'\n[FALHOU] 61º evento da sessão no mesmo minuto foi aceito';
-  exception when raise_exception then
+  exception when sqlstate 'PT429' then
     r := r || E'\n[OK] 61º evento da sessão no mesmo minuto é recusado';
   end;
   insert into public.eventos (empreendimento_id, sessao_id, tipo)

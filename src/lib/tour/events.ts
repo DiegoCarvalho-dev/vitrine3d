@@ -10,9 +10,15 @@ import {
 const SESSION_KEY = "vitrine3d:sessao";
 let memorySession: string | null = null;
 
-/** Random id without personal data (letters and digits). */
+/**
+ * Random id without personal data (32 hex digits). `crypto.randomUUID` only
+ * exists on HTTPS (and localhost); `getRandomValues` works on plain HTTP too
+ * (e.g. testing on the phone at http://<pc-ip>:3000).
+ */
 function newSessionId(): string {
-  return crypto.randomUUID().replaceAll("-", "");
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -32,21 +38,33 @@ export function sessionId(): string {
   }
 }
 
-let lastSent = "";
+const REPEAT_MS = 1_000;
+let last = { key: "", at: 0 };
 
 /**
- * Records an event. The same event twice in a row (a tap repeated, React
- * mounting twice in development) is sent once. `beacon`: when the page is
- * closing, the browser delivers it even after the page is gone.
+ * Records an event. The same event again within a second (a double tap,
+ * React mounting twice in development) is sent once; a real return later
+ * counts. `beacon`: when the page is closing, the browser delivers it even
+ * after the page is gone. Never throws: tracking must not break the tour.
  */
 export function track(
   event: Omit<EventInput, "sessaoId">,
   { beacon = false }: { beacon?: boolean } = {},
 ) {
   if (typeof window === "undefined") return;
+  try {
+    send(event, beacon);
+  } catch {
+    // Lost event; the tour goes on.
+  }
+}
+
+function send(event: Omit<EventInput, "sessaoId">, beacon: boolean) {
   const key = JSON.stringify(event);
-  if (event.tipo !== "saiu" && key === lastSent) return;
-  lastSent = key;
+  const now = Date.now();
+  if (event.tipo !== "saiu" && key === last.key && now - last.at < REPEAT_MS)
+    return;
+  last = { key, at: now };
 
   const payload = { ...event, sessaoId: sessionId() };
   if (!eventSchema.safeParse(payload).success) return; // a bug, not the visitor
@@ -68,6 +86,6 @@ export function track(
 
 /** Lets a test start from a clean state. */
 export function resetTracking() {
-  lastSent = "";
+  last = { key: "", at: 0 };
   memorySession = null;
 }

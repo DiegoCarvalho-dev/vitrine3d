@@ -100,7 +100,7 @@ export default async function UnitPage({ params, searchParams }: Props) {
       style={{ "--brand": brandColor(broker) } as React.CSSProperties}
     >
       <TourHeader broker={broker} />
-      <VisitTracker empreendimentoId={project.id} unidadeId={unit.id} />
+      <VisitTracker projectId={project.id} unitId={unit.id} />
       <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6">
         <Link
           href={`/e/${slug}?${back}`}

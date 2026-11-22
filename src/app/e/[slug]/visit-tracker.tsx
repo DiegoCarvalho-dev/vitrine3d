@@ -11,37 +11,37 @@ import { track } from "@/lib/tour/events";
  * `pagehide` is unreliable; `visibilitychange` is the recommended signal).
  */
 export function VisitTracker({
-  empreendimentoId,
-  unidadeId,
+  projectId,
+  unitId,
 }: {
-  empreendimentoId: string;
-  unidadeId?: string;
+  projectId: string;
+  unitId?: string;
 }) {
   useEffect(() => {
-    const pagina = unidadeId ? "unidade" : "predio";
+    const page = unitId ? "unidade" : "predio";
     track(
-      unidadeId
+      unitId
         ? {
-            empreendimentoId,
-            unidadeId,
+            empreendimentoId: projectId,
+            unidadeId: unitId,
             tipo: "abriu_unidade",
             dados: { via: "pagina" },
           }
-        : { empreendimentoId, tipo: "abriu_tour" },
+        : { empreendimentoId: projectId, tipo: "abriu_tour" },
     );
 
     let visibleSince = document.hidden ? null : Date.now();
     const report = () => {
       if (visibleSince === null) return;
-      const segundos = Math.round((Date.now() - visibleSince) / 1000);
+      const seconds = Math.round((Date.now() - visibleSince) / 1000);
       visibleSince = null;
-      if (segundos < 1) return;
+      if (seconds < 1) return;
       track(
         {
-          empreendimentoId,
-          unidadeId: unidadeId ?? null,
+          empreendimentoId: projectId,
+          unidadeId: unitId ?? null,
           tipo: "saiu",
-          dados: { pagina, segundos: Math.min(segundos, 86_400) },
+          dados: { pagina: page, segundos: Math.min(seconds, 86_400) },
         },
         { beacon: true },
       );
@@ -58,6 +58,6 @@ export function VisitTracker({
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", report);
     };
-  }, [empreendimentoId, unidadeId]);
+  }, [projectId, unitId]);
   return null;
 }

@@ -94,7 +94,7 @@ export default async function TourPage({ params, searchParams }: Props) {
       style={{ "--brand": brand } as React.CSSProperties}
     >
       <TourHeader broker={broker} />
-      <VisitTracker empreendimentoId={project.id} />
+      <VisitTracker projectId={project.id} />
 
       <section className="relative">
         {cover ? (

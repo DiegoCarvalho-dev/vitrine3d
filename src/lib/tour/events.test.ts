@@ -42,6 +42,32 @@ describe("envio de eventos no navegador", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("repetido dentro de 1 s conta uma vez; voltar depois conta de novo", () => {
+    vi.useFakeTimers();
+    const room = {
+      empreendimentoId: project,
+      comodoId: "0d3e0000-0000-4000-8000-000000010101",
+      tipo: "viu_comodo" as const,
+    };
+    track(room);
+    track(room); // toque duplo
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(5_000);
+    track(room); // fechou e abriu de novo
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("funciona em HTTP sem crypto.randomUUID (celular pelo IP do PC)", () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: crypto.getRandomValues.bind(crypto),
+    });
+    expect(() =>
+      track({ empreendimentoId: project, tipo: "abriu_tour" }),
+    ).not.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("não envia evento inválido (erro de programação, não do visitante)", () => {
     track({ empreendimentoId: "nao-e-uuid", tipo: "abriu_tour" });
     expect(fetchMock).not.toHaveBeenCalled();
