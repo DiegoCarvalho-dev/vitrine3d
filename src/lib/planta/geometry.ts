@@ -110,3 +110,57 @@ export function findOverlap<
 export function roundArea(points: readonly Point[]): number {
   return Math.round(polygonArea(points) * 100) / 100;
 }
+
+/** Is p inside the polygon? (ray casting; points on the edge may go either way) */
+export function isInside(points: readonly Point[], [x, y]: Point): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i];
+    const [xj, yj] = points[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+      inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Where a room's label goes (issue #50): the centroid, or, when it falls
+ * outside (an L-shaped room), the middle of the widest stretch inside the
+ * room at the centroid's height.
+ */
+export function labelPoint(points: readonly Point[]): Point {
+  let area2 = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    const cross = x1 * y2 - x2 * y1;
+    area2 += cross;
+    cx += (x1 + x2) * cross;
+    cy += (y1 + y2) * cross;
+  }
+  const centroid: Point = area2
+    ? [cx / (3 * area2), cy / (3 * area2)]
+    : [points[0][0], points[0][1]];
+  if (isInside(points, centroid)) return centroid;
+
+  // Crossings of the horizontal line y = centroid y with the edges.
+  const y = centroid[1];
+  const xs: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
+    if (y1 > y !== y2 > y) xs.push(x1 + ((y - y1) * (x2 - x1)) / (y2 - y1));
+  }
+  xs.sort((a, b) => a - b);
+  let best: Point = centroid;
+  let widest = -1;
+  for (let i = 0; i + 1 < xs.length; i += 2) {
+    if (xs[i + 1] - xs[i] > widest) {
+      widest = xs[i + 1] - xs[i];
+      best = [(xs[i] + xs[i + 1]) / 2, y];
+    }
+  }
+  return best;
+}

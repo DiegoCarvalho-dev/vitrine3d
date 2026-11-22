@@ -157,7 +157,7 @@ export default async function UnitPage({ params, searchParams }: Props) {
           </dl>
         )}
       </main>
-      <footer className="border-t py-6 text-center text-xs text-muted-foreground">
+      <footer className="border-t px-4 py-6 text-center text-xs text-muted-foreground">
         Imagens ilustrativas. Valores e disponibilidade sujeitos a confirmação
         com o corretor.
       </footer>

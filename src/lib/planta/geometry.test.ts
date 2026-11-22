@@ -4,6 +4,8 @@ import { type Point } from "@/lib/validacoes/planta";
 
 import {
   findOverlap,
+  isInside,
+  labelPoint,
   overlapArea,
   polygonToRect,
   rectToPolygon,
@@ -73,5 +75,31 @@ describe("sobreposição", () => {
     expect(overlapArea(lShape, { x: 1, y: 1, width: 2, depth: 2 })).toBeCloseTo(
       3,
     );
+  });
+});
+
+describe("labelPoint", () => {
+  it("retângulo: o centro", () => {
+    expect(
+      labelPoint([
+        [0, 0],
+        [4, 0],
+        [4, 2],
+        [0, 2],
+      ]),
+    ).toEqual([2, 1]);
+  });
+
+  it("cômodo em L: o ponto fica dentro do cômodo", () => {
+    const l: [number, number][] = [
+      [0, 0],
+      [6, 0],
+      [6, 1],
+      [1, 1],
+      [1, 6],
+      [0, 6],
+    ];
+    const p = labelPoint(l);
+    expect(isInside(l, p)).toBe(true);
   });
 });

@@ -10,8 +10,8 @@ import {
 import type { ModelPlan, ModelRoom } from "@/components/three/unit-model";
 import { Button } from "@/components/ui/button";
 
-const UnitPreview = dynamic(
-  () => import("@/components/three/unit-preview").then((m) => m.UnitPreview),
+const UnitViewer = dynamic(
+  () => import("@/components/three/unit-viewer").then((m) => m.UnitViewer),
   { ssr: false },
 );
 
@@ -24,6 +24,7 @@ export type LabTypology = {
 export function PlanLab({ typologies }: { typologies: LabTypology[] }) {
   const [index, setIndex] = useState(0);
   const [automatic, setAutomatic] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const typology = typologies[index];
   // Automatic doors (#49): the saved ones are left out, the windows stay.
   const plan = useMemo(
@@ -59,7 +60,12 @@ export function PlanLab({ typologies }: { typologies: LabTypology[] }) {
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="aspect-[4/3] overflow-hidden rounded-lg border">
-          <UnitPreview rooms={typology.rooms} plan={plan} />
+          <UnitViewer
+            rooms={typology.rooms}
+            plan={plan}
+            selectedId={selectedId}
+            onSelectRoom={setSelectedId}
+          />
         </div>
         <FloorPlanPreview rooms={typology.rooms} />
       </div>
