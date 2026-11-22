@@ -14,10 +14,9 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 
 import type { RoomType } from "@/lib/validacoes/comodo";
 import type { FloorPlan, Point } from "@/lib/validacoes/planta";
-import { DOOR_HEIGHT, planDoors } from "@/lib/planta/doors";
+import { unitOpenings } from "@/lib/planta/doors";
 import {
   buildWalls,
-  type Opening,
   WALL_THICKNESS,
   wallLength,
   wallPieces,
@@ -83,22 +82,7 @@ export function buildUnitGeometry(
     ? rooms.map((room) => flatShape(room.points, room.height))
     : [];
   // Doors (saved or automatic, #49) and windows are holes in the walls.
-  const windows: Opening[] = (plan?.janelas ?? []).map((w) => ({
-    a: w.de,
-    b: w.ate,
-    bottom: w.peitoril,
-    top: w.peitoril + w.altura,
-  }));
-  // A window from the floor is a glass door: it already connects the rooms.
-  const glassDoors = windows.filter((w) => w.bottom === 0);
-  const openings: Opening[] = [
-    ...planDoors(rooms, plan?.portas, glassDoors).map((door) => ({
-      ...door,
-      bottom: 0,
-      top: DOOR_HEIGHT,
-    })),
-    ...windows,
-  ];
+  const openings = unitOpenings(rooms, plan);
   const half = WALL_THICKNESS / 2;
   const walls = wallPieces(buildWalls(rooms), openings).map((piece) => {
     const [ax, ay] = piece.a;
@@ -177,7 +161,8 @@ export function UnitModel({
       {showCeiling && geometry.ceiling && (
         // Faces up, drawn from behind: visible from inside the room only.
         <mesh geometry={geometry.ceiling}>
-          <meshStandardMaterial color="#ffffff" side={BackSide} />
+          {/* Unlit: a bright, even ceiling (light falls on it only from below). */}
+          <meshBasicMaterial color="#ebe8e2" side={BackSide} />
         </mesh>
       )}
     </group>

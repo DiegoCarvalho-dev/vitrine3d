@@ -99,6 +99,34 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
       fullPage: true,
     });
 
+    // Modo caminhar (#51): entra, anda um pouco e volta à vista de cima.
+    const pageErrors: string[] = [];
+    anon.on("pageerror", (error) => pageErrors.push(error.message));
+    await anon.getByRole("button", { name: "Caminhar por dentro" }).click();
+    const viewer = anon.locator('[data-mode="walk"]');
+    await expect(viewer.locator("canvas")).toBeVisible({ timeout: 30_000 });
+    await expect(labels).toHaveCount(0);
+    if (isMobile) {
+      // Arrasta o controle para a frente por meio segundo.
+      const joystick = anon.getByTestId("walk-joystick");
+      await expect(joystick).toBeVisible();
+      const box = (await joystick.boundingBox())!;
+      await anon.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await anon.mouse.down();
+      await anon.mouse.move(box.x + box.width / 2, box.y);
+      await anon.waitForTimeout(500);
+      await anon.mouse.up();
+    } else {
+      await expect(viewer).toContainText("W A S D");
+      await anon.keyboard.down("KeyW");
+      await anon.waitForTimeout(500);
+      await anon.keyboard.up("KeyW");
+    }
+    await anon.getByRole("button", { name: "Voltar à vista de cima" }).click();
+    await expect(anon.locator('[data-mode="top"]')).toBeVisible();
+    await expect(labels).toHaveCount(2);
+    expect(pageErrors).toEqual([]);
+
     // Voltar ao prédio: mesmos filtros e a ficha da 101 aberta.
     await anon.getByRole("link", { name: "← Voltar ao prédio" }).click();
     await expect(anon.getByTestId("tour-unit-sheet")).toContainText(
