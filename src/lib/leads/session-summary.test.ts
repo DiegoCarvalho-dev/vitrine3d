@@ -42,6 +42,7 @@ describe("resumo da visita", () => {
       rooms: ["Sala", "Suíte"],
       seconds: 420,
       walked: true,
+      walkedIn: "902",
       days: 2,
     });
   });
@@ -53,6 +54,20 @@ describe("resumo da visita", () => {
         event("abriu_tour", "2026-11-21T00:10:00Z"), // 21:10 em Brasília
       ]).days,
     ).toBe(1);
+  });
+
+  it("caminhou em duas unidades: sempre a mesma, em qualquer ordem dos eventos", () => {
+    const events = [
+      event("caminhou", "2026-11-20T10:00:00Z", { unidade: "101" }),
+      event("caminhou", "2026-11-20T10:05:00Z", { unidade: "902" }),
+      event("caminhou", "2026-11-20T10:09:00Z", { unidade: "902" }),
+    ];
+    expect(summarizeSession(events).walkedIn).toBe("902"); // a mais caminhada
+    expect(summarizeSession([...events].reverse()).walkedIn).toBe("902");
+    // Empate: o menor número, sempre.
+    const tie = [events[0], events[1]];
+    expect(summarizeSession(tie).walkedIn).toBe("101");
+    expect(summarizeSession([...tie].reverse()).walkedIn).toBe("101");
   });
 
   it("duração em linguagem simples", () => {

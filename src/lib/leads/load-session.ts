@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { chunks, fetchAll } from "@/lib/supabase/fetch-all";
 import type { Database } from "@/types/database";
 
 import type { SessionEvent } from "./session-summary";
@@ -8,6 +9,125 @@ import type { SessionEvent } from "./session-summary";
 // ids), for the new-lead e-mail (#70) and the lead page of the panel (#71).
 // Works with any typed Supabase client: the admin one (e-mail) or the
 // broker's own (panel, where the RLS also limits it to their projects).
+
+type EventRow = {
+  tipo: string;
+  criado_em: string;
+  dados: unknown;
+  unidade_id: string | null;
+  comodo_id: string | null;
+};
+
+function toSessionEvent(
+  event: EventRow,
+  unitNumber: Map<string, string>,
+  roomName: Map<string, string>,
+): SessionEvent {
+  const dados = event.dados as { segundos?: unknown } | null;
+  // Events can be inserted straight through the public key: only a sane
+  // number of seconds counts (same bounds as the site's validation).
+  const seconds = dados?.segundos;
+  return {
+    tipo: event.tipo,
+    criado_em: event.criado_em,
+    unidade: event.unidade_id
+      ? (unitNumber.get(event.unidade_id) ?? null)
+      : null,
+    comodo: event.comodo_id ? (roomName.get(event.comodo_id) ?? null) : null,
+    segundos:
+      Number.isInteger(seconds) &&
+      (seconds as number) >= 0 &&
+      (seconds as number) <= 86_400
+        ? (seconds as number)
+        : null,
+  };
+}
+
+const SESSIONS_PER_REQUEST = 10;
+const IDS_PER_REQUEST = 100; // keeps each GET URL short
+const EVENTS_PER_SESSION = 500; // the same window as the lead page
+
+/**
+ * The events of MANY sessions at once (the lead list of the panel, #73), in
+ * small groups of sessions (the API returns at most 1000 rows per request, so
+ * each group is paged, and one chatty session can't crowd out the others).
+ * Each session keeps its latest 500 events: the same window as the lead page,
+ * so the list and the page show the same thermometer.
+ * `failed` = something could not be loaded (the caller says "unavailable"
+ * instead of calling the lead cold).
+ */
+export async function loadSessionsEvents(
+  client: SupabaseClient<Database>,
+  sessions: readonly { projectId: string; sessionId: string }[],
+): Promise<{ bySession: Map<string, SessionEvent[]>; failed: boolean }> {
+  const bySession = new Map<string, SessionEvent[]>();
+  if (!sessions.length) return { bySession, failed: false };
+  const projectOf = new Map(sessions.map((s) => [s.sessionId, s.projectId]));
+
+  type Row = EventRow & { sessao_id: string; empreendimento_id: string };
+  const rows: Row[] = [];
+  let failed = false;
+  for (const group of chunks([...projectOf.keys()], SESSIONS_PER_REQUEST)) {
+    const { data, error } = await fetchAll<Row>((from, to) =>
+      client
+        .from("eventos")
+        .select(
+          "tipo, criado_em, dados, unidade_id, comodo_id, sessao_id, empreendimento_id",
+        )
+        .in("sessao_id", group)
+        .in("empreendimento_id", [
+          ...new Set(group.map((id) => projectOf.get(id)!)),
+        ])
+        .order("criado_em", { ascending: false })
+        .range(from, Math.min(to, from + 999)),
+    );
+    if (error) failed = true;
+    rows.push(...data);
+  }
+
+  const ids = (pick: (row: Row) => string | null) => [
+    ...new Set(rows.map(pick).filter((id): id is string => Boolean(id))),
+  ];
+  const lookup = async (
+    table: "unidades" | "comodos",
+    column: "numero" | "nome",
+    wanted: string[],
+  ) => {
+    const names = new Map<string, string>();
+    for (const group of chunks(wanted, IDS_PER_REQUEST)) {
+      const { data, error } = await client
+        .from(table)
+        .select(`id, ${column}`)
+        .in("id", group);
+      if (error) failed = true;
+      for (const row of (data ?? []) as unknown as Record<string, string>[])
+        names.set(row.id, row[column]);
+    }
+    return names;
+  };
+  const [unitNumber, roomName] = await Promise.all([
+    lookup(
+      "unidades",
+      "numero",
+      ids((r) => r.unidade_id),
+    ),
+    lookup(
+      "comodos",
+      "nome",
+      ids((r) => r.comodo_id),
+    ),
+  ]);
+
+  // Latest first already; a session belongs to ONE project.
+  for (const row of rows) {
+    if (projectOf.get(row.sessao_id) !== row.empreendimento_id) continue;
+    const list = bySession.get(row.sessao_id) ?? [];
+    if (list.length >= EVENTS_PER_SESSION) continue;
+    list.push(toSessionEvent(row, unitNumber, roomName));
+    bySession.set(row.sessao_id, list);
+  }
+  return { bySession, failed };
+}
 
 export async function loadSessionEvents(
   client: SupabaseClient<Database>,
@@ -59,26 +179,9 @@ export async function loadSessionEvents(
   const unitNumber = new Map((units.data ?? []).map((u) => [u.id, u.numero]));
   const roomName = new Map((rooms.data ?? []).map((r) => [r.id, r.nome]));
 
-  const events: SessionEvent[] = data.map((event) => {
-    const dados = event.dados as { segundos?: unknown } | null;
-    // Events can be inserted straight through the public key: only a sane
-    // number of seconds counts (same bounds as the site's validation).
-    const seconds = dados?.segundos;
-    return {
-      tipo: event.tipo,
-      criado_em: event.criado_em,
-      unidade: event.unidade_id
-        ? (unitNumber.get(event.unidade_id) ?? null)
-        : null,
-      comodo: event.comodo_id ? (roomName.get(event.comodo_id) ?? null) : null,
-      segundos:
-        Number.isInteger(seconds) &&
-        (seconds as number) >= 0 &&
-        (seconds as number) <= 86_400
-          ? (seconds as number)
-          : null,
-    };
-  });
+  const events = data.map((event) =>
+    toSessionEvent(event, unitNumber, roomName),
+  );
   return {
     events,
     extraUnitNumber: extraUnitId ? (unitNumber.get(extraUnitId) ?? null) : null,

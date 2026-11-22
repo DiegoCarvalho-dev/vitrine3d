@@ -40,6 +40,23 @@ describe("e-mail de novo lead", () => {
     expect(email.html).toContain("https://wa.me/5511988887777?text=Ol%C3%A1");
   });
 
+  it("termômetro com o motivo no e-mail (texto e HTML)", () => {
+    const email = buildNewLeadEmail({
+      ...base,
+      summary: { ...base.summary, walkedIn: "902" },
+    });
+    // 8 min (2) + caminhou (2) + 2 dias (2) + 2 unidades (1) + 2 cômodos (0) = 7
+    expect(email.text).toContain(
+      "Termômetro: Quente: voltou em outro dia, caminhou por dentro da unidade 902, ficou 8 min no tour",
+    );
+    expect(email.html).toContain("<strong>Termômetro:</strong> Quente:");
+    // Sem registro da visita: frio, com o motivo (nunca quebra).
+    const cold = buildNewLeadEmail({ ...base, summary: null });
+    expect(cold.text).toContain(
+      "Termômetro: Frio: sem registro da visita no tour",
+    );
+  });
+
   it("texto do visitante nunca vira HTML", () => {
     const email = buildNewLeadEmail({
       ...base,

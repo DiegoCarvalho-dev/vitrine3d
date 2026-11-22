@@ -15,6 +15,8 @@ export type SessionSummary = {
   rooms: string[]; // room names viewed
   seconds: number; // time with the tour visible
   walked: boolean;
+  /** Number of the unit where they walked inside (the first one), if known. */
+  walkedIn?: string | null;
   days: number; // different days with a visit
 };
 
@@ -30,6 +32,7 @@ export function summarizeSession(
   const rooms: string[] = [];
   let seconds = 0;
   let walked = false;
+  const walks = new Map<string, number>();
   const days = new Set<string>();
   for (const event of events) {
     days.add(brazilDay.format(new Date(event.criado_em)));
@@ -42,12 +45,23 @@ export function summarizeSession(
     )
       rooms.push(event.comodo);
     if (event.tipo === "saiu" && event.segundos) seconds += event.segundos;
-    if (event.tipo === "caminhou") walked = true;
+    if (event.tipo === "caminhou") {
+      walked = true;
+      if (event.unidade)
+        walks.set(event.unidade, (walks.get(event.unidade) ?? 0) + 1);
+    }
   }
   const units = [...unitCount.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([unit]) => unit);
-  return { units, rooms, seconds, walked, days: days.size };
+  // The unit with the most walks (ties: the smaller number): the same answer
+  // whatever the order the events arrive in.
+  const walkedIn =
+    [...walks.entries()].sort(
+      (a, b) =>
+        b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR", { numeric: true }),
+    )[0]?.[0] ?? null;
+  return { units, rooms, seconds, walked, walkedIn, days: days.size };
 }
 
 /** "8 min", "45 s", "1 h 05 min" */
