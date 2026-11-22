@@ -5,7 +5,8 @@ import { whatsappLink, whatsappMessage } from "@/lib/tour/whatsapp";
 
 /**
  * "Falar no WhatsApp" (issue #68): fixed at the bottom on phones (thumb
- * reach) and in the corner on larger screens. Opens the broker's WhatsApp
+ * reach) and in the corner on larger screens. Layer z-30: BELOW the filters
+ * drawer (z-40) and dialogs (z-50), so it never covers their buttons. Opens the broker's WhatsApp
  * with the message ready; the click is a visit event. No valid number: no
  * button (the interest form, issue #69, is the other way in).
  */
@@ -38,7 +39,7 @@ export function WhatsAppButton({
           dados: { pagina: unit ? "unidade" : "predio" },
         })
       }
-      className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 inline-flex h-12 items-center gap-2 rounded-full bg-[#1a7f4b] px-5 text-sm font-medium text-white shadow-lg ring-1 ring-black/10 hover:bg-[#15683d] focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:outline-none sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
+      className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 inline-flex h-12 items-center gap-2 rounded-full bg-[#1a7f4b] px-5 text-sm font-medium text-white shadow-lg ring-1 ring-black/10 hover:bg-[#15683d] focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:outline-none sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
     >
       <svg
         aria-hidden
