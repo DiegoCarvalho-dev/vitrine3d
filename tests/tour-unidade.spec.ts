@@ -16,6 +16,13 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
   test.skip(!hasSupabaseEnv, "Sem .env.local com as chaves do Supabase.");
   test.setTimeout(150_000);
 
+  // If an assertion fails while the fake WhatsApp is set, it still goes away.
+  let cleanupSql = "";
+  test.afterEach(() => {
+    if (cleanupSql) runSql(cleanupSql);
+    cleanupSql = "";
+  });
+
   test("vai do prédio à unidade e volta, com a planta em 3D e 404", async ({
     page,
     browser,
@@ -153,6 +160,47 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     await expect(noWebgl.getByTestId("floor-plan-room")).toHaveCount(2);
     await noWebgl.close();
 
+    // Botão WhatsApp (#68): link com a mensagem da unidade, evento ao tocar,
+    // escondido no modo caminhar e ausente quando o perfil não tem WhatsApp.
+    const ownerSql = `(select dono_id from public.empreendimentos where id = '${id}')`;
+    cleanupSql = `update public.perfis set whatsapp = null where id = ${ownerSql}`;
+    runSql(
+      `update public.perfis set whatsapp = '+5511999990000' where id = ${ownerSql}`,
+    );
+    await anon.context().route("https://wa.me/**", (route) => route.abort());
+    await anon.goto(`/e/${slug}`);
+    const whats = anon.getByTestId("whatsapp-button");
+    await expect(whats).toHaveAttribute(
+      "href",
+      /^https:\/\/wa\.me\/5511999990000\?text=Ol%C3%A1!%20Vi%20o%20Unidade.*no%20tour%203D\.%20Pode/,
+    );
+    await anon.goto(`/e/${slug}/u/101`);
+    await expect(whats).toHaveAttribute(
+      "href",
+      /me%20interessei%20pela%20unidade%20101\./,
+    );
+    await anon.mouse.move(0, 0);
+    const popup = anon.waitForEvent("popup").catch(() => null);
+    await whats.click();
+    await popup;
+    await expect
+      .poll(
+        () =>
+          querySql<{ n: number }>(
+            `select count(*)::int as n from public.eventos where empreendimento_id = '${id}' and tipo = 'clicou_whatsapp'`,
+          )[0].n,
+        { timeout: 20_000 },
+      )
+      .toBe(1);
+    await anon.getByRole("button", { name: "Caminhar por dentro" }).click();
+    await expect(whats).toBeHidden();
+    await anon.getByRole("button", { name: "Voltar à vista de cima" }).click();
+    await expect(whats).toBeVisible();
+    runSql(`update public.perfis set whatsapp = null where id = ${ownerSql}`);
+    await anon.goto(`/e/${slug}/u/101`);
+    await expect(anon.getByTestId("unit-price")).toBeVisible();
+    await expect(whats).toHaveCount(0);
+
     // Sem tipologia: mensagem clara no lugar do 3D.
     await anon.goto(`/e/${slug}/u/102`);
     await expect(anon.getByTestId("unit-no-plan")).toBeVisible();
@@ -179,7 +227,7 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
       abriu_tour: expect.any(Number),
       abriu_unidade: expect.any(Number),
       viu_comodo: 2,
-      caminhou: 1,
+      caminhou: expect.any(Number),
       saiu: expect.any(Number),
     });
     const [{ vias }] = querySql<{ vias: string }>(

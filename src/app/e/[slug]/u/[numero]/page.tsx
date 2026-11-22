@@ -15,6 +15,7 @@ import { floorPlanSchema, roomGeometrySchema } from "@/lib/validacoes/planta";
 
 import { brandColor, TourHeader } from "../../tour-header";
 import { VisitTracker } from "../../visit-tracker";
+import { WhatsAppButton } from "../../whatsapp-button";
 import { type UnitRoom, UnitTour } from "./unit-tour";
 
 // Inside one unit (issue #52): its own link for the broker to send ("olha a
@@ -93,6 +94,15 @@ export default async function UnitPage({ params, searchParams }: Props) {
     ];
   });
   const plan = floorPlanSchema.safeParse(data.plan).data;
+  // Hidden while walking (the joystick is there): UnitTour decides.
+  const whatsapp = (
+    <WhatsAppButton
+      projectId={project.id}
+      projectName={project.nome}
+      phone={broker?.whatsapp}
+      unit={{ id: unit.id, number: unit.numero }}
+    />
+  );
 
   return (
     <div
@@ -136,6 +146,7 @@ export default async function UnitPage({ params, searchParams }: Props) {
           <UnitTour
             projectId={project.id}
             unitId={unit.id}
+            whatsapp={whatsapp}
             rooms={rooms}
             plan={plan}
             privateArea={typology?.area_privativa_m2 ?? null}
@@ -161,7 +172,9 @@ export default async function UnitPage({ params, searchParams }: Props) {
           </dl>
         )}
       </main>
-      <footer className="border-t px-4 py-6 text-center text-xs text-muted-foreground">
+      {!rooms.length && whatsapp}
+      {/* Bottom space so the fixed WhatsApp button never covers the text. */}
+      <footer className="border-t px-4 pt-6 pb-24 text-center text-xs text-muted-foreground">
         Imagens ilustrativas. Valores e disponibilidade sujeitos a confirmação
         com o corretor.
         <br />

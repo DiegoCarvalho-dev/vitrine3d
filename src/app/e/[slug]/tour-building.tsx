@@ -22,6 +22,7 @@ import type { SelectedUnit } from "@/components/three/BuildingPreview";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
 import { track } from "@/lib/tour/events";
+import { WhatsAppButton } from "./whatsapp-button";
 import { useWebGL } from "@/lib/webgl";
 import {
   filtersToSearch,
@@ -98,6 +99,8 @@ const toSelected = (unit: TourUnit): SelectedUnit => ({
  */
 export function TourBuilding({
   projectId,
+  projectName,
+  whatsapp,
   floors,
   unitsPerFloor,
   units,
@@ -106,8 +109,11 @@ export function TourBuilding({
   initialFilters,
   initialUnit,
 }: {
-  /** For the visit events (issue #67). */
+  /** For the visit events (issue #67) and the WhatsApp message (#68). */
   projectId: string;
+  projectName: string;
+  /** The broker's WhatsApp (E.164), or null. */
+  whatsapp: string | null;
   floors: number;
   unitsPerFloor: number;
   units: TourUnit[];
@@ -453,6 +459,17 @@ export function TourBuilding({
           </div>
         </section>
       )}
+      {/* With a unit open, the message is about that unit. */}
+      <WhatsAppButton
+        projectId={projectId}
+        projectName={projectName}
+        phone={whatsapp}
+        unit={
+          selectedUnit
+            ? { id: selectedUnit.id, number: selectedUnit.numero }
+            : null
+        }
+      />
     </div>
   );
 }
