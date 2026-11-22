@@ -126,14 +126,21 @@ Regras do CI:
 
 ## Branches
 
-**Regra atual:** depende do risco da issue.
+**Regra atual (desde a issue #83): a `main` está protegida. TUDO entra por Pull Request**, inclusive docs, configuração e testes. Um `git push` direto na `main` é recusado pelo GitHub.
 
-| Tipo de issue | Onde trabalhar |
+O que a proteção exige (ativada com `gh api` em `branches/main/protection`):
+
+| Regra | Efeito |
 |---|---|
-| Ajuste de ambiente, configuração, docs, testes, tarefas pequenas (`chore`, `docs`, `estudo`) | **Direto na `main`** |
-| Funcionalidade, bug, ou qualquer coisa que exija mais cuidado: banco/migrations, RLS, login, uploads, formulários públicos, 3D (`feature`, `fix`, label `seguranca`) | **Branch a partir da `main` + Pull Request** |
+| Pull Request obrigatório | Nada entra na `main` sem PR |
+| Check **`verificar`** (CI) verde | O botão de merge fica bloqueado com o CI vermelho ou ainda rodando |
+| Sem *force push* e sem apagar a `main` | Ninguém reescreve nem apaga o histórico |
+| Histórico linear | Só *squash merge* (um commit por PR) |
+| Vale também para administradores | Nem o dono da conta fura a regra por engano |
 
-Fluxo com branch:
+Uma branch por issue: `feat/<n>-descricao`, `fix/<n>-descricao`, `chore/<n>-descricao`.
+
+Fluxo:
 ```bash
 git switch main
 ```
@@ -143,13 +150,11 @@ git pull
 ```bash
 git switch -c feat/7-poc-3d
 ```
-Depois do commit: `git push -u origin feat/7-poc-3d` e `gh pr create`. O PR descreve o que mudou e tem `Closes #N` no corpo. O merge na `main` acontece **depois** do seu ok e das verificações do PR passarem.
+Depois do commit: `git push -u origin feat/7-poc-3d` e `gh pr create`. O PR descreve o que mudou e tem `Closes #N` no corpo. Em seguida **esperar o CI ficar verde** (`gh pr checks --watch`) e só então fazer o merge (`gh pr merge --squash --delete-branch`). Se o CI ficar vermelho: abrir o log do passo que falhou, corrigir e dar push; nunca contornar a regra.
 
-**Depois (sprint de CI):**
-- `main` protegida: só entra via **Pull Request**.
-- Branch por issue: `feat/<n>-descricao`, `fix/<n>-descricao`, `chore/<n>-descricao`.
-- **GitHub Actions** em todo PR: lint, typecheck, testes, build e Playwright.
-- A Vercel gera uma **URL de preview** por PR para testar antes do merge.
+A Vercel gera uma **URL de preview** por PR para testar antes do merge.
+
+**Se um dia o GitHub Actions ficar fora do ar** e a regra impedir um conserto urgente: o dono do repositório pode desativar a proteção em *Settings → Branches* (ou `gh api -X DELETE repos/{owner}/{repo}/branches/main/protection`) e **reativar logo depois**. Isso é exceção; não é o fluxo normal.
 
 ## Trabalhando com o Claude Code
 
