@@ -17,6 +17,7 @@ import { formatDecimal } from "@/lib/validacoes/numero";
 import { formatMoney } from "@/lib/validacoes/unidade";
 
 import { TourBuilding } from "./tour-building";
+import { VisitTracker } from "./visit-tracker";
 import { brandColor, TourHeader } from "./tour-header";
 
 type Props = PageProps<"/e/[slug]">;
@@ -93,6 +94,7 @@ export default async function TourPage({ params, searchParams }: Props) {
       style={{ "--brand": brand } as React.CSSProperties}
     >
       <TourHeader broker={broker} />
+      <VisitTracker projectId={project.id} />
 
       <section className="relative">
         {cover ? (
@@ -127,6 +129,7 @@ export default async function TourPage({ params, searchParams }: Props) {
           >
             {isBuilding ? (
               <TourBuilding
+                projectId={project.id}
                 accentColor={brand}
                 floors={project.numero_andares!}
                 unitsPerFloor={project.unidades_por_andar!}
@@ -135,6 +138,7 @@ export default async function TourPage({ params, searchParams }: Props) {
                 initialUnit={initialUnit}
                 typologies={typologies}
                 units={units.map((unit) => ({
+                  id: unit.id,
                   andar: unit.andar,
                   posicao_no_andar: unit.posicao_no_andar,
                   status: unit.status,
@@ -299,6 +303,9 @@ export default async function TourPage({ params, searchParams }: Props) {
       <footer className="border-t px-4 py-6 text-center text-xs text-muted-foreground">
         Imagens ilustrativas. Valores e disponibilidade sujeitos a confirmação
         com o corretor.
+        <br />
+        Registramos as páginas vistas neste tour, sem dados pessoais, para o
+        corretor saber o que mais interessou.
       </footer>
     </div>
   );

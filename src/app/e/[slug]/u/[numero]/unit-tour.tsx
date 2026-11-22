@@ -7,6 +7,7 @@ import type { ModelPlan } from "@/components/three/unit-model";
 import type { ViewerRoom, ViewMode } from "@/components/three/unit-viewer";
 import { FloorPlanPreview } from "@/components/floor-plan-preview";
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/tour/events";
 import { useWebGL } from "@/lib/webgl";
 import { formatDecimal } from "@/lib/validacoes/numero";
 
@@ -29,10 +30,15 @@ const UnitViewer = dynamic(
  * walks inside at eye height (issue #51).
  */
 export function UnitTour({
+  projectId,
+  unitId,
   rooms,
   plan,
   privateArea,
 }: {
+  /** For the visit events (issue #67). */
+  projectId: string;
+  unitId: string;
   rooms: UnitRoom[];
   plan?: ModelPlan;
   privateArea: number | null;
@@ -41,6 +47,25 @@ export function UnitTour({
   const [mode, setMode] = useState<ViewMode>("top");
   const webgl = useWebGL(); // null on the server, then true/false
   const selected = rooms.find((room) => room.id === selectedId) ?? null;
+
+  /** Opens (or closes) a room's description; opening is a visit event. */
+  function toggleRoom(id: string, via: "etiqueta" | "lista") {
+    const opening = selectedId !== id;
+    setSelectedId(opening ? id : null);
+    if (opening)
+      track({
+        empreendimentoId: projectId,
+        unidadeId: unitId,
+        comodoId: id,
+        tipo: "viu_comodo",
+        dados: { via },
+      });
+  }
+
+  function startWalking() {
+    setMode("walk");
+    track({ empreendimentoId: projectId, unidadeId: unitId, tipo: "caminhou" });
+  }
 
   return (
     <section
@@ -65,9 +90,7 @@ export function UnitTour({
         <>
           <div className="flex flex-wrap gap-2">
             {mode === "top" ? (
-              <Button onClick={() => setMode("walk")}>
-                Caminhar por dentro
-              </Button>
+              <Button onClick={startWalking}>Caminhar por dentro</Button>
             ) : (
               <Button variant="outline" onClick={() => setMode("top")}>
                 Voltar à vista de cima
@@ -82,9 +105,7 @@ export function UnitTour({
               rooms={rooms}
               plan={plan}
               selectedId={selectedId}
-              onSelectRoom={(id) =>
-                setSelectedId((current) => (current === id ? null : id))
-              }
+              onSelectRoom={(id) => toggleRoom(id, "etiqueta")}
               mode={mode}
             />
             <span className="pointer-events-none absolute top-3 left-3 z-30 rounded-full bg-white/85 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
@@ -116,11 +137,7 @@ export function UnitTour({
             <button
               type="button"
               aria-pressed={room.id === selectedId}
-              onClick={() =>
-                setSelectedId((current) =>
-                  current === room.id ? null : room.id,
-                )
-              }
+              onClick={() => toggleRoom(room.id, "lista")}
               className={`rounded-full border px-3 py-1 text-sm ${
                 room.id === selectedId
                   ? "border-foreground bg-foreground text-background"

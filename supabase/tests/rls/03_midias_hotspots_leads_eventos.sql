@@ -15,6 +15,7 @@ declare
   mid uuid;
   mid_b uuid;
   n int;
+  i int;
   r text := '';
 begin
   insert into auth.users (id, aud, role, email, raw_user_meta_data, created_at, updated_at)
@@ -175,6 +176,26 @@ begin
     r := r || E'\n[OK] evento NÃO aceita cômodo de outro empreendimento';
   end;
 
+  -- Tipos novos (#67) e limite por sessão: 60 por minuto, o 61º é recusado.
+  insert into public.eventos (empreendimento_id, unidade_id, sessao_id, tipo, dados)
+  values (emp_pub, uni, 'sessao_limite_67', 'caminhou', '{}'),
+         (emp_pub, null, 'sessao_limite_67', 'saiu', '{"segundos": 90}');
+  r := r || E'\n[OK] eventos "caminhou" e "saiu" aceitos';
+  for i in 1..58 loop
+    insert into public.eventos (empreendimento_id, sessao_id, tipo)
+    values (emp_pub, 'sessao_limite_67', 'abriu_tour');
+  end loop;
+  begin
+    insert into public.eventos (empreendimento_id, sessao_id, tipo)
+    values (emp_pub, 'sessao_limite_67', 'abriu_tour');
+    r := r || E'\n[FALHOU] 61º evento da sessão no mesmo minuto foi aceito';
+  exception when sqlstate 'PT429' then
+    r := r || E'\n[OK] 61º evento da sessão no mesmo minuto é recusado';
+  end;
+  insert into public.eventos (empreendimento_id, sessao_id, tipo)
+  values (emp_pub, 'outra_sessao_67', 'abriu_tour');
+  r := r || E'\n[OK] outra sessão continua registrando';
+
   begin
     insert into public.eventos (empreendimento_id, sessao_id, tipo, dados) values (emp_pub, 'sessao_teste_123', 'abriu_tour', jsonb_build_object('lixo', repeat('x', 5000)));
     r := r || E'\n[FALHOU] evento com dados gigantes foi aceito';
@@ -223,8 +244,9 @@ begin
     r := r || E'\n[OK] A NÃO altera os dados enviados pelo cliente (só o status)';
   end;
 
+  -- 1 do começo + 2 tipos novos + 58 do teste de limite + 1 de outra sessão.
   select count(*) into n from public.eventos where empreendimento_id = emp_pub;
-  r := r || format(E'\n[%s] A vê os eventos do próprio empreendimento', case when n = 1 then 'OK' else 'FALHOU' end);
+  r := r || format(E'\n[%s] A vê os eventos do próprio empreendimento', case when n = 62 then 'OK' else 'FALHOU' end);
 
   begin
     update public.eventos set tipo = 'enviou_lead' where empreendimento_id = emp_pub;

@@ -21,6 +21,7 @@ import { NativeSelect } from "@/components/native-select";
 import type { SelectedUnit } from "@/components/three/BuildingPreview";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
+import { track } from "@/lib/tour/events";
 import { useWebGL } from "@/lib/webgl";
 import {
   filtersToSearch,
@@ -37,6 +38,7 @@ import {
 import { TourFilters } from "./tour-filters";
 
 export type TourUnit = BuildingUnit & {
+  id: string;
   numero: string;
   tipologiaId: string | null;
   /** Bedrooms of the typology (null = none). */
@@ -95,6 +97,7 @@ const toSelected = (unit: TourUnit): SelectedUnit => ({
  * ficam na URL (?quartos=3&unidade=902); a unidade abre já no andar dela.
  */
 export function TourBuilding({
+  projectId,
   floors,
   unitsPerFloor,
   units,
@@ -103,6 +106,8 @@ export function TourBuilding({
   initialFilters,
   initialUnit,
 }: {
+  /** For the visit events (issue #67). */
+  projectId: string;
   floors: number;
   unitsPerFloor: number;
   units: TourUnit[];
@@ -148,7 +153,17 @@ export function TourBuilding({
   /** Opening a unit (3D tap or list) also cuts the building at its floor. */
   function selectUnit(unit: SelectedUnit | null) {
     setSelected(unit);
-    if (unit) setCutFloor(unit.floor);
+    if (unit) {
+      setCutFloor(unit.floor);
+      const id = byNumber.get(unit.number)?.id;
+      if (id)
+        track({
+          empreendimentoId: projectId,
+          unidadeId: id,
+          tipo: "abriu_unidade",
+          dados: { via: "ficha" },
+        });
+    }
     syncUrl(filters, unit);
   }
 
@@ -165,6 +180,17 @@ export function TourBuilding({
   useEffect(() => {
     if (initialUnit && !linkedUnit) syncUrl(initialFilters, null);
   }, [initialUnit, linkedUnit, initialFilters]);
+
+  // A link that opens a unit's sheet (?unidade=902) is a visit to it too.
+  useEffect(() => {
+    if (linkedUnit)
+      track({
+        empreendimentoId: projectId,
+        unidadeId: linkedUnit.id,
+        tipo: "abriu_unidade",
+        dados: { via: "ficha" },
+      });
+  }, [linkedUnit, projectId]);
 
   // After "Fechar" / "Ver o prédio inteiro", focus goes to a stable control.
   const unitSelectRef = useRef<HTMLSelectElement>(null);

@@ -572,7 +572,9 @@ export type Database = {
         | "abriu_unidade"
         | "viu_comodo"
         | "clicou_whatsapp"
-        | "enviou_lead";
+        | "enviou_lead"
+        | "caminhou"
+        | "saiu";
       tipo_midia: "foto" | "panorama_360" | "video" | "splat";
     };
     CompositeTypes: {
@@ -730,6 +732,8 @@ export const Constants = {
         "viu_comodo",
         "clicou_whatsapp",
         "enviou_lead",
+        "caminhou",
+        "saiu",
       ],
       tipo_midia: ["foto", "panorama_360", "video", "splat"],
     },
