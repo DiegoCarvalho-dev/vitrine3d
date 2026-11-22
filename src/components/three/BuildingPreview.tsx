@@ -25,8 +25,6 @@ import {
   Vector3,
 } from "three";
 
-import { AdaptiveQuality } from "./adaptive-quality";
-
 import {
   demoStatus,
   layoutUnits,
@@ -117,7 +115,6 @@ export function BuildingPreview({
       }
     >
       <color attach="background" args={["#f2f1ee"]} />
-      <AdaptiveQuality />
       {/* Neblina da mesma cor do fundo: o chão "some" no horizonte, sem borda. */}
       <fog attach="fog" args={["#f2f1ee", height * 3, height * 8]} />
       {/* Luz de fim de tarde: céu claro, sol baixo e quente pela direita. */}
@@ -316,6 +313,7 @@ function placeInstances(
     matrix.setPosition(item.x, item.y, item.z);
     mesh.setMatrixAt(i, matrix);
   });
+  mesh.count = items.length; // the rest of the buffer isn't drawn
   mesh.instanceMatrix.needsUpdate = true;
   mesh.computeBoundingSphere(); // so taps hit the right instance
 }
@@ -328,12 +326,15 @@ function Instances<T>({
   items,
   geometry,
   material,
+  capacity,
   onPick,
   onHover,
 }: {
   items: readonly Placement<T>[];
   geometry: BufferGeometry;
   material: Material;
+  /** The most copies it will ever hold (allocated once). */
+  capacity: number;
   onPick?: (item: T, event: ThreeEvent<MouseEvent>) => void;
   onHover?: (item: T | null) => void;
 }) {
@@ -341,16 +342,15 @@ function Instances<T>({
   useLayoutEffect(() => {
     if (mesh.current) placeInstances(mesh.current, items);
   }, [items]);
-  if (!items.length) return null;
   const itemAt = (index: number | undefined) =>
     index === undefined ? undefined : items[index]?.item;
   const interactive = Boolean(onPick || onHover);
   return (
     <instancedMesh
-      // A different count needs a new buffer.
-      key={items.length}
+      // Allocated once for `capacity`; changes only set how many are drawn.
+      key={capacity}
       ref={mesh}
-      args={[geometry, material, items.length]}
+      args={[geometry, material, Math.max(1, capacity)]}
       {...(interactive
         ? {
             onClick: (event: ThreeEvent<MouseEvent>) => {
@@ -507,7 +507,7 @@ function Building({
     };
     const bands = Object.fromEntries(
       [...UNIT_STATUSES, "dimmed"].map((kind) => [kind, []]),
-    ) as unknown as Record<BandKind, Placement[]>;
+    ) as unknown as Record<BandKind, Placement<PlacedUnit>[]>;
     for (const { x, y, ...unit } of visibleUnits) {
       const dimmed = isDimmed?.(unit.floor, unit.position) ?? false;
       glass[dimmed ? "dimmed" : "normal"].push({ x, y, z: 0, item: unit });
@@ -516,6 +516,7 @@ function Building({
         x,
         y: y - UNIT_H / 2 + 0.16,
         z: UNIT_D / 2 - 0.08,
+        item: unit,
       });
     }
     return { glass, bands };
@@ -591,6 +592,7 @@ function Building({
           items={slabs}
           geometry={slabGeometry}
           material={slabMaterial}
+          capacity={floors + 1}
         />
         {/* Cobertura: platibanda e casa de máquinas (some com o corte). */}
         {!cutFloor && (
@@ -614,6 +616,7 @@ function Building({
             items={glass[kind]}
             geometry={glassGeometry}
             material={kind === "dimmed" ? dimmedGlassMaterial : glassMaterial}
+            capacity={units.length}
             onPick={(unit, event) => handleClick(event, unit)}
             onHover={(unit) => setHovered(unit?.number ?? null)}
           />
@@ -626,6 +629,9 @@ function Building({
             material={
               kind === "dimmed" ? dimmedBandMaterial : bandMaterials[kind]
             }
+            capacity={units.length}
+            onPick={(unit, event) => handleClick(event, unit)}
+            onHover={(unit) => setHovered(unit?.number ?? null)}
           />
         ))}
         {/* Outline of the selected and the hovered unit. */}

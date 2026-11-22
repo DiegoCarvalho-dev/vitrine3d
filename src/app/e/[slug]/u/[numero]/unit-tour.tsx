@@ -44,7 +44,9 @@ export function UnitTour({
 
   return (
     <section
-      aria-label="Planta da unidade em 3D"
+      aria-label={
+        webgl === false ? "Planta da unidade" : "Planta da unidade em 3D"
+      }
       className="flex flex-col gap-3"
     >
       {webgl === false ? (
@@ -92,7 +94,8 @@ export function UnitTour({
         </>
       )}
       <p className="text-sm text-muted-foreground">
-        Arraste para girar e use dois dedos (ou a roda do mouse) para aproximar.
+        {webgl !== false &&
+          "Arraste para girar e use dois dedos (ou a roda do mouse) para aproximar. "}
         Toque no nome de um cômodo para ver a descrição.
         {privateArea ? (
           <>

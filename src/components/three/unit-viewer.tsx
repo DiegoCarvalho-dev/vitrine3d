@@ -130,6 +130,8 @@ export function UnitViewer({
   );
   const lastTouch = useRef<{ id: number; x: number; y: number } | null>(null);
   const walking = mode === "walk";
+  // Lowered by AdaptiveQuality on a slow phone (kept across re-renders).
+  const [dpr, setDpr] = useState<[number, number]>([1, 2]);
   useEffect(() => {
     if (walking) frame.current?.focus({ preventScroll: true });
   }, [walking]);
@@ -168,7 +170,7 @@ export function UnitViewer({
           key={`${center.join()}|${size}|${mode}`}
           // Walking draws continuously; the top view only when it changes.
           frameloop={walking ? "always" : "demand"}
-          dpr={[1, 2]}
+          dpr={dpr}
           camera={{
             fov: FOV,
             position: [
@@ -184,7 +186,7 @@ export function UnitViewer({
           }
         >
           <color attach="background" args={["#f2f1ee"]} />
-          <AdaptiveQuality />
+          {walking && <AdaptiveQuality onChange={setDpr} />}
           <hemisphereLight args={["#f4f6fa", "#b9b5ad", 1.8]} />
           <directionalLight position={[6, 12, 8]} intensity={1.8} />
           <UnitModel rooms={rooms} plan={plan} showCeiling={walking} />
