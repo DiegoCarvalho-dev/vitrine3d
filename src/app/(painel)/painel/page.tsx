@@ -3,9 +3,12 @@ import Link from "next/link";
 import { ProjectStatusBadge } from "@/components/project-status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentProfile } from "@/lib/auth/session";
+import { getMonthSummaries } from "@/lib/analytics/queries";
 import { listMyProjects } from "@/lib/empreendimentos/queries";
 import { getPublicEnv } from "@/lib/env";
 import { publicImageUrl } from "@/lib/validacoes/midia";
+
+import { MonthSummary } from "./month-summary";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
@@ -17,9 +20,10 @@ const dateFormat = new Intl.DateTimeFormat("pt-BR", {
 export default async function PanelPage({
   searchParams,
 }: PageProps<"/painel">) {
-  const [profile, projects] = await Promise.all([
+  const [profile, projects, summaries] = await Promise.all([
     getCurrentProfile(),
     listMyProjects(),
+    getMonthSummaries(),
   ]);
   const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
   const firstName = profile?.nome?.trim().split(/\s+/)[0];
@@ -61,6 +65,12 @@ export default async function PanelPage({
           </Link>
         )}
       </div>
+
+      {projects.length > 0 && (
+        <div className="mt-8">
+          <MonthSummary {...summaries} />
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <div className="mt-8 rounded-lg border border-dashed p-8 text-center">
