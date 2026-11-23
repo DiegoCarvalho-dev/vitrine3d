@@ -18,7 +18,7 @@
 **Com o usuário:** ativar a proteção da `main` (issue 2, o Claude passa o comando ou o caminho na tela) e medir o tour num Android médio (issue 6).
 
 ## Próximas sprints (roteiro, a detalhar em ondas)
-- **Sprint 8 – Editor de planta e polimento:** editor visual de cômodos em grade (portas e janelas), móveis simples por tipo de cômodo (cama, sofá, mesa: dão escala), outro jeito de andar (tocar no chão para ir até lá), polimento visual do painel e do tour (prédio 3D mais realista) e demo final para o portfólio. Antes, juntar a lista de melhorias do usuário.
+- Detalhadas em `sprint-8.md` (Editor de planta e unidade por dentro) e `sprint-9.md` (Visual e pronto para o piloto).
 
 ## Depois do MVP (fases, ver `docs/01`)
 - **Fase 2:** fotos 360° de cada cômodo, links por campanha com relatório, agendamento de visita, e-mail com domínio próprio, simulador, mapa.
