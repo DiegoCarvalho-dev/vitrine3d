@@ -86,20 +86,52 @@ begin
     r := r || E'\n[OK] A NÃO cria hotspot no cômodo de B';
   end;
 
-  -- ===== Visitante: leads =====
+  -- ===== Visitante: não grava nada direto (#84) =====
   perform set_config('role', 'anon', true);
   perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
 
-  insert into public.leads (empreendimento_id, unidade_id, nome, telefone, consentimento_lgpd)
-  values (emp_pub, uni, 'Maria', '+5511988887777', true);
-  r := r || E'\n[OK] visitante envia lead com consentimento (empreendimento publicado)';
-
+  begin
+    insert into public.leads (empreendimento_id, unidade_id, nome, telefone, consentimento_lgpd)
+    values (emp_pub, uni, 'Direto', '+5511988887777', true);
+    r := r || E'\n[FALHOU] visitante inseriu lead direto pela API';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] visitante NÃO insere lead direto pela API (só o servidor grava)';
+  end;
+  begin
+    insert into public.eventos (empreendimento_id, sessao_id, tipo) values (emp_pub, 'sessao_direta_84', 'abriu_tour');
+    r := r || E'\n[FALHOU] visitante inseriu evento direto pela API';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] visitante NÃO insere evento direto pela API (só o servidor grava)';
+  end;
   begin
     perform 1 from public.leads;
     r := r || E'\n[FALHOU] visitante leu leads';
   exception when insufficient_privilege then
-    r := r || E'\n[OK] visitante NÃO lê leads (nem o que acabou de enviar)';
+    r := r || E'\n[OK] visitante NÃO lê leads';
   end;
+  begin
+    perform public.registrar_envio('lead', repeat('a', 32), 1, 60);
+    r := r || E'\n[FALHOU] visitante chamou registrar_envio';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] visitante NÃO chama registrar_envio (limite por IP é do servidor)';
+  end;
+
+  -- ===== Servidor (service_role): grava leads, com as travas do banco =====
+  perform set_config('role', 'service_role', true);
+  perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
+
+  insert into public.leads (empreendimento_id, unidade_id, nome, telefone, consentimento_lgpd)
+  values (emp_pub, uni, 'Maria', '+5511988887777', true);
+  r := r || E'\n[OK] servidor grava lead com consentimento (empreendimento publicado)';
+
+  -- Limite por IP (registrar_envio): 2 cabem, o 3º na mesma janela não.
+  r := r || format(E'\n[%s] limite por IP: dentro do limite passa',
+    case when public.registrar_envio('lead', repeat('b', 32), 2, 600)
+           and public.registrar_envio('lead', repeat('b', 32), 2, 600) then 'OK' else 'FALHOU' end);
+  r := r || format(E'\n[%s] limite por IP: acima do limite é recusado',
+    case when not public.registrar_envio('lead', repeat('b', 32), 2, 600) then 'OK' else 'FALHOU' end);
+  r := r || format(E'\n[%s] limite por IP: chave fora do formato é recusada',
+    case when not public.registrar_envio('lead', '1.2.3.4', 5, 600) then 'OK' else 'FALHOU' end);
 
   -- Lead com a sessão do tour (#69) e limite de 5 por sessão em 10 minutos
   -- (no empreendimento de B, para não mexer nas contas de A abaixo).
@@ -107,7 +139,7 @@ begin
     insert into public.leads (empreendimento_id, nome, email, consentimento_lgpd, sessao_id)
     values (emp_b, 'Sessão ' || i, 'pessoa' || i || '@exemplo.test', true, 'sessao_lead_69');
   end loop;
-  r := r || E'\n[OK] visitante envia lead com sessao_id';
+  r := r || E'\n[OK] servidor grava lead com sessao_id';
   begin
     insert into public.leads (empreendimento_id, nome, email, consentimento_lgpd, sessao_id)
     values (emp_b, 'Sexto', 'sexto@exemplo.test', true, 'sessao_lead_69');
@@ -133,8 +165,8 @@ begin
   begin
     insert into public.leads (empreendimento_id, nome, telefone, consentimento_lgpd) values (emp_rasc, 'Rascunho', '11999990000', true);
     r := r || E'\n[FALHOU] lead em rascunho foi aceito';
-  exception when insufficient_privilege then
-    r := r || E'\n[OK] lead em empreendimento em rascunho é recusado';
+  exception when sqlstate 'PT403' then
+    r := r || E'\n[OK] lead em empreendimento em rascunho é recusado (trava do banco, mesmo para o servidor)';
   end;
 
   begin
@@ -146,16 +178,16 @@ begin
 
   begin
     insert into public.leads (empreendimento_id, nome, telefone, consentimento_lgpd, status) values (emp_pub, 'Forja', '11999990000', true, 'ganho');
-    r := r || E'\n[FALHOU] visitante escolheu o status do lead';
+    r := r || E'\n[FALHOU] servidor escolheu o status do lead';
   exception when insufficient_privilege then
-    r := r || E'\n[OK] visitante NÃO escolhe o status do lead';
+    r := r || E'\n[OK] servidor NÃO escolhe o status do lead (só colunas de dados)';
   end;
 
   begin
     insert into public.leads (empreendimento_id, nome, telefone, consentimento_lgpd, consentimento_em) values (emp_pub, 'Forja', '11999990000', true, now() - interval '1 year');
-    r := r || E'\n[FALHOU] visitante forjou a data do consentimento';
+    r := r || E'\n[FALHOU] servidor forjou a data do consentimento';
   exception when insufficient_privilege then
-    r := r || E'\n[OK] visitante NÃO forja a data do consentimento';
+    r := r || E'\n[OK] servidor NÃO forja a data do consentimento';
   end;
 
   begin
@@ -165,30 +197,23 @@ begin
     r := r || E'\n[OK] campos com tamanho máximo (nome de 500 caracteres recusado)';
   end;
 
-  -- ===== Visitante: eventos =====
+  -- ===== Servidor: eventos =====
   insert into public.eventos (empreendimento_id, unidade_id, comodo_id, sessao_id, tipo, dados)
   values (emp_pub, uni, com, 'sessao_teste_123', 'viu_comodo', '{"segundos": 42}');
-  r := r || E'\n[OK] visitante registra evento em empreendimento publicado';
-
-  begin
-    perform 1 from public.eventos;
-    r := r || E'\n[FALHOU] visitante leu eventos';
-  exception when insufficient_privilege then
-    r := r || E'\n[OK] visitante NÃO lê eventos';
-  end;
+  r := r || E'\n[OK] servidor grava evento em empreendimento publicado';
 
   begin
     insert into public.eventos (empreendimento_id, sessao_id, tipo) values (emp_rasc, 'sessao_teste_123', 'abriu_tour');
     r := r || E'\n[FALHOU] evento em rascunho foi aceito';
-  exception when insufficient_privilege then
-    r := r || E'\n[OK] evento em empreendimento em rascunho é recusado';
+  exception when sqlstate 'PT403' then
+    r := r || E'\n[OK] evento em empreendimento em rascunho é recusado (trava do banco)';
   end;
 
   begin
     insert into public.eventos (empreendimento_id, comodo_id, sessao_id, tipo) values (emp_pub, com_b, 'sessao_teste_123', 'viu_comodo');
     r := r || E'\n[FALHOU] evento aceitou cômodo de outro empreendimento';
-  exception when insufficient_privilege then
-    r := r || E'\n[OK] evento NÃO aceita cômodo de outro empreendimento';
+  exception when sqlstate 'PT403' then
+    r := r || E'\n[OK] evento NÃO aceita cômodo de outro empreendimento (trava do banco)';
   end;
 
   -- Tipos novos (#67) e limite por sessão: 60 por minuto, o 61º é recusado.
@@ -225,7 +250,15 @@ begin
     r := r || E'\n[OK] sessao_id com formato inválido é recusado';
   end;
 
-  -- ===== Visitante: mídias e hotspots =====
+  -- ===== Visitante: não lê eventos; mídias e hotspots =====
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
+  begin
+    perform 1 from public.eventos;
+    r := r || E'\n[FALHOU] visitante leu eventos';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] visitante NÃO lê eventos';
+  end;
   select count(*) into n from public.midias where empreendimento_id = emp_pub;
   r := r || format(E'\n[%s] visitante vê mídias do publicado', case when n = 1 then 'OK' else 'FALHOU' end);
   select count(*) into n from public.hotspots where comodo_id = com;

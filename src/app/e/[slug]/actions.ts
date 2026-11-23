@@ -5,25 +5,28 @@ import { after } from "next/server";
 
 import { notifyBrokerOfLead } from "@/lib/email/notify-lead";
 
-import { createRateLimiter } from "@/lib/rate-limit";
-import { createAnonClient } from "@/lib/supabase/anon";
+import { allowByIp, clientIp, getWriter } from "@/lib/public-writes";
 import {
   leadContextSchema,
   leadSchema,
   MIN_FILL_MS,
 } from "@/lib/validacoes/lead";
 
-// Interest form of the public tour (issue #69). Saved with the ANONYMOUS
-// client: the RLS only accepts it with consent, for a published project, and
-// the visitor can never read leads back (not even this one).
+// Interest form of the public tour (issues #69 and #84). Validated (Zod) and
+// saved by the SERVER: the visitor's public key can't insert leads. The
+// database still refuses an unpublished project and a unit of another project,
+// and limits each session (5 leads per 10 minutes); the visitor can never read
+// leads back (not even this one).
 
 export type LeadResult = { ok: true } | { ok: false; error: string };
 
 const TOO_MANY =
   "Muitos envios em pouco tempo. Tente de novo em alguns minutos.";
-// Generous per IP: phone carriers (CGNAT) and launch events share one IP.
-const perIp = createRateLimiter(30, 10 * 60_000);
-const perSession = createRateLimiter(5, 10 * 60_000);
+// Generous per IP (per tour): phone carriers (CGNAT) and launch events share
+// one IP. Kept in the database, so it holds across server instances.
+const PER_IP_PER_TOUR = 30;
+const UNAVAILABLE =
+  "O envio está indisponível agora. Fale com o corretor pelo WhatsApp.";
 
 export async function sendLead(
   input: unknown,
@@ -49,20 +52,23 @@ export async function sendLead(
   // it learns nothing; nothing is saved.
   if (lead.website || fillMs < MIN_FILL_MS) return { ok: true };
 
-  const requestHeaders = await headers();
-  const ip =
-    requestHeaders.get("x-real-ip") ??
-    requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (
-    (ip && !perIp(`ip:${ip}:${projectId}`)) ||
-    (sessionId && !perSession(`s:${sessionId}`))
-  ) {
-    return { ok: false, error: TOO_MANY };
-  }
+  // Without the server key (an environment without secrets) nothing can be
+  // saved: say so, and point to the WhatsApp.
+  const writer = getWriter();
+  if (!writer) return { ok: false, error: UNAVAILABLE };
 
-  const supabase = createAnonClient();
-  // No .select(): the visitor has no permission to read the lead back.
-  const { error } = await supabase.from("leads").insert({
+  const limit = await allowByIp(writer, {
+    ip: clientIp(await headers()),
+    scope: "lead",
+    limit: PER_IP_PER_TOUR,
+    windowSeconds: 10 * 60,
+    keyScope: projectId,
+  });
+  if (limit === "error") return { ok: false, error: UNAVAILABLE };
+  if (limit === "limit") return { ok: false, error: TOO_MANY };
+
+  // No .select(): nothing about the lead goes back to the visitor.
+  const { error } = await writer.client.from("leads").insert({
     empreendimento_id: projectId,
     unidade_id: lead.unitId,
     nome: lead.name,
@@ -74,7 +80,7 @@ export async function sendLead(
     sessao_id: sessionId,
   });
   if (error) {
-    // PT429: the database limit; the rest (unpublished project, unit of
+    // PT429: the per-session limit; the rest (unpublished project, unit of
     // another project, sizes): generic, nothing to learn by probing.
     return {
       ok: false,
@@ -108,7 +114,7 @@ export async function sendLead(
 
   // The visit event (best effort: the lead is what matters).
   if (sessionId) {
-    await supabase.from("eventos").insert({
+    await writer.client.from("eventos").insert({
       empreendimento_id: projectId,
       unidade_id: lead.unitId,
       sessao_id: sessionId,

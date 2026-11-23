@@ -54,28 +54,39 @@ begin
   select count(*) into n from public.unidades where empreendimento_id = emp_arq;
   r := r || format(E'\n[%s] visitante NÃO vê unidades de empreendimento arquivado', case when n = 0 then 'OK' else 'FALHOU' end);
 
+  -- Leads e eventos agora são gravados pelo SERVIDOR (#84); a trava do banco
+  -- recusa empreendimento arquivado mesmo para ele.
+  perform set_config('role', 'service_role', true);
+  perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
   begin
     insert into public.leads (empreendimento_id, nome, telefone, consentimento_lgpd) values (emp_arq, 'X', '11999990000', true);
     r := r || E'\n[FALHOU] lead em empreendimento arquivado foi aceito';
-  exception when insufficient_privilege then
+  exception when sqlstate 'PT403' then
     r := r || E'\n[OK] lead em empreendimento arquivado é recusado';
   end;
 
   begin
     insert into public.eventos (empreendimento_id, sessao_id, tipo) values (emp_arq, 'sessao_teste_123', 'abriu_tour');
     r := r || E'\n[FALHOU] evento em empreendimento arquivado foi aceito';
-  exception when insufficient_privilege then
+  exception when sqlstate 'PT403' then
     r := r || E'\n[OK] evento em empreendimento arquivado é recusado';
   end;
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
 
   select count(*) into n from public.perfis where id = c;
   r := r || format(E'\n[%s] visitante NÃO vê o perfil de quem só tem rascunho/arquivado', case when n = 0 then 'OK' else 'FALHOU' end);
   select count(*) into n from public.perfis where id = a;
   r := r || format(E'\n[%s] visitante vê o perfil de quem tem publicado', case when n = 1 then 'OK' else 'FALHOU' end);
 
-  -- Lead e evento no publicado de A (para testar a cascata da exclusão)
+  -- Lead e evento no publicado de A (para testar a cascata da exclusão),
+  -- gravados pelo servidor, como no site.
+  perform set_config('role', 'service_role', true);
+  perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
   insert into public.leads (empreendimento_id, unidade_id, nome, telefone, consentimento_lgpd) values (emp_pub, uni, 'Maria', '11999990000', true);
   insert into public.eventos (empreendimento_id, unidade_id, comodo_id, sessao_id, tipo) values (emp_pub, uni, com, 'sessao_teste_123', 'viu_comodo');
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
 
   -- ===== Arquivar tira do ar na hora =====
   -- Controle positivo: ANTES de arquivar, o visitante vê o empreendimento e a unidade.
