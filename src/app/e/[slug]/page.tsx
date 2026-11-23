@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { preconnect, preload } from "react-dom";
 
 import { statusCountLabel, UNIT_STATUSES } from "@/lib/building";
 import { getPublicEnv } from "@/lib/env";
@@ -80,6 +81,11 @@ export default async function TourPage({ params, searchParams }: Props) {
   const supabaseUrl = getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
   const cover = publicImageUrl(supabaseUrl, project.capa_url);
   const avatar = publicImageUrl(supabaseUrl, broker?.avatar_url);
+  // The cover is the biggest thing on a phone screen (issue #87). It comes
+  // from Supabase (another address), so the phone opens that connection
+  // right away and asks for the cover first, before the page's scripts.
+  preconnect(new URL(supabaseUrl).origin);
+  if (cover) preload(cover, { as: "image", fetchPriority: "high" });
   const brand = brandColor(broker);
   const count = statusCounts(units);
   const fromPrice = lowestPublicPrice(units);
