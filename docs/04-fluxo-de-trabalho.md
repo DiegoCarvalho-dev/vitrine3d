@@ -147,8 +147,8 @@ $env:SUPABASE_DB_LOCAL="1"
 $env:NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321"
 $env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="<PUBLISHABLE_KEY do status>"
 $env:SUPABASE_SECRET_KEY="<SECRET_KEY do status>"
-$env:RESEND_API_KEY=""   # e-mail desligado nos testes
-# 4) Testa
+$env:RESEND_API_KEY="desligado"   # e-mail desligado (vazio no PowerShell apaga a variável e o .env.local voltaria)
+# 4) Testa (feche antes qualquer `npm run dev` aberto: ele usaria o banco da nuvem)
 npm run test:rls
 npx playwright test tests/jornada.spec.ts
 # 5) Desliga quando acabar (os dados locais somem com --no-backup)

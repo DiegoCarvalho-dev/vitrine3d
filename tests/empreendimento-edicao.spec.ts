@@ -116,9 +116,11 @@ test.describe("Editar, publicar e excluir empreendimento", () => {
     // Lead direto no banco. O banco só aceita lead em empreendimento
     // publicado (#84), então publica, recebe o lead e volta ao rascunho.
     runSql(
-      `update public.empreendimentos set status = 'publicado' where id = '${id}';
+      `begin;
+       update public.empreendimentos set status = 'publicado' where id = '${id}';
        insert into public.leads (empreendimento_id, nome, telefone, consentimento_lgpd) values ('${id}', 'Cliente Teste', '11999990000', true);
-       update public.empreendimentos set status = 'rascunho' where id = '${id}'`,
+       update public.empreendimentos set status = 'rascunho' where id = '${id}';
+       commit;`,
     );
 
     await page.reload();

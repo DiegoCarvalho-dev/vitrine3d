@@ -140,14 +140,12 @@ test.describe("Jornada completa", () => {
     await expect(page).toHaveURL(/\/painel\/leads$/, { timeout: 15_000 });
     await page.goto(mine);
     await expect(page.getByTestId("leads-empty")).toBeVisible();
-    await expect
-      .poll(
-        () =>
-          querySql<{ n: number }>(
-            `select count(*)::int as n from public.leads where empreendimento_id = '${id}'`,
-          )[0].n,
-        { timeout: 15_000 },
-      )
-      .toBe(0);
+    const countIn = (table: string) =>
+      querySql<{ n: number }>(
+        `select count(*)::int as n from public.${table} where empreendimento_id = '${id}'`,
+      )[0].n;
+    await expect.poll(() => countIn("leads"), { timeout: 15_000 }).toBe(0);
+    // ... e o histórico da visita vai junto (LGPD), só com a chave do servidor.
+    await expect.poll(() => countIn("eventos"), { timeout: 15_000 }).toBe(0);
   });
 });

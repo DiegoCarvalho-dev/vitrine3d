@@ -34,7 +34,7 @@ export function execSql(sql: string): SpawnSyncReturns<string> {
     );
   }
   // No shell: the arguments reach the CLI whole.
-  return spawnSync("supabase", ["db", "query", "--remote", "--yes", sql], {
+  return spawnSync("supabase", ["db", "query", ...dbTargetArgs, "--yes", sql], {
     encoding: "utf8",
   });
 }

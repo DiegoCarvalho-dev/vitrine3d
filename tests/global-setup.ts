@@ -54,7 +54,7 @@ $$;`;
     // No CI isso é erro: pular os testes com login daria um "verde" falso.
     if (process.env.CI)
       throw new Error(
-        `[setup] Não consegui criar os usuários de teste no banco: ${result.stderr ?? result.error}`,
+        `[setup] Não consegui criar os usuários de teste no banco: ${result.error?.message ?? ""} ${result.stderr ?? ""}`,
       );
     // No computador: avisa e segue. Os testes com login são pulados
     // (tests/fixtures.ts), os demais rodam normalmente.

@@ -32,7 +32,7 @@ export function runSql(sql: string) {
   const result = execSql(sql);
   if (result.error || result.status !== 0) {
     throw new Error(
-      `Falha ao rodar SQL de teste: ${result.stderr ?? ""}${result.stdout ?? ""}`.slice(
+      `Falha ao rodar SQL de teste (Docker aberto? CLI do Supabase instalada?): ${result.error?.message ?? ""} ${result.stderr ?? ""}${result.stdout ?? ""}`.slice(
         0,
         2_000,
       ),
