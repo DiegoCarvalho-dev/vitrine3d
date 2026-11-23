@@ -45,9 +45,10 @@ jobs:
       - name: Instalar as dependências
         run: npm ci
 
-      # Falha só com alerta ALTO ou CRÍTICO (moderados aparecem no log).
+      # Falha só com alerta ALTO ou CRÍTICO nas dependências que vão para o
+      # site (as ferramentas de desenvolvimento ficam de fora).
       - name: Dependências com falha grave (npm audit)
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Formato (Prettier)
         run: npm run format:check

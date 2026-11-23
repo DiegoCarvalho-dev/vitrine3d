@@ -71,13 +71,18 @@ test.describe("Política de conteúdo (CSP)", () => {
     // Unidade: vista de cima e caminhar (WebGL), se o navegador tiver.
     await anon.goto(`/e/${DEMO}/u/${unit.numero}`);
     const walk = anon.getByRole("button", { name: "Caminhar por dentro" });
-    if (await walk.isVisible({ timeout: 20_000 }).catch(() => false)) {
+    const hasWebGL = await walk
+      .waitFor({ state: "visible", timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasWebGL) {
       await walk.click();
       await expect(
         anon.locator('[data-mode="walk"]').locator("canvas"),
       ).toBeVisible({ timeout: 30_000 });
       await anon.waitForTimeout(1_000);
     }
+    await anon.waitForLoadState("networkidle"); // os pedaços do 3D já vieram
     expect(await violations(anon), "unidade").toEqual([]);
 
     // Login.

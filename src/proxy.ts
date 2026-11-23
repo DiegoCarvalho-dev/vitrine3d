@@ -15,7 +15,6 @@ export async function proxy(request: NextRequest) {
     dev: process.env.NODE_ENV === "development",
   });
   const header = cspHeaderName(process.env.CSP_REPORT_ONLY === "1");
-  request.headers.set("x-nonce", nonce);
   request.headers.set(header, csp);
 
   const response = await updateSession(request);
@@ -24,8 +23,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Every path except static files and images.
+  // Every path except Next's static files and files at the site ROOT
+  // (favicon.ico, robots.txt...). A page like /e/x.png still goes through
+  // here and gets the CSP (issue #86 review).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt)$).*)",
+    "/((?!_next/static|_next/image|[^/]+\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt)$).*)",
   ],
 };
