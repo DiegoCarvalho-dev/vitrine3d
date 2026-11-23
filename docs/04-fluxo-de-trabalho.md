@@ -200,6 +200,8 @@ O arquivo `CLAUDE.md` na raiz do projeto guarda essas regras, para o Claude segu
 
 ## Segredos e variáveis de ambiente
 
-- `.env.local` **nunca** vai para o Git (está no `.gitignore`).
+- `.env.local` **nunca** vai para o Git (está no `.gitignore`). O job **`segredos`** do CI (gitleaks) falha se um commit trouxer uma chave.
+- **Dependências:** o `verificar` roda `npm audit --audit-level=high` (falha só com alerta alto ou crítico) e o Dependabot (`.github/dependabot.yml`) abre PRs agrupados toda segunda.
+- **CSP (issue #86):** `src/proxy.ts` gera um nonce por visita e manda a política de `src/lib/csp.ts` (scripts só com o nonce, conexões e imagens só do site e do Supabase). Por isso todas as páginas são montadas na hora (`connection()` no layout raiz). Se algo novo precisar de outra origem (ex.: um mapa), libere em `src/lib/csp.ts` e rode `tests/csp.spec.ts`. **Interruptor de emergência:** `CSP_REPORT_ONLY=1` na Vercel faz a política só relatar (no console) sem bloquear.
 - `.env.example` lista as variáveis **sem valores**.
 - A `SUPABASE_SERVICE_ROLE_KEY` (se um dia for usada) **nunca** pode ir para o navegador nem ter o prefixo `NEXT_PUBLIC_`.

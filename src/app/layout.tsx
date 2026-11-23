@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo } from "next/font/google";
+import { connection } from "next/server";
 
 import { Toaster } from "@/components/ui/sonner";
 
@@ -24,7 +25,11 @@ export const metadata: Metadata = {
     "Tours 3D interativos para corretores de imóveis: prédio, unidade e captação de leads em um link.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Every page is rendered per request, so each one gets a fresh CSP nonce
+  // (src/proxy.ts, issue #86). A page built ahead of time would carry
+  // scripts without the nonce, and the browser would block them.
+  await connection();
   return (
     <html lang="pt-BR" className={`${archivo.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
