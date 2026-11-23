@@ -32,6 +32,22 @@ export type EmailEnv = {
   from: string;
 };
 
+/**
+ * The Supabase secret key, or null when it isn't configured (#84: without
+ * it the site can't save leads or events, but the tour still works).
+ */
+export function getSecretKey(
+  source: Record<string, string | undefined> = process.env,
+): string | null {
+  const key = source.SUPABASE_SECRET_KEY;
+  if (!key) return null;
+  if (!key.startsWith("sb_secret_")) {
+    console.error("SUPABASE_SECRET_KEY deve começar com sb_secret_.");
+    return null;
+  }
+  return key;
+}
+
 /** The e-mail settings, or null when a key is missing (e-mail off). */
 export function getEmailEnv(
   source: Record<string, string | undefined> = process.env,

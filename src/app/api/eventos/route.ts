@@ -1,15 +1,15 @@
-import { createRateLimiter } from "@/lib/rate-limit";
-import { createAnonClient } from "@/lib/supabase/anon";
+import { allowByIp, clientIp, getWriter } from "@/lib/public-writes";
 import { eventSchema } from "@/lib/validacoes/evento";
 
-// Visit events of the public tour (issue #67). The browser posts here (fetch
-// or sendBeacon); the event is validated and saved with the ANONYMOUS client,
-// so the RLS still decides (published project only, room of the same
-// project). Answers carry no detail: nothing to learn by probing.
+// Visit events of the public tour (issues #67 and #84). The browser posts
+// here (fetch or sendBeacon); the event is validated (Zod) and saved by the
+// SERVER (the visitor's public key can't insert). The database still refuses
+// an unpublished project or a room of another project (trigger), and limits
+// each session (60 events per minute). Answers carry no detail: nothing to
+// learn by probing.
 
 const MAX_BODY = 2_000; // characters of JSON (an event is ~300)
-const perIp = createRateLimiter(120);
-const perSession = createRateLimiter(60);
+const PER_IP_PER_MINUTE = 120;
 
 const empty = (status: number) => new Response(null, { status });
 
@@ -45,29 +45,29 @@ export async function POST(request: Request) {
   if (!parsed.success) return empty(400);
   const event = parsed.data;
 
-  // The visitor's IP as the host platform reports it (Vercel sets
-  // x-real-ip); unknown: only the per-session limit applies.
-  const ip =
-    request.headers.get("x-real-ip") ??
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if ((ip && !perIp(`ip:${ip}`)) || !perSession(`s:${event.sessaoId}`)) {
-    return empty(429);
-  }
+  // Without the server key the tour still works; the event is just lost.
+  const writer = getWriter();
+  if (!writer) return empty(503);
 
-  const { error } = await createAnonClient()
-    .from("eventos")
-    .insert({
-      empreendimento_id: event.empreendimentoId,
-      unidade_id: event.unidadeId ?? null,
-      comodo_id: event.comodoId ?? null,
-      sessao_id: event.sessaoId,
-      tipo: event.tipo,
-      dados: event.dados,
-    });
+  const allowed = await allowByIp(writer, {
+    ip: clientIp(request.headers),
+    scope: "evento",
+    limit: PER_IP_PER_MINUTE,
+    windowSeconds: 60,
+  });
+  if (!allowed) return empty(429);
+
+  const { error } = await writer.client.from("eventos").insert({
+    empreendimento_id: event.empreendimentoId,
+    unidade_id: event.unidadeId ?? null,
+    comodo_id: event.comodoId ?? null,
+    sessao_id: event.sessaoId,
+    tipo: event.tipo,
+    dados: event.dados,
+  });
   if (error) {
-    // PT429: the database limit per session (privado.limitar_eventos); the
-    // rest: refused by the RLS or the foreign keys (unpublished project,
-    // unit of another one).
+    // PT429: the per-session limit; the rest (unpublished project, room or
+    // unit of another project, bad data): refused, without detail.
     return empty(error.code === "PT429" ? 429 : 400);
   }
   return empty(204);

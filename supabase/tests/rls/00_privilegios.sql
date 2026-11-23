@@ -33,7 +33,21 @@ begin
   r := r || format(E'\n[%s] perfis.notificar_leads_email: visitante sem acesso',
     case when has_column_privilege('anon', 'public.perfis', 'notificar_leads_email', 'SELECT') then 'FALHOU' else 'OK' end);
 
-  -- leads e eventos: visitante só insere, não lê nenhuma coluna, não altera, não apaga.
+  -- leads e eventos (#84): visitante NÃO insere (só o servidor grava).
+  foreach t in array array['leads', 'eventos'] loop
+    r := r || format(E'\n[%s] %s: visitante não insere (só o servidor)',
+      case when has_table_privilege('anon', 'public.' || t, 'INSERT')
+             or exists (select 1 from information_schema.column_privileges
+                        where table_schema = 'public' and table_name = t and grantee = 'anon' and privilege_type = 'INSERT')
+        then 'FALHOU' else 'OK' end, t);
+  end loop;
+  r := r || format(E'\n[%s] registrar_envio: só o servidor executa',
+    case when has_function_privilege('service_role', 'public.registrar_envio(text, text, int, int)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.registrar_envio(text, text, int, int)', 'EXECUTE')
+          and not has_function_privilege('authenticated', 'public.registrar_envio(text, text, int, int)', 'EXECUTE')
+      then 'OK' else 'FALHOU' end);
+
+  -- leads e eventos: visitante não lê nenhuma coluna, não altera, não apaga.
   foreach t in array array['leads', 'eventos'] loop
     select count(*) into n
     from information_schema.column_privileges
