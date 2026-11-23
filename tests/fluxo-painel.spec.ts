@@ -13,6 +13,19 @@ import { bigPhoto, createBuilding, hasSupabaseEnv } from "./fixtures";
  * que um passo seguinte do fluxo falhe, e o teste continua.
  */
 async function checkA11y(page: Page, where: string) {
+  // Measure the final colors: a dialog fading in (or a button's hover
+  // transition) is still semi-transparent and fails contrast by chance.
+  await page.waitForFunction(
+    () =>
+      document.getAnimations().every(
+        (a) =>
+          a.playState !== "running" ||
+          // Spinners loop forever: never "done", and don't affect text.
+          a.effect?.getComputedTiming().iterations === Infinity,
+      ),
+    undefined,
+    { timeout: 5_000 },
+  );
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])
     // Toasts are measured mid-animation (still transparent): false positive.
