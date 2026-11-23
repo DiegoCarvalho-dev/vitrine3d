@@ -206,17 +206,29 @@ export function TourBuilding({
   const webgl = useWebGL();
   const pathname = usePathname();
 
-  // The heavy 3D code only starts after the page content is up (and the
-  // browser is idle), so the text, cover and SVG show first on slow phones.
+  // The heavy 3D code (~250 KB) only starts after the page has fully loaded
+  // (cover included) and the browser is idle: on 4G it used to share the
+  // connection with the cover and delay it (issue #87). The SVG shows first.
   const [idle, setIdle] = useState(false);
   useEffect(() => {
+    let cancel = () => {};
     const start = () => setIdle(true);
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(start, { timeout: 500 });
-      return () => window.cancelIdleCallback(id);
+    const whenIdle = () => {
+      if ("requestIdleCallback" in window) {
+        const id = window.requestIdleCallback(start, { timeout: 1_500 });
+        cancel = () => window.cancelIdleCallback(id);
+      } else {
+        const id = setTimeout(start, 300);
+        cancel = () => clearTimeout(id);
+      }
+    };
+    if (document.readyState === "complete") {
+      whenIdle();
+    } else {
+      window.addEventListener("load", whenIdle, { once: true });
+      cancel = () => window.removeEventListener("load", whenIdle);
     }
-    const id = setTimeout(start, 800);
-    return () => clearTimeout(id);
+    return () => cancel();
   }, []);
 
   const byPosition = useMemo(
