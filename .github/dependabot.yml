@@ -1,0 +1,27 @@
+# Dependabot (issue #86): uma vez por semana confere se alguma dependência
+# tem atualização de segurança e abre PRs AGRUPADOS (um para o npm, um para as
+# Actions), que passam pelo CI como qualquer outro PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      seguranca-npm:
+        applies-to: security-updates
+        patterns: ["*"]
+      dependencias-npm:
+        applies-to: version-updates
+        update-types: [minor, patch]
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
