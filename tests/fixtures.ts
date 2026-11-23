@@ -85,7 +85,10 @@ export function querySql<Row>(sql: string): Row[] {
   if (result.error || result.status !== 0) {
     throw new Error(`Falha na consulta de teste: ${result.stderr ?? ""}`);
   }
-  return (JSON.parse(result.stdout) as { rows: Row[] }).rows;
+  // The CLI prints a plain list of rows, or { rows } when it detects an AI
+  // agent running it (with an "untrusted data" warning): accept both.
+  const parsed = JSON.parse(result.stdout) as Row[] | { rows: Row[] };
+  return Array.isArray(parsed) ? parsed : parsed.rows;
 }
 
 /** URL e chave pública do Supabase (as mesmas que o navegador usa). */
