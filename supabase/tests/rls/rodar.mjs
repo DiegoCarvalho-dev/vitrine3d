@@ -1,17 +1,19 @@
 // Roda os testes de RLS (supabase/tests/rls/*.sql) no projeto ligado
-// (vitrine3d-dev). Cada teste roda numa transação desfeita no fim: não deixa
+// (vitrine3d-dev) ou, com SUPABASE_DB_LOCAL=1, no Supabase local (Docker,
+// usado pelo CI: issue #85). Cada teste roda numa transação desfeita no fim: não deixa
 // dados no banco. Os cenários de cada teste estão descritos no próprio .sql.
 //
 // O banco devolve um resumo "total=N;ok=N;falhas=...;FIM". Só aprovamos se o
 // marcador FIM chegou (a CLI corta mensagens longas) e se ok == total.
 //
-// Uso: npm run test:rls   (precisa do `supabase login` + `supabase link`)
+// Uso: npm run test:rls   (nuvem: precisa do `supabase login` + `supabase link`;
+//      local: `supabase start` e SUPABASE_DB_LOCAL=1)
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Trava de segurança: o teste roda no banco de verdade (vitrine3d-dev), então
+ * Trava de segurança: na nuvem o teste roda no banco de verdade (vitrine3d-dev), então
  * só é enviado se tiver o formato que garante "desfazer tudo no fim":
  * - um único bloco `do $$ ... $$;` (nada fora dele);
  * - terminar com `raise exception 'RELATORIO_RLS:...` (que desfaz a transação);
@@ -47,6 +49,10 @@ const files = readdirSync(dir)
 const SUMMARY = /RELATORIO_RLS:total=(\d+);ok=(\d+);falhas=(.*?);FIM/s;
 
 let failed = 0;
+// Nuvem (padrão, o projeto ligado à CLI) ou o Supabase local do CI
+// (SUPABASE_DB_LOCAL=1, banco descartável: issue #85).
+const target = process.env.SUPABASE_DB_LOCAL === "1" ? [] : ["--remote"];
+
 for (const file of files) {
   const reason = unsafeReason(readFileSync(join(dir, file), "utf8"));
   if (reason) {
@@ -57,7 +63,7 @@ for (const file of files) {
 
   const result = spawnSync(
     "supabase",
-    ["db", "query", "--remote", "--yes", "-f", join(dir, file)],
+    ["db", "query", ...target, "--yes", "-f", join(dir, file)],
     { encoding: "utf8" }, // sem shell: argumentos chegam inteiros à CLI
   );
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;

@@ -122,7 +122,42 @@ Regras do CI:
 
 **Divisão do trabalho (a partir da Sprint 7):** o CI roda a suíte automática; no computador, durante a issue, rodamos só `lint`, `typecheck` e os testes da parte mexida. `/code-review` e `/security-review` continuam sendo feitos antes do merge: o CI confere se funciona, não se está bem feito ou seguro.
 
-**Até a issue #85:** o CI ainda NÃO roda os testes de RLS nem os de navegador (e2e). Por isso, enquanto ela não existir, quem mexer em banco/RLS roda `npm run test:rls` e quem mexer em telas roda o spec e2e **dessa parte** no computador. Não precisa da suíte completa, mas não dá para pular esses testes. Depois da #85 o CI faz tudo isso sozinho.
+### Job "banco e navegador" (issue #85)
+
+Um segundo job, no mesmo workflow, testa o banco e as telas **sem nenhuma chave do banco de desenvolvimento**:
+
+1. sobe um **Supabase local** (Docker) dentro da máquina do CI, aplica todas as migrations e o seed (Residencial Demo);
+2. roda `npm run test:rls` (permissões no banco);
+3. roda `npm run test:e2e` inteiro (desktop e iPhone 13), contra o site compilado apontando para esse banco, incluindo a **jornada completa** (`tests/jornada.spec.ts`: prédio → unidade → caminhar → formulário → lead no painel → situação → apagar);
+4. se algo falhar, guarda o relatório do Playwright, os prints e o "replay" como **artefato** (página do CI > *Summary* > *Artifacts* > `relatorio-playwright`). Para abrir: descompactar e rodar `npx playwright show-report <pasta>/playwright-report`.
+
+O banco some no fim: cada rodada começa limpa. Quem escolhe o banco nos scripts de teste é a variável `SUPABASE_DB_LOCAL=1` (`tests/db-target.ts`); sem ela, os testes usam o projeto na nuvem, como antes.
+
+### Rodar o mesmo banco local no seu computador
+
+Precisa do Docker Desktop aberto. No PowerShell, dentro da pasta do projeto:
+
+```powershell
+# 1) Sobe o Supabase local (a 1ª vez baixa as imagens, demora alguns minutos)
+supabase start -x studio,edge-runtime,logflare,vector,imgproxy,realtime,supavisor,mailpit,postgres-meta
+# 2) Mostra a URL e as chaves LOCAIS (de demonstração, iguais em todo computador)
+supabase status
+# 3) Aponta os testes e o site para ele (vale só para este terminal)
+$env:SUPABASE_DB_LOCAL="1"
+$env:NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321"
+$env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="<PUBLISHABLE_KEY do status>"
+$env:SUPABASE_SECRET_KEY="<SECRET_KEY do status>"
+$env:RESEND_API_KEY="desligado"   # e-mail desligado (vazio no PowerShell apaga a variável e o .env.local voltaria)
+# 4) Testa (feche antes qualquer `npm run dev` aberto: ele usaria o banco da nuvem)
+npm run test:rls
+npx playwright test tests/jornada.spec.ts
+# 5) Desliga quando acabar (os dados locais somem com --no-backup)
+supabase stop --no-backup
+```
+
+As variáveis do terminal valem mais que as do `.env.local`, então o seu `.env.local` (da nuvem) não precisa mudar. Para voltar à nuvem, feche o terminal.
+
+**Divisão do trabalho:** o CI roda tudo (RLS e a suíte e2e inteira). No computador, durante a issue, basta `lint`, `typecheck`, `test` e o spec da parte mexida; o resto fica com o CI.
 
 ## Branches
 

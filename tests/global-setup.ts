@@ -1,7 +1,8 @@
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 
 import { chromium, type FullConfig } from "@playwright/test";
+
+import { execSql } from "./db-target";
 
 // Antes dos testes e2e: prepara UM corretor logado por projeto (desktop e
 // celular) e salva a sessão em tests/.auth/<projeto>.json.
@@ -48,13 +49,14 @@ begin
   end loop;
 end
 $$;`;
-  const result = spawnSync(
-    "supabase",
-    ["db", "query", "--remote", "--yes", sql],
-    { encoding: "utf8" },
-  );
+  const result = execSql(sql);
   if (result.error || result.status !== 0) {
-    // Como no teardown: avisa e segue. Os testes com login são pulados
+    // No CI isso é erro: pular os testes com login daria um "verde" falso.
+    if (process.env.CI)
+      throw new Error(
+        `[setup] Não consegui criar os usuários de teste no banco: ${result.error?.message ?? ""} ${result.stderr ?? ""}`,
+      );
+    // No computador: avisa e segue. Os testes com login são pulados
     // (tests/fixtures.ts), os demais rodam normalmente.
     console.warn(
       "[setup] Não consegui criar os usuários de teste (Supabase CLI instalada e ligada ao projeto?). Os testes com login serão pulados.",

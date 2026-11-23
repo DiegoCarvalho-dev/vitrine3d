@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireUserId } from "@/lib/auth/session";
-import { getEmailEnv } from "@/lib/env.server";
+import { getSecretKey } from "@/lib/env.server";
 import { leadStatusSchema } from "@/lib/leads/status";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -58,9 +58,11 @@ export async function deleteLead(rawId: unknown): Promise<LeadActionResult> {
   // through the API (they are immutable), so the server does it, but ONLY
   // after the RLS proved this broker owns the lead that was just deleted.
   const [{ sessao_id, empreendimento_id }] = data;
-  const env = getEmailEnv();
-  if (sessao_id && env) {
-    const { error: eventsError } = await createAdminClient(env.secretKey)
+  // Only the server key is needed (not the e-mail settings: #85 found the
+  // history stayed behind when e-mail was off).
+  const secretKey = getSecretKey();
+  if (sessao_id && secretKey) {
+    const { error: eventsError } = await createAdminClient(secretKey)
       .from("eventos")
       .delete()
       .eq("sessao_id", sessao_id)
