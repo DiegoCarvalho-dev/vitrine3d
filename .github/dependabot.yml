@@ -9,6 +9,12 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    # Versões grandes (major) mudam regras e quebram coisas: ficam para uma
+    # issue própria. Isto só vale para atualizações de VERSÃO; correções de
+    # SEGURANÇA continuam chegando sempre, mesmo se forem major.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       seguranca-npm:
         applies-to: security-updates
