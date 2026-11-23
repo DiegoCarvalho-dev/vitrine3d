@@ -3,8 +3,9 @@ name: CI
 # Conferência automática de todo PR e de todo push na main (issue #82):
 # formato, lint, tipos, testes unitários e build. NÃO usa nenhuma chave real:
 # o build recebe valores de exemplo (só o formato é validado).
-# Os testes de banco (RLS) e de navegador entram na issue #85, com um banco
-# de teste descartável dentro do próprio CI.
+# O job "banco e navegador" (issue #85) sobe um Supabase LOCAL e descartável
+# (Docker) com as migrations e o seed, e roda os testes de RLS e e2e contra
+# ele: nenhuma chave do banco de desenvolvimento vai para o GitHub.
 
 on:
   pull_request:
@@ -68,3 +69,78 @@ jobs:
 
       - name: Build (Next.js)
         run: npm run build
+
+  banco-e-navegador:
+    name: banco e navegador
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Os testes falam com o banco local (tests/db-target.ts, rodar.mjs).
+      SUPABASE_DB_LOCAL: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar o Node 22 (com cache do npm)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar as dependências
+        run: npm ci
+
+      - name: Instalar a CLI do Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 3.2.0
+
+      # Só o que os testes usam: banco, login, API e storage.
+      - name: Subir o Supabase local (migrations + seed)
+        run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy,realtime,supavisor,mailpit,postgres-meta
+
+      # As chaves do Supabase LOCAL são de demonstração (iguais em todo
+      # computador) e só valem dentro desta máquina descartável.
+      - name: Apontar o site para o banco local
+        run: |
+          supabase status -o json > /tmp/supabase.json
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL /tmp/supabase.json)"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(jq -r .PUBLISHABLE_KEY /tmp/supabase.json)"
+            echo "SUPABASE_SECRET_KEY=$(jq -r .SECRET_KEY /tmp/supabase.json)"
+          } >> "$GITHUB_ENV"
+
+      - name: RLS (testes de permissão no banco)
+        run: npm run test:rls
+
+      - name: Cache dos navegadores do Playwright
+        id: cache-navegadores
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Instalar os navegadores (Chromium e WebKit)
+        if: steps.cache-navegadores.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Dependências de sistema dos navegadores
+        if: steps.cache-navegadores.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
+
+      # Desktop e celular (iPhone 13), contra o site compilado (build + start).
+      - name: e2e (Playwright)
+        run: npm run test:e2e
+
+      # Se algo falhar: relatório, prints e "replay" para baixar na página
+      # do CI (aba Summary > Artifacts).
+      - name: Guardar relatório e prints
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-playwright
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

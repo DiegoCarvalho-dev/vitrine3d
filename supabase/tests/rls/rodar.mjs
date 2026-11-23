@@ -47,6 +47,10 @@ const files = readdirSync(dir)
 const SUMMARY = /RELATORIO_RLS:total=(\d+);ok=(\d+);falhas=(.*?);FIM/s;
 
 let failed = 0;
+// Nuvem (padrão, o projeto ligado à CLI) ou o Supabase local do CI
+// (SUPABASE_DB_LOCAL=1, banco descartável: issue #85).
+const target = process.env.SUPABASE_DB_LOCAL === "1" ? [] : ["--remote"];
+
 for (const file of files) {
   const reason = unsafeReason(readFileSync(join(dir, file), "utf8"));
   if (reason) {
@@ -57,7 +61,7 @@ for (const file of files) {
 
   const result = spawnSync(
     "supabase",
-    ["db", "query", "--remote", "--yes", "-f", join(dir, file)],
+    ["db", "query", ...target, "--yes", "-f", join(dir, file)],
     { encoding: "utf8" }, // sem shell: argumentos chegam inteiros à CLI
   );
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { test as base, expect, type Page } from "@playwright/test";
 
+import { dbTargetArgs, execSql } from "./db-target";
 import { hasSupabaseEnv, sessionFile } from "./global-setup";
 
 export { hasSupabaseEnv };
@@ -28,15 +29,14 @@ export const loggedInTest = base.extend({
  * RLS. Só para montar cenários que a tela ainda não permite (ex.: um lead).
  */
 export function runSql(sql: string) {
-  const result = spawnSync(
-    "supabase",
-    ["db", "query", "--remote", "--yes", sql],
-    {
-      encoding: "utf8",
-    },
-  );
+  const result = execSql(sql);
   if (result.error || result.status !== 0) {
-    throw new Error(`Falha ao rodar SQL de teste: ${result.stderr ?? ""}`);
+    throw new Error(
+      `Falha ao rodar SQL de teste: ${result.stderr ?? ""}${result.stdout ?? ""}`.slice(
+        0,
+        2_000,
+      ),
+    );
   }
 }
 
@@ -71,7 +71,15 @@ export async function createBuilding(page: Page, name: string) {
 export function querySql<Row>(sql: string): Row[] {
   const result = spawnSync(
     "supabase",
-    ["db", "query", "--remote", "--read-only", "--output-format", "json", sql],
+    [
+      "db",
+      "query",
+      ...dbTargetArgs,
+      "--read-only",
+      "--output-format",
+      "json",
+      sql,
+    ],
     { encoding: "utf8" },
   );
   if (result.error || result.status !== 0) {
