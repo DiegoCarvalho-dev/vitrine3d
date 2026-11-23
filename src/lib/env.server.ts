@@ -39,13 +39,15 @@ export type EmailEnv = {
 export function getSecretKey(
   source: Record<string, string | undefined> = process.env,
 ): string | null {
-  const key = source.SUPABASE_SECRET_KEY;
-  if (!key) return null;
-  if (!key.startsWith("sb_secret_")) {
-    console.error("SUPABASE_SECRET_KEY deve começar com sb_secret_.");
+  const parsed = serverEnvSchema.shape.SUPABASE_SECRET_KEY.safeParse(
+    source.SUPABASE_SECRET_KEY || undefined,
+  );
+  if (!parsed.success) {
+    // Wrong format: say which rule (never the value) and stay off.
+    console.error(parsed.error.issues[0]?.message);
     return null;
   }
-  return key;
+  return parsed.data ?? null;
 }
 
 /** The e-mail settings, or null when a key is missing (e-mail off). */

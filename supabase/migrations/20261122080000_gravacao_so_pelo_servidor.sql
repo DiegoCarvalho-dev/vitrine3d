@@ -23,7 +23,7 @@ grant insert (empreendimento_id, unidade_id, nome, telefone, email, mensagem, or
   on public.leads to service_role;
 grant insert (empreendimento_id, unidade_id, comodo_id, sessao_id, tipo, dados)
   on public.eventos to service_role;
--- A conferência "cômodo do mesmo empreendimento" no servidor lê tipologias.
+-- (O SELECT em tipologias abaixo saiu na migration 20261122082000: a trava do banco faz essa conferência.)
 grant select on public.tipologias to service_role;
 
 -- 3) Trava no banco, para qualquer papel --------------------------------------

@@ -9,7 +9,9 @@ import { eventSchema } from "@/lib/validacoes/evento";
 // learn by probing.
 
 const MAX_BODY = 2_000; // characters of JSON (an event is ~300)
-const PER_IP_PER_MINUTE = 120;
+// Per IP AND per tour: people on one carrier IP (CGNAT) or venue Wi-Fi share
+// it. The per-session limit (60/min, in the database) stops a single abuser.
+const PER_IP_PER_TOUR_PER_MINUTE = 300;
 
 const empty = (status: number) => new Response(null, { status });
 
@@ -49,13 +51,15 @@ export async function POST(request: Request) {
   const writer = getWriter();
   if (!writer) return empty(503);
 
-  const allowed = await allowByIp(writer, {
+  const limit = await allowByIp(writer, {
     ip: clientIp(request.headers),
     scope: "evento",
-    limit: PER_IP_PER_MINUTE,
+    limit: PER_IP_PER_TOUR_PER_MINUTE,
     windowSeconds: 60,
+    keyScope: event.empreendimentoId,
   });
-  if (!allowed) return empty(429);
+  if (limit === "error") return empty(503);
+  if (limit === "limit") return empty(429);
 
   const { error } = await writer.client.from("eventos").insert({
     empreendimento_id: event.empreendimentoId,

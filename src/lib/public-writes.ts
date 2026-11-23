@@ -10,10 +10,11 @@ import type { Database } from "@/types/database";
 
 // What the public tour writes (leads and visit events) goes through the
 // SERVER (issue #84): the visitor's public key can no longer insert anything.
-// The server validates first (Zod), checks the target here, applies the
-// per-IP limit kept in the database, and saves with the secret key. The
-// database still refuses unpublished projects and rooms of another project
-// (trigger), whoever writes.
+// The server validates first (Zod), applies the per-IP limit kept in the
+// database and saves with the secret key. The database itself refuses
+// unpublished projects and rooms of another project (trigger), whoever
+// writes. Known limit: a submission the database refuses later still counts
+// toward its IP's limit.
 
 export type Writer = {
   client: SupabaseClient<Database>;
@@ -27,15 +28,19 @@ export function getWriter(): Writer | null {
 }
 
 /**
- * The visitor's IP as the host platform reports it (Vercel sets x-real-ip).
- * Unknown (local development): null, and only the per-session limit applies.
+ * The visitor's IP, ONLY from a header the host platform sets (on Vercel,
+ * x-real-ip and x-forwarded-for are overwritten by it). Anywhere else the
+ * visitor could invent x-forwarded-for, so it's ignored: null, and only the
+ * per-session limit applies.
  */
-export function clientIp(headers: Headers): string | null {
-  return (
-    headers.get("x-real-ip") ??
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    null
-  );
+export function clientIp(
+  headers: Headers,
+  onVercel = Boolean(process.env.VERCEL),
+): string | null {
+  const real = headers.get("x-real-ip");
+  if (real) return real;
+  if (!onVercel) return null;
+  return headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 }
 
 /**
@@ -49,9 +54,12 @@ export function ipKey(ip: string, secretKey: string, scope = ""): string {
     .slice(0, 32);
 }
 
+export type LimitResult = "ok" | "limit" | "error";
+
 /**
  * Counts a submission against a per-IP limit kept in the database (valid for
- * every server instance). Fails closed: if the check can't run, it says no.
+ * every server instance). "error" (the check couldn't run) is NOT "too many":
+ * the caller says the service is unavailable, and it's logged.
  */
 export async function allowByIp(
   writer: Writer,
@@ -69,13 +77,17 @@ export async function allowByIp(
     /** Extra part of the key (e.g. the project: the limit is per tour). */
     keyScope?: string;
   },
-): Promise<boolean> {
-  if (!ip) return true; // no IP known: the per-session limit still applies
+): Promise<LimitResult> {
+  if (!ip) return "ok"; // no IP known: the per-session limit still applies
   const { data, error } = await writer.client.rpc("registrar_envio", {
     p_escopo: scope,
     p_chave: ipKey(ip, writer.secretKey, keyScope),
     p_limite: limit,
     p_janela_segundos: windowSeconds,
   });
-  return !error && data === true;
+  if (error) {
+    console.error(`Limite por IP indisponível (${error.code ?? "erro"})`);
+    return "error";
+  }
+  return data === true ? "ok" : "limit";
 }

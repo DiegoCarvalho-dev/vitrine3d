@@ -57,14 +57,15 @@ export async function sendLead(
   const writer = getWriter();
   if (!writer) return { ok: false, error: UNAVAILABLE };
 
-  const allowed = await allowByIp(writer, {
+  const limit = await allowByIp(writer, {
     ip: clientIp(await headers()),
     scope: "lead",
     limit: PER_IP_PER_TOUR,
     windowSeconds: 10 * 60,
     keyScope: projectId,
   });
-  if (!allowed) return { ok: false, error: TOO_MANY };
+  if (limit === "error") return { ok: false, error: UNAVAILABLE };
+  if (limit === "limit") return { ok: false, error: TOO_MANY };
 
   // No .select(): nothing about the lead goes back to the visitor.
   const { error } = await writer.client.from("leads").insert({
