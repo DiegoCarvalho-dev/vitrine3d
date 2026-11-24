@@ -15,6 +15,7 @@ import {
   type Rect,
   roundArea,
 } from "@/lib/planta/geometry";
+import { planProblem } from "@/lib/planta/openings";
 import { createClient } from "@/lib/supabase/server";
 import {
   planSaveSchema,
@@ -263,7 +264,7 @@ export async function savePlan(
   };
   const stored = await listRooms(loaded.typology.id);
   const existing = new Set(stored.map((room) => room.id));
-  const { rooms: drawn, removed } = parsed.data;
+  const { rooms: drawn, removed, plan } = parsed.data;
   // Every id sent must be a room of THIS typology (never another one's).
   if (
     drawn.some((room) => room.id && !existing.has(room.id)) ||
@@ -299,11 +300,26 @@ export async function savePlan(
     };
   });
 
+  // Doors and windows must sit on the walls of the rooms being saved.
+  if (plan) {
+    const problem = planProblem(
+      drawn.map((room, index) => ({
+        id: room.id ?? `novo-${index}`,
+        type: room.type,
+        points: room.points,
+        height: room.ceilingHeight,
+      })),
+      plan,
+    );
+    if (problem) return { error: problem };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.rpc("salvar_comodos", {
     p_tipologia_id: loaded.typology.id,
     p_comodos: rooms,
     p_remover: removed,
+    ...(plan ? { p_planta: plan } : {}),
   });
   if (error)
     return { error: "Não foi possível salvar a planta. Tente de novo." };
