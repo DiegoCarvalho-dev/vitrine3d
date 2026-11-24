@@ -5,13 +5,31 @@ import type { RoomType } from "@/lib/validacoes/comodo";
 import type { Point } from "@/lib/validacoes/planta";
 
 import {
-  blockingSegments,
+  blockingSegments as blockingWithFurniture,
   collides,
   rayDistance,
-  startPoint,
+  startPoint as startWithFurniture,
   step,
 } from "./collision";
 import type { DoorRoom } from "./doors";
+
+// Estes testes são das paredes e portas: os móveis (#107), que também
+// bloqueiam, ficam desligados aqui e têm testes próprios (furniture.test.ts).
+type TestPlan = Parameters<typeof blockingWithFurniture>[1];
+const blockingSegments = (rooms: readonly DoorRoom[], plan?: TestPlan) =>
+  blockingWithFurniture(rooms, {
+    portas: [],
+    janelas: [],
+    ...plan,
+    moveis: false,
+  });
+const startPoint = (rooms: readonly DoorRoom[], plan?: TestPlan) =>
+  startWithFurniture(rooms, {
+    portas: [],
+    janelas: [],
+    ...plan,
+    moveis: false,
+  });
 import { isInside } from "./geometry";
 
 const rect = (

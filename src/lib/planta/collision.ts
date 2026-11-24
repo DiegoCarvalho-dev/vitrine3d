@@ -1,6 +1,7 @@
 import type { FloorPlan, Point } from "@/lib/validacoes/planta";
 
 import { type DoorRoom, unitOpenings } from "./doors";
+import { planFurniture } from "./furniture";
 import { isInside, labelPoint } from "./geometry";
 import { buildWalls, type Opening, WALL_THICKNESS, wallPieces } from "./walls";
 
@@ -38,17 +39,30 @@ function widen(opening: Opening): Opening {
  */
 export function blockingSegments(
   rooms: readonly DoorRoom[],
-  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas">,
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas" | "moveis">,
 ): Segment[] {
   const walls = buildWalls(rooms);
   const inside = walls.filter((wall) => wall.rooms.length === 2);
   const outside = walls.filter((wall) => wall.rooms.length === 1);
   const openings = unitOpenings(rooms, plan).map(widen);
+  // Furniture (#107) blocks too: its outline on the floor.
+  const furniture = planFurniture(rooms, plan)
+    .filter((piece) => piece.blocks)
+    .flatMap(({ footprint: f }): Segment[] => {
+      const corners: Point[] = [
+        [f.x, f.y],
+        [f.x + f.width, f.y],
+        [f.x + f.width, f.y + f.depth],
+        [f.x, f.y + f.depth],
+      ];
+      return corners.map((a, i) => ({ a, b: corners[(i + 1) % 4] }));
+    });
   return [
     ...wallPieces(inside, openings)
       .filter((piece) => piece.bottom < BODY_HEIGHT)
       .map(({ a, b }) => ({ a, b })),
     ...outside.map(({ a, b }) => ({ a, b })),
+    ...furniture,
   ];
 }
 
@@ -117,7 +131,7 @@ function freeSpotNear(p: Point, walls: readonly Segment[]): Point {
  */
 export function startPoint(
   rooms: readonly DoorRoom[],
-  plan?: Pick<FloorPlan, "portas" | "janelas">,
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas" | "moveis">,
 ): { at: Point; facing: Point } {
   const exterior = buildWalls(rooms).filter((wall) => wall.rooms.length === 1);
   const walls = blockingSegments(rooms, plan);

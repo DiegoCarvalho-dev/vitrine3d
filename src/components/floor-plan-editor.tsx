@@ -24,6 +24,7 @@ import { toast } from "sonner";
 
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -327,7 +328,7 @@ export function FloorPlanEditor({
 }: {
   rooms: PlanEditorRoom[];
   /** Saved doors and windows (tipologias.planta); none: automatic doors. */
-  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas">;
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas" | "moveis">;
   /** Saves the whole plan; returns an error message, or null when saved. */
   onSave: (plan: PlanSaveInput) => Promise<string | null>;
   onDirtyChange?: (dirty: boolean) => void;
@@ -351,6 +352,7 @@ export function FloorPlanEditor({
   /** First corner of a "tap, tap" drawing (phones). */
   const [corner, setCorner] = useState<Point | null>(null);
   const [zoom, setZoom] = useState<(typeof ZOOMS)[number]>(1);
+  const [furnitureOn, setFurnitureOn] = useState(initialPlan?.moveis !== false);
   const [pending, startTransition] = useTransition();
   const svgRef = useRef<SVGSVGElement>(null);
   const helpId = useId();
@@ -390,16 +392,21 @@ export function FloorPlanEditor({
 
   // What would be saved, and what the page loaded (to know if it changed).
   const wallRooms = asWallRooms(state.rooms);
-  const { plan: openingsPlan, dropped } = planFromOpenings(
+  const { plan: openingsOnly, dropped } = planFromOpenings(
     wallRooms,
     state.openings,
   );
+  // Furniture in the 3D (#107): on unless the broker turned it off.
+  const openingsPlan = { ...openingsOnly, moveis: furnitureOn };
   const initialSignature = useMemo(() => {
     const rooms = initialRooms.map(toDraft);
     const openings = openingsFromPlan(asWallRooms(rooms), initialPlan);
     return JSON.stringify([
       toInput(rooms),
-      planFromOpenings(asWallRooms(rooms), openings).plan,
+      {
+        ...planFromOpenings(asWallRooms(rooms), openings).plan,
+        moveis: initialPlan?.moveis !== false,
+      },
     ]);
   }, [initialRooms, initialPlan]);
   const dirty =
@@ -1210,6 +1217,17 @@ export function FloorPlanEditor({
           }
         />
       )}
+
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id={`${helpId}-furniture`}
+          checked={furnitureOn}
+          onCheckedChange={(checked) => setFurnitureOn(checked === true)}
+        />
+        <Label htmlFor={`${helpId}-furniture`} className="font-normal">
+          Mostrar móveis no tour (cama, sofá, mesa: dão noção de tamanho)
+        </Label>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
