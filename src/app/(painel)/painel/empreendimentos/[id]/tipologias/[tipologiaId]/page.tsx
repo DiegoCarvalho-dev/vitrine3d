@@ -55,8 +55,8 @@ export default async function TypologyPage({ params }: Props) {
           {typology.nome}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Cada cômodo é um retângulo em metros, a partir do canto inferior
-          esquerdo da planta. A prévia mostra como está ficando.
+          Desenhe os cômodos na grade (cada quadrado é 1 m) ou digite as
+          medidas. O tour em 3D é gerado a partir desta planta.
         </p>
       </div>
       <RoomsEditor

@@ -14,6 +14,7 @@ declare
   tip_b uuid;
   uni_oculta uuid;
   uni_visivel uuid;
+  sala_a uuid;
   n int;
   v numeric;
   r text := '';
@@ -36,7 +37,8 @@ begin
   values (emp_pub, 'Tipo A', 2, 65) returning id into tip_a;
   insert into public.tipologias (empreendimento_id, nome) values (emp_rasc, 'Tipo R') returning id into tip_rasc;
   insert into public.comodos (tipologia_id, nome, tipo, geometria)
-  values (tip_a, 'Sala', 'sala', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}');
+  values (tip_a, 'Sala', 'sala', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}')
+  returning id into sala_a;
   insert into public.comodos (tipologia_id, nome, geometria) values (tip_rasc, 'Sala R', '{"tipo":"poligono","pontos":[]}');
 
   insert into public.unidades (empreendimento_id, tipologia_id, andar, numero, posicao_no_andar, preco, observacoes)
@@ -86,6 +88,16 @@ begin
   insert into public.empreendimentos (dono_id, nome, slug, numero_andares, unidades_por_andar)
   values (b, 'Emp B', 'teste-b-' || left(b::text, 8), 5, 2) returning id into emp_b;
 
+  -- Salvar a planta inteira (#105): B não mexe na planta de A (nem apaga tudo).
+  begin
+    perform public.salvar_comodos(tip_a, '[]'::jsonb, array[sala_a]);
+    r := r || E'\n[FALHOU] B salvou (apagou) a planta de A';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] B NÃO salva a planta de uma tipologia de A';
+  end;
+  select count(*) into n from public.comodos where tipologia_id = tip_a;
+  r := r || format(E'\n[%s] ... e os cômodos de A continuam lá (%s)', case when n = 1 then 'OK' else 'FALHOU' end, n);
+
   select count(*) into n from public.unidades where empreendimento_id = emp_pub;
   r := r || format(E'\n[%s] concorrente logado NÃO lê unidades de A (nem o preço oculto) (%s)', case when n = 0 then 'OK' else 'FALHOU' end, n);
 
@@ -124,6 +136,13 @@ begin
   -- ===== Visitante anônimo =====
   perform set_config('role', 'anon', true);
   perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
+
+  begin
+    perform public.salvar_comodos(tip_a, '[]'::jsonb, array[sala_a]);
+    r := r || E'\n[FALHOU] visitante chamou salvar_comodos';
+  exception when insufficient_privilege then
+    r := r || E'\n[OK] visitante NÃO chama salvar_comodos';
+  end;
 
   begin
     perform preco from public.unidades where id = uni_oculta;
@@ -178,6 +197,57 @@ begin
   -- ===== Volta para A: apagar tipologia e empreendimento =====
   perform set_config('role', 'authenticated', true);
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+
+  -- Salvar a planta inteira (#105): atualiza a sala, cria o quarto, na ordem.
+  perform public.salvar_comodos(tip_a, jsonb_build_array(
+    jsonb_build_object('nome', 'Quarto', 'tipo', 'quarto', 'descricao', null, 'area_m2', 12,
+      'geometria', '{"tipo":"poligono","pontos":[[4,0],[7,0],[7,4],[4,4]],"pe_direito":2.7}'::jsonb),
+    jsonb_build_object('id', sala_a, 'nome', 'Sala ampla', 'tipo', 'sala', 'descricao', 'Com varanda', 'area_m2', 12,
+      'geometria', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}'::jsonb)
+  ));
+  select count(*) into n from public.comodos where tipologia_id = tip_a;
+  r := r || format(E'\n[%s] dono salva a planta inteira (cria e atualiza) (%s cômodos)', case when n = 2 then 'OK' else 'FALHOU' end, n);
+  select ordem into n from public.comodos where id = sala_a and nome = 'Sala ampla';
+  r := r || format(E'\n[%s] ... e a ordem segue a lista (sala em 2º)', case when n = 1 then 'OK' else 'FALHOU' end);
+
+  -- Um item inválido no meio: nada muda (a planta nunca fica pela metade).
+  begin
+    perform public.salvar_comodos(tip_a, jsonb_build_array(
+      jsonb_build_object('id', sala_a, 'nome', 'Mudou', 'tipo', 'sala', 'area_m2', 12,
+        'geometria', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}'::jsonb),
+      jsonb_build_object('nome', 'Ruim', 'tipo', 'nao_existe', 'area_m2', 5,
+        'geometria', '{"tipo":"poligono","pontos":[[8,0],[9,0],[9,1],[8,1]],"pe_direito":2.7}'::jsonb)
+    ));
+    r := r || E'\n[FALHOU] planta com item inválido foi aceita';
+  exception when invalid_text_representation then
+    r := r || E'\n[OK] planta com item inválido é recusada inteira';
+  end;
+  select count(*) into n from public.comodos where id = sala_a and nome = 'Sala ampla';
+  r := r || format(E'\n[%s] ... e nada mudou (a sala manteve o nome)', case when n = 1 then 'OK' else 'FALHOU' end);
+
+  -- Cômodo fora da lista e NÃO pedido para remover continua (outra aba, dado antigo).
+  perform public.salvar_comodos(tip_a, jsonb_build_array(
+    jsonb_build_object('id', sala_a, 'nome', 'Sala ampla', 'tipo', 'sala', 'area_m2', 12,
+      'geometria', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}'::jsonb)
+  ));
+  select count(*) into n from public.comodos where tipologia_id = tip_a;
+  r := r || format(E'\n[%s] cômodo fora da lista e não removido continua (%s)', case when n = 2 then 'OK' else 'FALHOU' end, n);
+
+  -- Só o que foi pedido em p_remover é apagado; as portas vão na mesma transação.
+  perform public.salvar_comodos(tip_a, jsonb_build_array(
+      jsonb_build_object('id', sala_a, 'nome', 'Sala ampla', 'tipo', 'sala', 'area_m2', 12,
+        'geometria', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}'::jsonb)),
+    (select array_agg(id) from public.comodos where tipologia_id = tip_a and id <> sala_a),
+    '{"versao":1,"portas":[{"de":[4,1],"ate":[4,1.8]}],"janelas":[]}'::jsonb);
+  select count(*) into n from public.comodos where tipologia_id = tip_a;
+  r := r || format(E'\n[%s] cômodo pedido em p_remover é apagado (%s)', case when n = 1 then 'OK' else 'FALHOU' end, n);
+  select count(*) into n from public.tipologias where id = tip_a and planta->'portas'->0->>'ate' is not null;
+  r := r || format(E'\n[%s] ... e as portas são salvas na mesma transação', case when n = 1 then 'OK' else 'FALHOU' end);
+  -- Pedir para remover cômodo de OUTRA tipologia não apaga nada dela.
+  perform public.salvar_comodos(tip_a, '[]'::jsonb,
+    (select array_agg(id) from public.comodos where tipologia_id = tip_rasc));
+  select count(*) into n from public.comodos where tipologia_id = tip_rasc;
+  r := r || format(E'\n[%s] p_remover não apaga cômodo de outra tipologia (%s)', case when n = 1 then 'OK' else 'FALHOU' end, n);
 
   delete from public.tipologias where id = tip_a;
   select count(*) into n from public.unidades where id in (uni_oculta, uni_visivel) and tipologia_id is null;

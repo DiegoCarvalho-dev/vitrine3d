@@ -56,6 +56,8 @@ test.describe("Cômodos e prévia da planta", () => {
     ).toBeVisible({
       timeout: 30_000,
     });
+    // O formulário numérico fica na aba "Medidas" (#105: "Desenhar" é a principal).
+    await page.getByRole("tab", { name: "Medidas" }).click();
 
     // Sala (0; 0; 5 × 4) — sem cômodos, o formulário já vem aberto.
     let form = await fillRoom(page, {

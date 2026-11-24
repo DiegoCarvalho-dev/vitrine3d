@@ -17,6 +17,7 @@ import {
 } from "@/lib/planta/geometry";
 import { createClient } from "@/lib/supabase/server";
 import {
+  planSaveSchema,
   rectGeometry,
   roomDetailsSchema,
   roomFormSchema,
@@ -227,6 +228,85 @@ export async function moveRoom(
   );
   if (results.some((result) => result?.error))
     return { error: "Não foi possível reordenar. Tente de novo." };
+  refresh(loaded.project.id, loaded.typology.id);
+  return { ok: true };
+}
+
+/**
+ * Saves the whole plan drawn in the visual editor (issue #105) at once, in a
+ * single database transaction (public.salvar_comodos): rooms with an id are
+ * updated, without id are created, and only the rooms the broker took out
+ * (`removed`) are deleted. Zod checks every room and the overlaps; the
+ * database checks the owner (RLS + the function's own check).
+ */
+export async function savePlan(
+  rawProjectId: unknown,
+  rawTypologyId: unknown,
+  input: unknown,
+): Promise<RoomResult> {
+  const loaded = await load(rawProjectId, rawTypologyId);
+  if (!loaded) return NOT_FOUND;
+  const parsed = planSaveSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      error:
+        issue && issue.code !== "invalid_type"
+          ? issue.message
+          : "Confira os cômodos da planta.",
+    };
+  }
+
+  const stale = {
+    error:
+      "A planta mudou em outra aba. Recarregue a página e desenhe de novo.",
+  };
+  const stored = await listRooms(loaded.typology.id);
+  const existing = new Set(stored.map((room) => room.id));
+  const { rooms: drawn, removed } = parsed.data;
+  // Every id sent must be a room of THIS typology (never another one's).
+  if (
+    drawn.some((room) => room.id && !existing.has(room.id)) ||
+    removed.some((id) => !existing.has(id))
+  )
+    return stale;
+  // A room the editor never saw (created in another tab since the page
+  // opened) would be left out of the overlap check: refuse instead.
+  const known = new Set([
+    ...drawn.flatMap((room) => (room.id ? [room.id] : [])),
+    ...removed,
+  ]);
+  const unseen = stored.some(
+    (room) =>
+      !known.has(room.id) &&
+      roomGeometrySchema.safeParse(room.geometria).success,
+  );
+  if (unseen) return stale;
+
+  const rooms = drawn.map((room) => {
+    const geometry = roomGeometrySchema.parse({
+      tipo: "poligono",
+      pontos: room.points,
+      pe_direito: room.ceilingHeight,
+    });
+    return {
+      ...(room.id ? { id: room.id } : {}),
+      nome: room.name,
+      tipo: room.type,
+      descricao: room.description,
+      geometria: geometry,
+      area_m2: roundArea(geometry.pontos),
+    };
+  });
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("salvar_comodos", {
+    p_tipologia_id: loaded.typology.id,
+    p_comodos: rooms,
+    p_remover: removed,
+  });
+  if (error)
+    return { error: "Não foi possível salvar a planta. Tente de novo." };
   refresh(loaded.project.id, loaded.typology.id);
   return { ok: true };
 }

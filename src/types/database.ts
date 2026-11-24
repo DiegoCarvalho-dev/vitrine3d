@@ -563,6 +563,15 @@ export type Database = {
         Returns: boolean;
       };
       resumo_visitas: { Args: { p_ate: string; p_de: string }; Returns: Json };
+      salvar_comodos: {
+        Args: {
+          p_comodos: Json;
+          p_planta?: Json;
+          p_remover?: string[];
+          p_tipologia_id: string;
+        };
+        Returns: undefined;
+      };
     };
     Enums: {
       status_lead:
