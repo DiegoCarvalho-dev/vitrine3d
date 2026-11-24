@@ -7,6 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
+import { FloorPlanEditor } from "@/components/floor-plan-editor";
 import {
   FloorPlanPreview,
   type PreviewRoom,
@@ -41,7 +42,13 @@ import {
 } from "@/lib/validacoes/comodo";
 import { formatDecimal, parseMeters } from "@/lib/validacoes/numero";
 
-import { createRoom, deleteRoom, moveRoom, updateRoom } from "./actions";
+import {
+  createRoom,
+  deleteRoom,
+  moveRoom,
+  savePlan,
+  updateRoom,
+} from "./actions";
 
 // The 3D only exists in the browser (WebGL); loaded only when asked for.
 const UnitPreview = dynamic(
@@ -108,7 +115,116 @@ const FIELDS = [
   ["depth", "Profundidade (m)", "Para cima"],
 ] as const;
 
-export function RoomsEditor({
+/**
+ * Rooms page (issues #32 and #105): two ways to build the plan.
+ * "Desenhar" (the visual editor, saved at once) is the main one; "Medidas"
+ * (the numeric form, one room at a time) is the accessible alternative and
+ * the place for fine adjustments. Switching waits until the drawing is saved.
+ */
+export function RoomsEditor(props: {
+  projectId: string;
+  typologyId: string;
+  rooms: EditorRoom[];
+  privateArea: number | null;
+  plan?: ModelPlan;
+}) {
+  const { projectId, typologyId, rooms } = props;
+  const [tab, setTab] = useState<"desenhar" | "medidas">("desenhar");
+  const [dirty, setDirty] = useState(false);
+  // After a save the page brings the new rooms: the editor starts over from them.
+  const signature = useMemo(
+    () => JSON.stringify(rooms.map((r) => [r.id, r.points, r.name, r.type])),
+    [rooms],
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div
+        role="tablist"
+        aria-label="Como montar a planta"
+        className="flex gap-2"
+      >
+        {(
+          [
+            ["desenhar", "Desenhar"],
+            ["medidas", "Medidas"],
+          ] as const
+        ).map(([value, text]) => (
+          <Button
+            key={value}
+            role="tab"
+            size="sm"
+            aria-selected={tab === value}
+            variant={tab === value ? "secondary" : "ghost"}
+            disabled={tab !== value && dirty}
+            title={
+              tab !== value && dirty
+                ? "Salve ou desfaça o desenho antes de trocar."
+                : undefined
+            }
+            onClick={() => setTab(value)}
+          >
+            {text}
+          </Button>
+        ))}
+      </div>
+      {tab === "desenhar" ? (
+        <div className="flex flex-col gap-3" role="tabpanel">
+          <FloorPlanEditor
+            key={signature}
+            rooms={rooms}
+            onDirtyChange={setDirty}
+            onSave={async (input) => {
+              const result = await savePlan(projectId, typologyId, input);
+              return result.ok ? null : result.error;
+            }}
+          />
+          <AreaSummary rooms={rooms} privateArea={props.privateArea} />
+        </div>
+      ) : (
+        <div role="tabpanel">
+          <MeasuresEditor {...props} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AreaSummary({
+  rooms,
+  privateArea,
+}: {
+  rooms: EditorRoom[];
+  privateArea: number | null;
+}) {
+  // Rounded like the stored areas, so 0.1 + 0.2 doesn't "pass" 0.3.
+  const totalArea =
+    Math.round(rooms.reduce((sum, room) => sum + room.area, 0) * 100) / 100;
+  return (
+    <>
+      <p
+        className="text-sm text-muted-foreground tabular-nums"
+        data-testid="area-summary"
+      >
+        Soma dos cômodos salvos: {formatDecimal(totalArea)} m²
+        {privateArea
+          ? ` de ${formatDecimal(privateArea)} m² (área privativa)`
+          : ""}
+      </p>
+      {privateArea !== null && totalArea > privateArea && (
+        <p
+          role="status"
+          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
+          A soma dos cômodos passou da área privativa. Confira as medidas ou a
+          área da tipologia.
+        </p>
+      )}
+    </>
+  );
+}
+
+function MeasuresEditor({
   projectId,
   typologyId,
   rooms,

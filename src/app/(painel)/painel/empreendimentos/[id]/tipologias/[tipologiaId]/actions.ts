@@ -17,6 +17,7 @@ import {
 } from "@/lib/planta/geometry";
 import { createClient } from "@/lib/supabase/server";
 import {
+  planSaveSchema,
   rectGeometry,
   roomDetailsSchema,
   roomFormSchema,
@@ -227,6 +228,65 @@ export async function moveRoom(
   );
   if (results.some((result) => result?.error))
     return { error: "Não foi possível reordenar. Tente de novo." };
+  refresh(loaded.project.id, loaded.typology.id);
+  return { ok: true };
+}
+
+/**
+ * Saves the whole plan drawn in the visual editor (issue #105) at once, in a
+ * single database transaction (public.salvar_comodos): rooms with an id are
+ * updated, without id are created, and rooms missing from the list are
+ * deleted. Zod checks every room and the overlaps; the database checks the
+ * owner (RLS + the function's own check).
+ */
+export async function savePlan(
+  rawProjectId: unknown,
+  rawTypologyId: unknown,
+  input: unknown,
+): Promise<RoomResult> {
+  const loaded = await load(rawProjectId, rawTypologyId);
+  if (!loaded) return NOT_FOUND;
+  const parsed = planSaveSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      error:
+        issue && issue.code !== "invalid_type"
+          ? issue.message
+          : "Confira os cômodos da planta.",
+    };
+  }
+
+  // Every id sent must be a room of THIS typology (never another one's).
+  const existing = new Set(
+    (await listRooms(loaded.typology.id)).map((room) => room.id),
+  );
+  if (parsed.data.some((room) => room.id && !existing.has(room.id)))
+    return { error: "A planta mudou em outra aba. Recarregue a página." };
+
+  const rooms = parsed.data.map((room) => {
+    const geometry = roomGeometrySchema.parse({
+      tipo: "poligono",
+      pontos: room.points,
+      pe_direito: room.ceilingHeight,
+    });
+    return {
+      ...(room.id ? { id: room.id } : {}),
+      nome: room.name,
+      tipo: room.type,
+      descricao: room.description,
+      geometria: geometry,
+      area_m2: roundArea(geometry.pontos),
+    };
+  });
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("salvar_comodos", {
+    p_tipologia_id: loaded.typology.id,
+    p_comodos: rooms,
+  });
+  if (error)
+    return { error: "Não foi possível salvar a planta. Tente de novo." };
   refresh(loaded.project.id, loaded.typology.id);
   return { ok: true };
 }

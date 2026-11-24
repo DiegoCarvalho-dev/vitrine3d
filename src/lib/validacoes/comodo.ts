@@ -1,9 +1,10 @@
 import { z } from "zod";
 
+import { overlapPairs } from "@/lib/planta/editor";
 import { rectToPolygon } from "@/lib/planta/geometry";
 
 import { parseMeters } from "./numero";
-import { roomGeometrySchema } from "./planta";
+import { pointSchema, polygonArea, roomGeometrySchema } from "./planta";
 
 // Room (cômodo) form, issue #32. Until the visual editor (Sprint 8) a room is
 // a rectangle typed in meters: corner (x, y) from the bottom-left of the unit,
@@ -102,3 +103,38 @@ export function rectGeometry(r: z.output<typeof roomRectSchema>) {
     pe_direito: r.ceilingHeight,
   });
 }
+
+/**
+ * The whole plan from the visual editor (issue #105), saved at once: rooms
+ * with an id are updated, without id are created, missing ones are deleted.
+ * Same rules as the form: name, type, 0,5 m² minimum, no overlaps.
+ */
+export const planRoomSchema = roomDetailsSchema.extend({
+  id: z.uuid().nullable(),
+  ceilingHeight: z.number().min(2.2).max(6),
+  points: z.array(pointSchema).min(3).max(64),
+});
+export type PlanRoomInput = z.input<typeof planRoomSchema>;
+
+export const planSaveSchema = z
+  .array(planRoomSchema)
+  .max(60, "No máximo 60 cômodos por tipologia.")
+  .superRefine((rooms, ctx) => {
+    const ids = rooms.flatMap((room) => (room.id ? [room.id] : []));
+    if (new Set(ids).size !== ids.length)
+      ctx.addIssue({ code: "custom", message: "Cômodo repetido na planta." });
+    rooms.forEach((room, index) => {
+      if (polygonArea(room.points) <= 0.5)
+        ctx.addIssue({
+          code: "custom",
+          path: [index, "points"],
+          message: `“${room.name}” precisa ter mais de 0,5 m².`,
+        });
+    });
+    const [pair] = overlapPairs(rooms);
+    if (pair)
+      ctx.addIssue({
+        code: "custom",
+        message: `“${pair[0].name}” e “${pair[1].name}” estão um em cima do outro. Ajuste antes de salvar.`,
+      });
+  });

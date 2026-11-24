@@ -105,6 +105,7 @@ test.describe("Fluxo completo do painel", () => {
       timeout: 15_000,
     });
     await page.getByRole("link", { name: "Cômodos" }).click();
+    await page.getByRole("tab", { name: "Medidas" }).click(); // formulário numérico (#105)
     const form = page.getByRole("form");
     await expect(form).toBeVisible({ timeout: 30_000 });
     await form.getByLabel("Nome").fill("Sala");

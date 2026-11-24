@@ -100,12 +100,17 @@ begin
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
       -- Liberadas de propósito (usadas dentro das policies):
-      and (ns.nspname, p.proname) not in (('privado', 'comodo_do_empreendimento'), ('privado', 'pode_gravar_midia'), ('privado', 'empreendimento_tem_leads'), ('public', 'resumo_visitas'))
+      and (ns.nspname, p.proname) not in (('privado', 'comodo_do_empreendimento'), ('privado', 'pode_gravar_midia'), ('privado', 'empreendimento_tem_leads'), ('public', 'resumo_visitas'), ('public', 'salvar_comodos'))
   loop
     r := r || format(E'\n[FALHOU] função %s executável pela API (faltou revoke execute)', t);
   end loop;
   r := r || E'\n[OK] varredura de funções do public e do privado concluída';
 
+  -- salvar_comodos (#105): só o corretor logado (security invoker: o RLS decide).
+  r := r || format(E'\n[%s] salvar_comodos: corretor logado executa, anônimo não',
+    case when has_function_privilege('authenticated', 'public.salvar_comodos(uuid, jsonb)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.salvar_comodos(uuid, jsonb)', 'EXECUTE')
+      then 'OK' else 'FALHOU' end);
   -- resumo_visitas (#72) é liberada só para o corretor logado, nunca para o anônimo.
   r := r || format(E'
 [%s] resumo_visitas: corretor logado executa, anônimo não',
