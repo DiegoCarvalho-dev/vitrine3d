@@ -7,6 +7,7 @@ import { MathUtils, type Vector3 } from "three";
 
 import { blockingSegments, startPoint } from "@/lib/planta/collision";
 import { bounds } from "@/lib/planta/geometry";
+import { walkGrid } from "@/lib/planta/path";
 
 import { AdaptiveQuality } from "./adaptive-quality";
 
@@ -31,9 +32,25 @@ const TILT = MathUtils.degToRad(28); // from straight down
 
 export type ViewerRoom = ModelRoom & LabelRoom;
 
+type Touch = {
+  id: number;
+  x: number;
+  y: number;
+  startX: number;
+  startY: number;
+  at: number;
+};
+
 /** The look-drag ends only when ITS finger lifts. */
-function endLook(last: { current: { id: number } | null }, pointerId: number) {
+function endLook(last: { current: Touch | null }, pointerId: number) {
   if (last.current?.id === pointerId) last.current = null;
+}
+
+/** A quick touch that didn't move: a tap (walk there), not a look-drag. */
+function isTap(touch: Touch, x: number, y: number, now: number) {
+  return (
+    Math.hypot(x - touch.startX, y - touch.startY) < 10 && now - touch.at < 400
+  );
 }
 
 type ControlsLike = { target: Vector3; update: () => void };
@@ -121,6 +138,28 @@ export function UnitViewer({
   // Walk mode: the walls that block, where it starts, and the touch input.
   const walls = useMemo(() => blockingSegments(rooms, plan), [rooms, plan]);
   const start = useMemo(() => startPoint(rooms, plan), [rooms, plan]);
+  // Where the body fits, for "tap on the floor to walk there" (#108).
+  // Built only in the walk mode (the top view doesn't need it).
+  const grid = useMemo(
+    () =>
+      mode === "walk"
+        ? walkGrid(walls, {
+            x0: box.x0 - 0.2,
+            y0: box.y0 - 0.2,
+            x1: box.x1 + 0.2,
+            y1: box.y1 + 0.2,
+          })
+        : null,
+    [mode, walls, box.x0, box.y0, box.x1, box.y1],
+  );
+  const reducedMotion = useMemo(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
+  // The joystick is optional now (tapping walks): hidden behind a button.
+  const [joystick, setJoystick] = useState(false);
   const [walkInput] = useState(() => new WalkInput());
   const isTouch = useMemo(
     () =>
@@ -128,7 +167,7 @@ export function UnitViewer({
       window.matchMedia("(pointer: coarse)").matches,
     [],
   );
-  const lastTouch = useRef<{ id: number; x: number; y: number } | null>(null);
+  const lastTouch = useRef<Touch | null>(null);
   const walking = mode === "walk";
   // Lowered by AdaptiveQuality on a slow phone (kept across re-renders).
   const [dpr, setDpr] = useState<[number, number]>([1, 2]);
@@ -143,12 +182,16 @@ export function UnitViewer({
       data-mode={mode}
       // Phone, walk mode: dragging on the 3D looks around.
       onPointerDown={(event) => {
-        if (!walking || event.pointerType !== "touch") return;
+        // Finger or stylus (a mouse looks with the pointer lock instead).
+        if (!walking || event.pointerType === "mouse") return;
         if (lastTouch.current) return; // one finger looks; others are ignored
         lastTouch.current = {
           id: event.pointerId,
           x: event.clientX,
           y: event.clientY,
+          startX: event.clientX,
+          startY: event.clientY,
+          at: event.timeStamp,
         };
       }}
       onPointerMove={(event) => {
@@ -158,7 +201,23 @@ export function UnitViewer({
         walkInput.addLook(last.x - event.clientX, last.y - event.clientY);
         lastTouch.current = { ...last, x: event.clientX, y: event.clientY };
       }}
-      onPointerUp={(event) => endLook(lastTouch, event.pointerId)}
+      onPointerUp={(event) => {
+        const touch = lastTouch.current;
+        if (
+          walking &&
+          touch?.id === event.pointerId &&
+          isTap(touch, event.clientX, event.clientY, event.timeStamp)
+        ) {
+          // Screen spot -> -1..1 (y up), for the floor under the finger.
+          event.currentTarget.removeAttribute("data-walk-at");
+          const area = event.currentTarget.getBoundingClientRect();
+          walkInput.tap(
+            ((event.clientX - area.left) / area.width) * 2 - 1,
+            -(((event.clientY - area.top) / area.height) * 2 - 1),
+          );
+        }
+        endLook(lastTouch, event.pointerId);
+      }}
       onPointerCancel={(event) => endLook(lastTouch, event.pointerId)}
       // Focusable, so the walk keys work only while it has the focus.
       tabIndex={walking ? -1 : undefined}
@@ -190,12 +249,21 @@ export function UnitViewer({
           <hemisphereLight args={["#f4f6fa", "#b9b5ad", 1.8]} />
           <directionalLight position={[6, 12, 8]} intensity={1.8} />
           <UnitModel rooms={rooms} plan={plan} showCeiling={walking} />
-          {walking ? (
+          {walking && grid ? (
             <WalkControls
               walls={walls}
+              grid={grid}
               start={start}
               input={walkInput}
               keyTarget={frame}
+              reducedMotion={reducedMotion}
+              // Where a tap-to-walk ended (read by the e2e tests).
+              onArrive={(at) =>
+                frame.current?.setAttribute(
+                  "data-walk-at",
+                  at.map((n) => n.toFixed(2)).join(","),
+                )
+              }
             />
           ) : (
             <>
@@ -223,11 +291,29 @@ export function UnitViewer({
       )}
       {walking ? (
         <>
-          {isTouch && <WalkJoystick input={walkInput} />}
-          <p className="pointer-events-none absolute right-3 bottom-3 left-36 z-30 rounded-md bg-black/55 px-2.5 py-1.5 text-xs text-white sm:left-auto sm:max-w-sm">
+          {isTouch && joystick && <WalkJoystick input={walkInput} />}
+          {isTouch && (
+            <button
+              type="button"
+              aria-pressed={joystick}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => {
+                walkInput.setMove(0, 0);
+                setJoystick((on) => !on);
+              }}
+              className="absolute top-3 right-3 z-30 rounded-md bg-black/55 px-3 py-2 text-xs font-medium text-white"
+            >
+              {joystick ? "Esconder controle" : "Controle"}
+            </button>
+          )}
+          <p
+            className={`pointer-events-none absolute right-3 bottom-3 z-30 rounded-md bg-black/55 px-2.5 py-1.5 text-xs text-white sm:left-auto sm:max-w-sm ${joystick ? "left-36" : "left-3"}`}
+          >
             {isTouch
-              ? "Use o controle para andar e arraste a imagem para olhar."
-              : "Clique na imagem para olhar com o mouse. Ande com W A S D ou as setas. Esc solta o mouse."}
+              ? joystick
+                ? "Use o controle para andar e arraste a imagem para olhar."
+                : "Toque no chão para andar até lá. Arraste a imagem para olhar."
+              : "Clique na imagem para olhar com o mouse. Ande com W A S D ou as setas, ou clique de novo para ir até o chão logo abaixo do centro. Esc solta o mouse."}
           </p>
         </>
       ) : (

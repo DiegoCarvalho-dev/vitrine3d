@@ -114,8 +114,21 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     await expect(viewer.locator("canvas")).toBeVisible({ timeout: 30_000 });
     await expect(labels).toHaveCount(0);
     if (isMobile) {
-      // Arrasta o controle para a frente por meio segundo.
+      // Tocar no chão (#108): toque embaixo, no meio da imagem, anda até lá.
       const joystick = anon.getByTestId("walk-joystick");
+      await expect(joystick).toHaveCount(0); // o controle agora é opcional
+      await expect(viewer).toContainText("Toque no chão");
+      await viewer.scrollIntoViewIfNeeded(); // tocar dentro da tela
+      const area = (await viewer.boundingBox())!;
+      await anon.touchscreen.tap(
+        area.x + area.width / 2,
+        area.y + area.height * 0.8,
+      );
+      await expect(viewer).toHaveAttribute("data-walk-at", /^-?\d/, {
+        timeout: 10_000,
+      });
+      // O controle continua disponível, atrás de um botão.
+      await viewer.getByRole("button", { name: "Controle" }).click();
       await expect(joystick).toBeVisible();
       const box = (await joystick.boundingBox())!;
       await anon.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
