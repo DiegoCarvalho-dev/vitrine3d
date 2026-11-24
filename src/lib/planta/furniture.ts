@@ -204,12 +204,16 @@ type Room = {
 function wishList(type: RoomType, rect: Rect): FurnitureKind[] {
   const area = rect.width * rect.depth;
   const short = Math.min(rect.width, rect.depth);
-  const bedFor = short >= 2.6 && area >= 8.5 ? "cama-casal" : "cama-solteiro";
+  // A double bed when the room is big enough; if it doesn't fit (doors,
+  // windows), a single one (only one bed per room).
+  const beds: FurnitureKind[] =
+    short >= 2.6 && area >= 8.5
+      ? ["cama-casal", "cama-solteiro"]
+      : ["cama-solteiro"];
   switch (type) {
     case "quarto":
-      return [bedFor, ...(area >= 7 ? (["guarda-roupa"] as const) : [])];
     case "suite":
-      return ["cama-casal", "cama-solteiro", "guarda-roupa"];
+      return [...beds, ...(area >= 7 ? (["guarda-roupa"] as const) : [])];
     case "sala":
       return ["sofa", "rack", ...(area >= 14 ? (["mesa"] as const) : [])];
     case "cozinha":
@@ -243,6 +247,7 @@ export type FurniturePiece = {
 const GAP = 0.05; // between pieces
 const DOOR_CLEAR = 0.9; // free space in front of a door, on both sides
 const MAX_COVER = 0.45; // furniture never takes more than 45% of the room
+const PASSAGE = 0.7; // free in front of every piece: a person walks by
 
 const intersects = (a: Rect, b: Rect, pad = 0) =>
   a.x < b.x + b.width + pad &&
@@ -272,6 +277,14 @@ function doorZone(o: Opening): Rect {
 }
 
 type Side = { a: Point; b: Point; inward: Point };
+
+/** The strip of `depth` meters in front of a footprint (toward `inward`). */
+function frontOf(f: Rect, [nx, ny]: Point, depth: number): Rect {
+  if (nx > 0) return { x: f.x + f.width, y: f.y, width: depth, depth: f.depth };
+  if (nx < 0) return { x: f.x - depth, y: f.y, width: depth, depth: f.depth };
+  if (ny > 0) return { x: f.x, y: f.y + f.depth, width: f.width, depth };
+  return { x: f.x, y: f.y - depth, width: f.width, depth };
+}
 
 /** The four sides of the rect, each with the direction into the room. */
 function sidesOf(r: Rect): Side[] {
@@ -352,6 +365,12 @@ export function roomFurniture(
   room: Room,
   openings: readonly Opening[],
 ): FurniturePiece[] {
+  // Slanted walls: no furniture (a piece could poke through them).
+  const straight = room.points.every((p, i) => {
+    const q = room.points[(i + 1) % room.points.length];
+    return Math.abs(p[0] - q[0]) < 1e-9 || Math.abs(p[1] - q[1]) < 1e-9;
+  });
+  if (!straight) return [];
   const rects = rectsOf(room.points);
   if (!rects.length) return [];
   // The biggest rectangle of the room (an L uses its main part).
@@ -375,6 +394,8 @@ export function roomFurniture(
         Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]),
     );
   const placed: FurniturePiece[] = [];
+  /** The free strip in front of each placed piece (nobody puts anything there). */
+  const passages: Rect[] = [];
   let covered = 0;
   const wanted = wishList(room.type, rect);
   const done = new Set<string>(); // one bed per room (casal OR solteiro)
@@ -396,12 +417,15 @@ export function roomFurniture(
         side.a[1] + ((side.b[1] - side.a[1]) * d) / len,
       ];
       const fit = offsets
-        // Its back must lean on a real wall along its whole width.
-        .filter((offset) =>
-          [offset, offset + width / 2, offset + width].every((d) =>
-            onBoundary(room.points, along(d)),
-          ),
-        )
+        // Its back must lean on a real wall along its whole width (checked
+        // every 10 cm: never over a gap).
+        .filter((offset) => {
+          const samples = Math.max(2, Math.ceil(width / 0.1));
+          for (let i = 0; i <= samples; i++)
+            if (!onBoundary(room.points, along(offset + (width * i) / samples)))
+              return false;
+          return true;
+        })
         .map((offset) => pieceAt(room.id, kind, side, offset, width))
         .find((piece) => {
           const f = piece.footprint;
@@ -414,6 +438,19 @@ export function roomFurniture(
           if (zones.some((z) => intersects(f, z))) return false;
           if (placed.some((other) => intersects(f, other.footprint, GAP)))
             return false;
+          // Room to walk in front of it, and it never sits in front of another.
+          if (spec.blocks) {
+            const front = frontOf(f, side.inward, PASSAGE);
+            const frontInside =
+              front.x >= inner.x - 1e-6 &&
+              front.y >= inner.y - 1e-6 &&
+              front.x + front.width <= inner.x + inner.width + 1e-6 &&
+              front.y + front.depth <= inner.y + inner.depth + 1e-6;
+            if (!frontInside) return false;
+            if (placed.some((other) => intersects(front, other.footprint)))
+              return false;
+            if (passages.some((p) => intersects(f, p))) return false;
+          }
           // A tall piece never covers a window on its wall.
           const underWindow = windows.some(
             (w) =>
@@ -431,6 +468,8 @@ export function roomFurniture(
         });
       if (fit) {
         placed.push(fit);
+        if (fit.blocks)
+          passages.push(frontOf(fit.footprint, side.inward, PASSAGE));
         covered += fit.footprint.width * fit.footprint.depth;
         done.add(family);
         break;
