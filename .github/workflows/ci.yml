@@ -98,7 +98,9 @@ jobs:
   banco-e-navegador:
     name: banco e navegador
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Folga para quando o espelho de pacotes do Ubuntu fica lento (já levou
+    # 26 min só para instalar as dependências dos navegadores).
+    timeout-minutes: 45
     env:
       # Os testes falam com o banco local (tests/db-target.ts, rodar.mjs).
       SUPABASE_DB_LOCAL: "1"
@@ -122,8 +124,17 @@ jobs:
           version: 3.2.0
 
       # Só o que os testes usam: banco, login, API e storage.
+      # Às vezes a máquina do CI começa com uma porta ocupada: na falha,
+      # desliga o que subiu pela metade e tenta de novo uma vez.
       - name: Subir o Supabase local (migrations + seed)
-        run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy,realtime,supavisor,mailpit,postgres-meta
+        run: |
+          EXCLUIR=studio,edge-runtime,logflare,vector,imgproxy,realtime,supavisor,mailpit,postgres-meta
+          supabase start -x "$EXCLUIR" || {
+            echo "Primeira tentativa falhou; tentando de novo em 15 s..."
+            supabase stop --no-backup || true
+            sleep 15
+            supabase start -x "$EXCLUIR"
+          }
 
       # As chaves do Supabase LOCAL são de demonstração (iguais em todo
       # computador) e só valem dentro desta máquina descartável.
@@ -152,6 +163,7 @@ jobs:
 
       - name: Dependências de sistema dos navegadores
         if: steps.cache-navegadores.outputs.cache-hit == 'true'
+        timeout-minutes: 30
         run: npx playwright install-deps chromium webkit
 
       # Desktop e celular (iPhone 13), contra o site compilado (build + start).
