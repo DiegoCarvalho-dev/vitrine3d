@@ -15,6 +15,9 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { RoomType } from "@/lib/validacoes/comodo";
 import type { FloorPlan, Point } from "@/lib/validacoes/planta";
 import { unitOpenings } from "@/lib/planta/doors";
+import { planFurniture } from "@/lib/planta/furniture";
+
+import { Furniture } from "./furniture";
 import {
   buildWalls,
   WALL_THICKNESS,
@@ -122,7 +125,7 @@ export function buildUnitGeometry(
 
 export type ModelPlan = Pick<
   FloorPlan,
-  "portas" | "janelas" | "portas_definidas"
+  "portas" | "janelas" | "portas_definidas" | "moveis"
 >;
 
 export function UnitModel({
@@ -140,6 +143,7 @@ export function UnitModel({
     () => buildUnitGeometry(rooms, { ceiling: showCeiling, plan }),
     [rooms, showCeiling, plan],
   );
+  const furniture = useMemo(() => planFurniture(rooms, plan), [rooms, plan]);
   useEffect(
     () => () => {
       geometry.floor?.dispose();
@@ -161,6 +165,7 @@ export function UnitModel({
           <meshStandardMaterial vertexColors roughness={0.9} />
         </mesh>
       )}
+      <Furniture pieces={furniture} />
       {showCeiling && geometry.ceiling && (
         // Faces up, drawn from behind: visible from inside the room only.
         <mesh geometry={geometry.ceiling}>

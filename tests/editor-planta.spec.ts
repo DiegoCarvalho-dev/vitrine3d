@@ -217,6 +217,11 @@ test.describe("Editor visual da planta", () => {
     await page.getByRole("button", { name: "Desfazer" }).click();
     await expect(page.getByTestId("plan-closed")).toHaveCount(0);
 
+    // Móveis (#107): ligados por padrão; o corretor pode desligar.
+    const furniture = page.getByRole("checkbox", { name: /Mostrar móveis/ });
+    await expect(furniture).toBeChecked();
+    await furniture.click();
+
     await page.getByTestId("plan-save").click();
     await expect(page.getByText("Planta salva.")).toBeVisible({
       timeout: 15_000,
@@ -225,12 +230,19 @@ test.describe("Editor visual da planta", () => {
       portas: number;
       janelas: number;
       peitoril: number;
+      moveis: boolean;
     }>(
       `select jsonb_array_length(planta->'portas') as portas,
               jsonb_array_length(planta->'janelas') as janelas,
-              (planta->'janelas'->0->>'peitoril')::float8 as peitoril
+              (planta->'janelas'->0->>'peitoril')::float8 as peitoril,
+              (planta->>'moveis')::boolean as moveis
          from public.tipologias where id = '${typologyId}'`,
     );
-    expect(plan).toEqual({ portas: 2, janelas: 1, peitoril: 1 });
+    expect(plan).toEqual({
+      portas: 2,
+      janelas: 1,
+      peitoril: 1,
+      moveis: false,
+    });
   });
 });

@@ -51,6 +51,8 @@ export const floorPlanSchema = z.object({
   // true: the broker set the doors in the editor (#106), even if none; no
   // automatic doors then (only a bridge to a room nobody could reach).
   portas_definidas: z.boolean().optional(),
+  // Simple furniture in the 3D (#107); false turns it off (default: on).
+  moveis: z.boolean().optional(),
   portas: z.array(segmentSchema).max(200).default([]),
   janelas: z
     .array(

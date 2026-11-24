@@ -1,6 +1,7 @@
 import type { FloorPlan, Point } from "@/lib/validacoes/planta";
 
 import { type DoorRoom, unitOpenings } from "./doors";
+import { planFurniture } from "./furniture";
 import { isInside, labelPoint } from "./geometry";
 import { buildWalls, type Opening, WALL_THICKNESS, wallPieces } from "./walls";
 
@@ -38,17 +39,30 @@ function widen(opening: Opening): Opening {
  */
 export function blockingSegments(
   rooms: readonly DoorRoom[],
-  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas">,
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas" | "moveis">,
 ): Segment[] {
   const walls = buildWalls(rooms);
   const inside = walls.filter((wall) => wall.rooms.length === 2);
   const outside = walls.filter((wall) => wall.rooms.length === 1);
   const openings = unitOpenings(rooms, plan).map(widen);
+  // Furniture (#107) blocks too: its outline on the floor.
+  const furniture = planFurniture(rooms, plan)
+    .filter((piece) => piece.blocks)
+    .flatMap(({ footprint: f }): Segment[] => {
+      const corners: Point[] = [
+        [f.x, f.y],
+        [f.x + f.width, f.y],
+        [f.x + f.width, f.y + f.depth],
+        [f.x, f.y + f.depth],
+      ];
+      return corners.map((a, i) => ({ a, b: corners[(i + 1) % 4] }));
+    });
   return [
     ...wallPieces(inside, openings)
       .filter((piece) => piece.bottom < BODY_HEIGHT)
       .map(({ a, b }) => ({ a, b })),
     ...outside.map(({ a, b }) => ({ a, b })),
+    ...furniture,
   ];
 }
 
@@ -94,9 +108,30 @@ function nearestWall(p: Point, walls: readonly Segment[]): number {
   return Math.min(...walls.map((wall) => distanceToSegment(p, wall)));
 }
 
-/** The closest free spot to `p` (rings of 10 cm around it), or `p`. */
-function freeSpotNear(p: Point, walls: readonly Segment[]): Point {
-  if (!collides(p, walls)) return p;
+type Box = { x: number; y: number; width: number; depth: number };
+
+/** Inside a piece of furniture (with the body's clearance around it)? */
+const insideAny = (p: Point, boxes: readonly Box[]) =>
+  boxes.some(
+    (b) =>
+      p[0] > b.x - CLEARANCE &&
+      p[0] < b.x + b.width + CLEARANCE &&
+      p[1] > b.y - CLEARANCE &&
+      p[1] < b.y + b.depth + CLEARANCE,
+  );
+
+/**
+ * The closest free spot to `p` (rings of 10 cm around it), or `p`. Free =
+ * away from the walls AND not inside furniture (its outline alone would
+ * let a point deep inside a bed count as free).
+ */
+function freeSpotNear(
+  p: Point,
+  walls: readonly Segment[],
+  boxes: readonly Box[] = [],
+): Point {
+  const blocked = (q: Point) => collides(q, walls) || insideAny(q, boxes);
+  if (!blocked(p)) return p;
   for (let ring = 1; ring <= 15; ring++) {
     for (let i = 0; i < 16; i++) {
       const angle = (i / 16) * Math.PI * 2;
@@ -104,7 +139,7 @@ function freeSpotNear(p: Point, walls: readonly Segment[]): Point {
         p[0] + Math.cos(angle) * ring * 0.1,
         p[1] + Math.sin(angle) * ring * 0.1,
       ];
-      if (!collides(q, walls)) return q;
+      if (!blocked(q)) return q;
     }
   }
   return p;
@@ -117,10 +152,13 @@ function freeSpotNear(p: Point, walls: readonly Segment[]): Point {
  */
 export function startPoint(
   rooms: readonly DoorRoom[],
-  plan?: Pick<FloorPlan, "portas" | "janelas">,
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas" | "moveis">,
 ): { at: Point; facing: Point } {
   const exterior = buildWalls(rooms).filter((wall) => wall.rooms.length === 1);
   const walls = blockingSegments(rooms, plan);
+  const boxes = planFurniture(rooms, plan)
+    .filter((piece) => piece.blocks)
+    .map((piece) => piece.footprint);
   const doors = (plan?.portas ?? []).map((d) => ({ a: d.de, b: d.ate }));
   for (const door of doors) {
     const mid: Point = [
@@ -142,14 +180,14 @@ export function startPoint(
         mid[1] + normal[1] * 0.8,
       ];
       if (isInside(room.points, inward))
-        return { at: freeSpotNear(inward, walls), facing: normal };
+        return { at: freeSpotNear(inward, walls, boxes), facing: normal };
     }
   }
   const living =
     rooms.find((r) => r.type === "sala") ??
     rooms.find((r) => r.type === "outro") ??
     rooms[0];
-  const at = freeSpotNear(labelPoint(living.points), walls);
+  const at = freeSpotNear(labelPoint(living.points), walls, boxes);
   return { at, facing: widestView(at, walls) };
 }
 
