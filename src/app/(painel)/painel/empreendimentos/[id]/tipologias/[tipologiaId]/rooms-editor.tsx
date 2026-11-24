@@ -132,9 +132,10 @@ export function RoomsEditor(props: {
   const [tab, setTab] = useState<"desenhar" | "medidas">("desenhar");
   const [dirty, setDirty] = useState(false);
   // After a save the page brings the new rooms: the editor starts over from them.
+  const { plan } = props;
   const signature = useMemo(
     () =>
-      JSON.stringify(
+      JSON.stringify([
         rooms.map((r) => [
           r.id,
           r.points,
@@ -143,8 +144,9 @@ export function RoomsEditor(props: {
           r.description,
           r.ceilingHeight,
         ]),
-      ),
-    [rooms],
+        plan ?? null,
+      ]),
+    [rooms, plan],
   );
 
   return (
@@ -183,6 +185,7 @@ export function RoomsEditor(props: {
           <FloorPlanEditor
             key={signature}
             rooms={rooms}
+            plan={plan}
             onDirtyChange={setDirty}
             onSave={async (input) => {
               const result = await savePlan(projectId, typologyId, input);

@@ -4,7 +4,12 @@ import { overlapPairs } from "@/lib/planta/editor";
 import { rectToPolygon } from "@/lib/planta/geometry";
 
 import { parseMeters } from "./numero";
-import { pointSchema, polygonArea, roomGeometrySchema } from "./planta";
+import {
+  floorPlanSchema,
+  pointSchema,
+  polygonArea,
+  roomGeometrySchema,
+} from "./planta";
 
 // Room (cômodo) form, issue #32. Until the visual editor (Sprint 8) a room is
 // a rectangle typed in meters: corner (x, y) from the bottom-left of the unit,
@@ -144,6 +149,8 @@ export const planSaveSchema = z
   .object({
     rooms: planRoomsSchema,
     removed: z.array(z.uuid()).max(60),
+    // Doors and windows (#106); absent: tipologias.planta stays as it is.
+    plan: floorPlanSchema.optional(),
   })
   .refine(
     ({ rooms, removed }) =>

@@ -48,6 +48,9 @@ const segmentSchema = z.object({ de: pointSchema, ate: pointSchema });
 /** tipologias.planta (extra elements besides the rooms) */
 export const floorPlanSchema = z.object({
   versao: z.literal(1),
+  // true: the broker set the doors in the editor (#106), even if none; no
+  // automatic doors then (only a bridge to a room nobody could reach).
+  portas_definidas: z.boolean().optional(),
   portas: z.array(segmentSchema).max(200).default([]),
   janelas: z
     .array(

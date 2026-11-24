@@ -131,6 +131,8 @@ export function planDoors(
   rooms: readonly DoorRoom[],
   saved: readonly { de: Point; ate: Point }[] = [],
   passages: readonly Door[] = [],
+  /** The broker set the doors (#106): no automatic ones, even with none saved. */
+  defined = false,
 ): Door[] {
   const allRuns = sharedRuns(rooms);
   const walls = buildWalls(rooms);
@@ -162,7 +164,7 @@ export function planDoors(
       .join("|");
   const longestFirst = (a: Run, b: Run) => b.length - a.length;
 
-  if (!kept.length) {
+  if (!kept.length && !defined) {
     // 1. Bathrooms: one door, to the preferred neighbor.
     for (const room of rooms.filter((r) => r.type === "banheiro")) {
       if (hasDoor(room)) continue;
@@ -265,7 +267,7 @@ export function onSegment(a: Point, b: Point, p: Point): boolean {
  */
 export function unitOpenings(
   rooms: readonly DoorRoom[],
-  plan?: Pick<FloorPlan, "portas" | "janelas">,
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas">,
 ): Opening[] {
   const windows: Opening[] = (plan?.janelas ?? []).map((w) => ({
     a: w.de,
@@ -275,11 +277,13 @@ export function unitOpenings(
   }));
   const glassDoors = windows.filter((w) => w.bottom === 0);
   return [
-    ...planDoors(rooms, plan?.portas, glassDoors).map((door) => ({
-      ...door,
-      bottom: 0,
-      top: DOOR_HEIGHT,
-    })),
+    ...planDoors(rooms, plan?.portas, glassDoors, plan?.portas_definidas).map(
+      (door) => ({
+        ...door,
+        bottom: 0,
+        top: DOOR_HEIGHT,
+      }),
+    ),
     ...windows,
   ];
 }

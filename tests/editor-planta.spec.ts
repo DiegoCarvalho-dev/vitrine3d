@@ -70,7 +70,7 @@ test.describe("Editor visual da planta", () => {
     await expect(panel.getByLabel("Nome")).toHaveValue("Sala");
 
     // 2) Quarto ao lado. No celular: dois toques (um em cada canto).
-    await page.getByRole("button", { name: "Desenhar cômodo" }).click();
+    await page.getByRole("button", { name: "Cômodo", exact: true }).click();
     if (testInfo.project.use.hasTouch) {
       // Cada posição calculada na hora: o 1º toque dá foco à grade e a
       // página pode rolar um pouco.
@@ -157,5 +157,80 @@ test.describe("Editor visual da planta", () => {
         `select count(*)::int as n from public.comodos where tipologia_id = '${typologyId}'`,
       )[0].n,
     ).toBe(3);
+  });
+
+  test("portas e janelas: põe, recusa janela interna, tira, desfaz e salva", async ({
+    page,
+  }, testInfo) => {
+    const id = await createBuilding(
+      page,
+      `Aberturas ${Date.now()} ${testInfo.project.name}`,
+    );
+    runSql(
+      `insert into public.tipologias (empreendimento_id, nome, quartos) values ('${id}', 'Tipo P', 1)`,
+    );
+    const [{ id: typologyId }] = querySql<{ id: string }>(
+      `select id from public.tipologias where empreendimento_id = '${id}'`,
+    );
+    // Sala 0..4 × 0..3 e quarto 4..7 × 0..3 (parede comum em x = 4).
+    runSql(
+      `insert into public.comodos (tipologia_id, nome, tipo, geometria, area_m2, ordem) values
+        ('${typologyId}', 'Sala', 'sala', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}', 12, 0),
+        ('${typologyId}', 'Quarto', 'quarto', '{"tipo":"poligono","pontos":[[4,0],[7,0],[7,3],[4,3]],"pe_direito":2.7}', 9, 1)`,
+    );
+    await page.goto(`/painel/empreendimentos/${id}/tipologias/${typologyId}`);
+    await expect(page.getByTestId("plan-editor")).toBeVisible({
+      timeout: 30_000,
+    });
+    const openings = page.getByTestId("plan-opening");
+    const tap = async (at: Meters) => {
+      const p = await screenOf(page, at);
+      await page.mouse.click(p.x, p.y);
+    };
+
+    // A porta automática (a mesma do tour) já vem editável.
+    await expect(openings).toHaveCount(1);
+    await expect(openings.first()).toHaveAttribute("data-kind", "porta");
+
+    // Janela na parede entre sala e quarto: recusada, com o motivo.
+    await page.getByRole("button", { name: "Janela", exact: true }).click();
+    await tap([4, 2.5]);
+    await expect(page.getByTestId("plan-hint")).toContainText("parede externa");
+    // Janela na parede de fora do quarto: entra.
+    await tap([7, 1.5]);
+    await expect(openings.filter({ has: page.locator("line") })).toHaveCount(2);
+    await expect(page.getByTestId("plan-opening-panel")).toBeVisible();
+
+    // Porta de entrada na parede de baixo da sala.
+    await page.getByRole("button", { name: "Porta", exact: true }).click();
+    await tap([2, 0]);
+    await expect(openings).toHaveCount(3);
+
+    // Tirar a porta entre os cômodos: o quarto fica sem porta (aviso); desfazer.
+    const inner = await screenOf(page, [4, 1.5]);
+    await page.mouse.click(inner.x, inner.y);
+    await page
+      .getByTestId("plan-opening-panel")
+      .getByRole("button", { name: "Tirar da planta" })
+      .click();
+    await expect(page.getByTestId("plan-closed")).toContainText("Quarto");
+    await page.getByRole("button", { name: "Desfazer" }).click();
+    await expect(page.getByTestId("plan-closed")).toHaveCount(0);
+
+    await page.getByTestId("plan-save").click();
+    await expect(page.getByText("Planta salva.")).toBeVisible({
+      timeout: 15_000,
+    });
+    const [plan] = querySql<{
+      portas: number;
+      janelas: number;
+      peitoril: number;
+    }>(
+      `select jsonb_array_length(planta->'portas') as portas,
+              jsonb_array_length(planta->'janelas') as janelas,
+              (planta->'janelas'->0->>'peitoril')::float8 as peitoril
+         from public.tipologias where id = '${typologyId}'`,
+    );
+    expect(plan).toEqual({ portas: 2, janelas: 1, peitoril: 1 });
   });
 });
