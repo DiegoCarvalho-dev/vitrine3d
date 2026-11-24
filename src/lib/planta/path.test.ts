@@ -54,6 +54,12 @@ describe("tocar no chão para andar (#108)", () => {
     ).toBe(true);
   });
 
+  it("grade de planta enorme cabe no limite, sem pedaço inalcançável", () => {
+    const big = walkGrid([], { x0: 0, y0: 0, x1: 120, y1: 120 });
+    expect(big.cols * big.rows).toBeLessThanOrEqual(250_000);
+    expect(big.free.every((f) => f === 1)).toBe(true);
+  });
+
   it("toque fora do apartamento: vai até o ponto alcançável mais perto", () => {
     const path = findPath(grid, walls, [1, 1.5], [-3, 1.5]);
     const end = path.at(-1)!;

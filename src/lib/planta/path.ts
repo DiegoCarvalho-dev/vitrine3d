@@ -13,6 +13,8 @@ const MAX_CELLS = 250_000; // a 100 × 100 m plan at 20 cm is the ceiling
 export type WalkGrid = {
   x0: number;
   y0: number;
+  /** Cell side, meters (20 cm; bigger only on a huge plan). */
+  cell: number;
   cols: number;
   rows: number;
   /** 1 = the body fits there. */
@@ -24,29 +26,31 @@ export function walkGrid(
   walls: readonly Segment[],
   bounds: { x0: number; y0: number; x1: number; y1: number },
 ): WalkGrid {
-  const cols = Math.max(1, Math.ceil((bounds.x1 - bounds.x0) / CELL));
-  const rows = Math.max(1, Math.ceil((bounds.y1 - bounds.y0) / CELL));
-  const free = new Uint8Array(Math.min(cols * rows, MAX_CELLS));
+  const width = Math.max(bounds.x1 - bounds.x0, CELL);
+  const height = Math.max(bounds.y1 - bounds.y0, CELL);
+  // Bigger cells on a huge plan, so the whole plan always fits the limit.
+  const cell = Math.max(CELL, Math.sqrt((width * height) / MAX_CELLS));
+  const cols = Math.max(1, Math.ceil(width / cell));
+  const rows = Math.max(1, Math.ceil(height / cell));
+  const free = new Uint8Array(cols * rows);
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {
-      const i = r * cols + c;
-      if (i >= free.length) break;
       const p: Point = [
-        bounds.x0 + (c + 0.5) * CELL,
-        bounds.y0 + (r + 0.5) * CELL,
+        bounds.x0 + (c + 0.5) * cell,
+        bounds.y0 + (r + 0.5) * cell,
       ];
-      free[i] = collides(p, walls) ? 0 : 1;
+      free[r * cols + c] = collides(p, walls) ? 0 : 1;
     }
-  return { x0: bounds.x0, y0: bounds.y0, cols, rows, free };
+  return { x0: bounds.x0, y0: bounds.y0, cell, cols, rows, free };
 }
 
 const cellOf = (g: WalkGrid, [x, y]: Point): [number, number] => [
-  Math.min(g.cols - 1, Math.max(0, Math.floor((x - g.x0) / CELL))),
-  Math.min(g.rows - 1, Math.max(0, Math.floor((y - g.y0) / CELL))),
+  Math.min(g.cols - 1, Math.max(0, Math.floor((x - g.x0) / g.cell))),
+  Math.min(g.rows - 1, Math.max(0, Math.floor((y - g.y0) / g.cell))),
 ];
 const centerOf = (g: WalkGrid, c: number, r: number): Point => [
-  g.x0 + (c + 0.5) * CELL,
-  g.y0 + (r + 0.5) * CELL,
+  g.x0 + (c + 0.5) * g.cell,
+  g.y0 + (r + 0.5) * g.cell,
 ];
 
 /** Is the straight line from a to b walkable (checked every 10 cm)? */
@@ -118,6 +122,8 @@ export function findPath(
       queue.push(n);
     }
   }
+  // Nothing closer than where the visitor already is: stay put.
+  if (best === index(sc, sr) && bestDistance > 0) return [];
   // Back from the best cell to the start.
   const cells: Point[] = [];
   for (let i = best; i >= 0; i = previous[i]) {

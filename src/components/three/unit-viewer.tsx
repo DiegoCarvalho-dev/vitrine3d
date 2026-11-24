@@ -139,15 +139,18 @@ export function UnitViewer({
   const walls = useMemo(() => blockingSegments(rooms, plan), [rooms, plan]);
   const start = useMemo(() => startPoint(rooms, plan), [rooms, plan]);
   // Where the body fits, for "tap on the floor to walk there" (#108).
+  // Built only in the walk mode (the top view doesn't need it).
   const grid = useMemo(
     () =>
-      walkGrid(walls, {
-        x0: box.x0 - 0.2,
-        y0: box.y0 - 0.2,
-        x1: box.x1 + 0.2,
-        y1: box.y1 + 0.2,
-      }),
-    [walls, box.x0, box.y0, box.x1, box.y1],
+      mode === "walk"
+        ? walkGrid(walls, {
+            x0: box.x0 - 0.2,
+            y0: box.y0 - 0.2,
+            x1: box.x1 + 0.2,
+            y1: box.y1 + 0.2,
+          })
+        : null,
+    [mode, walls, box.x0, box.y0, box.x1, box.y1],
   );
   const reducedMotion = useMemo(
     () =>
@@ -179,7 +182,8 @@ export function UnitViewer({
       data-mode={mode}
       // Phone, walk mode: dragging on the 3D looks around.
       onPointerDown={(event) => {
-        if (!walking || event.pointerType !== "touch") return;
+        // Finger or stylus (a mouse looks with the pointer lock instead).
+        if (!walking || event.pointerType === "mouse") return;
         if (lastTouch.current) return; // one finger looks; others are ignored
         lastTouch.current = {
           id: event.pointerId,
@@ -205,6 +209,7 @@ export function UnitViewer({
           isTap(touch, event.clientX, event.clientY, event.timeStamp)
         ) {
           // Screen spot -> -1..1 (y up), for the floor under the finger.
+          event.currentTarget.removeAttribute("data-walk-at");
           const area = event.currentTarget.getBoundingClientRect();
           walkInput.tap(
             ((event.clientX - area.left) / area.width) * 2 - 1,
@@ -244,7 +249,7 @@ export function UnitViewer({
           <hemisphereLight args={["#f4f6fa", "#b9b5ad", 1.8]} />
           <directionalLight position={[6, 12, 8]} intensity={1.8} />
           <UnitModel rooms={rooms} plan={plan} showCeiling={walking} />
-          {walking ? (
+          {walking && grid ? (
             <WalkControls
               walls={walls}
               grid={grid}
@@ -308,7 +313,7 @@ export function UnitViewer({
               ? joystick
                 ? "Use o controle para andar e arraste a imagem para olhar."
                 : "Toque no chão para andar até lá. Arraste a imagem para olhar."
-              : "Clique na imagem para olhar com o mouse. Ande com W A S D ou as setas; clique de novo para ir até o ponto do centro. Esc solta o mouse."}
+              : "Clique na imagem para olhar com o mouse. Ande com W A S D ou as setas, ou clique de novo para ir até o chão logo abaixo do centro. Esc solta o mouse."}
           </p>
         </>
       ) : (

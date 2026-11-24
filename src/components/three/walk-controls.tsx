@@ -13,7 +13,12 @@ import {
   Vector3,
 } from "three";
 
-import { EYE_HEIGHT, type Segment, step } from "@/lib/planta/collision";
+import {
+  EYE_HEIGHT,
+  rayDistance,
+  type Segment,
+  step,
+} from "@/lib/planta/collision";
 import { findPath, type WalkGrid } from "@/lib/planta/path";
 import type { Point } from "@/lib/validacoes/planta";
 
@@ -30,6 +35,10 @@ const FLOOR = new Plane(new Vector3(0, 1, 0), 0);
 const RAY = new Raycaster();
 const NDC = new Vector2();
 const HIT = new Vector3();
+/** Stop this far in front of a wall or furniture that hides the tapped spot. */
+const STOP_BEFORE = 0.4;
+/** Desktop: a click aims a little below the center (the view starts level). */
+export const CENTER_TAP: [number, number] = [0, -0.35];
 const LOOK_SPEED = 0.0025; // radians per pixel
 const MAX_PITCH = 1.2; // ~70° up or down
 
@@ -204,9 +213,10 @@ export function WalkControls({
   useEffect(() => {
     const lock = (event: PointerEvent) => {
       if (event.pointerType !== "mouse") return;
-      // Already looking with the mouse: the click walks to the center spot.
+      // Already looking with the mouse: the click walks to the spot a
+      // little below the center of the view.
       if (document.pointerLockElement === canvas) {
-        input.tap(0, 0);
+        input.tap(...CENTER_TAP);
         return;
       }
       // Chrome refuses (and rejects the promise) right after Esc.
@@ -239,7 +249,19 @@ export function WalkControls({
     if (tap) {
       RAY.setFromCamera(NDC.set(tap[0], tap[1]), camera);
       if (RAY.ray.intersectPlane(FLOOR, HIT)) {
-        const target: Point = [HIT.x, -HIT.z];
+        let target: Point = [HIT.x, -HIT.z];
+        // The floor spot may be behind a wall or furniture that was tapped
+        // (the floor plane goes under everything): then walk only up to it.
+        const [x, y] = position.current;
+        const far = Math.hypot(target[0] - x, target[1] - y);
+        if (far > 1e-6) {
+          const dir: Point = [(target[0] - x) / far, (target[1] - y) / far];
+          const blocked = rayDistance(position.current, dir, walls);
+          if (blocked < far) {
+            const reach = Math.max(0, blocked - STOP_BEFORE);
+            target = [x + dir[0] * reach, y + dir[1] * reach];
+          }
+        }
         route.current = findPath(grid, walls, position.current, target);
         if (reducedMotion && route.current.length) {
           position.current = route.current.at(-1)!;

@@ -124,7 +124,7 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
         area.x + area.width / 2,
         area.y + area.height * 0.8,
       );
-      await expect(viewer).toHaveAttribute("data-walk-at", /^\d/, {
+      await expect(viewer).toHaveAttribute("data-walk-at", /^-?\d/, {
         timeout: 10_000,
       });
       // O controle continua disponível, atrás de um botão.
