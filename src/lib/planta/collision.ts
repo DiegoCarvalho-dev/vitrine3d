@@ -38,7 +38,7 @@ function widen(opening: Opening): Opening {
  */
 export function blockingSegments(
   rooms: readonly DoorRoom[],
-  plan?: Pick<FloorPlan, "portas" | "janelas">,
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas">,
 ): Segment[] {
   const walls = buildWalls(rooms);
   const inside = walls.filter((wall) => wall.rooms.length === 2);

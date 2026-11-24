@@ -6,6 +6,7 @@ import {
   type DraftOpening,
   nearestWall,
   openingsFromPlan,
+  overlappingOpenings,
   placeOnWall,
   planFromOpenings,
   planProblem,
@@ -120,6 +121,49 @@ describe("portas e janelas no editor (#106)", () => {
       { de: [7, 1], ate: [7, 2], peitoril: 1, altura: 1.2 },
     ]);
     expect(planProblem(rooms, plan)).toBeNull();
+  });
+
+  it("planta sem portas por escolha continua sem portas (só a ponte de acesso)", () => {
+    // Sala + quarto ligados por uma porta de vidro: sem a porta comum.
+    const glass = {
+      de: [4, 0.5],
+      ate: [4, 2.5],
+      peitoril: 0,
+      altura: 2.1,
+    } as const;
+    const plan = {
+      portas: [],
+      janelas: [{ ...glass, de: [...glass.de], ate: [...glass.ate] }],
+      portas_definidas: true,
+    } as Parameters<typeof openingsFromPlan>[1];
+    const openings = openingsFromPlan(rooms, plan);
+    expect(openings.filter((o) => o.kind === "porta")).toHaveLength(0);
+    // Sem a marca (planta antiga): portas automáticas.
+    expect(
+      openingsFromPlan(rooms, { portas: [], janelas: [] }).filter(
+        (o) => o.kind === "porta",
+      ),
+    ).toHaveLength(1);
+    expect(planFromOpenings(rooms, []).plan.portas_definidas).toBe(true);
+  });
+
+  it("duas peças no mesmo lugar são recusadas", () => {
+    expect(
+      overlappingOpenings([
+        { key: "a", a: [4, 1], b: [4, 1.8] },
+        { key: "b", a: [4, 1.5], b: [4, 2.3] },
+        { key: "c", a: [4, 2.4], b: [4, 2.9] }, // encostada: tudo bem
+      ]),
+    ).toEqual(new Set(["a", "b"]));
+    expect(
+      planProblem(rooms, {
+        portas: [
+          { de: [4, 1], ate: [4, 1.8] },
+          { de: [4, 1.2], ate: [4, 2] },
+        ],
+        janelas: [],
+      }),
+    ).toContain("mesmo lugar");
   });
 
   it("o servidor recusa porta fora da parede e janela em parede interna", () => {

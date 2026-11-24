@@ -188,7 +188,7 @@ export const newOpeningKey = () => `abertura-${++openingCounter}`;
  */
 export function openingsFromPlan(
   rooms: readonly DoorRoom[],
-  plan?: Pick<FloorPlan, "portas" | "janelas">,
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas">,
 ): DraftOpening[] {
   const windows: DraftOpening[] = (plan?.janelas ?? []).map((w) => ({
     key: newOpeningKey(),
@@ -201,9 +201,10 @@ export function openingsFromPlan(
   const glass = windows
     .filter((w) => w.kind === "vidro")
     .map((w) => ({ a: w.a, b: w.b }));
-  const doors = plan?.portas.length
-    ? plan.portas.map((d) => ({ a: d.de, b: d.ate }))
-    : planDoors(rooms, [], glass);
+  const doors =
+    plan?.portas_definidas || plan?.portas.length
+      ? plan.portas.map((d) => ({ a: d.de, b: d.ate }))
+      : planDoors(rooms, [], glass);
   return [
     ...doors.map((d): DraftOpening => ({
       key: newOpeningKey(),
@@ -223,13 +224,11 @@ export function planFromOpenings(
   openings: readonly DraftOpening[],
 ): { plan: FloorPlan; dropped: number } {
   const walls = buildWalls(rooms);
-  const kept = openings.filter((o) => {
-    const wall = wallOf(walls, o);
-    return wall && !wallRule(o.kind, wall);
-  });
+  const kept = openings.filter((o) => openingState(walls, o) === "ok");
   return {
     plan: {
       versao: 1,
+      portas_definidas: true,
       portas: kept
         .filter((o) => o.kind === "porta")
         .map((o) => ({ de: o.a, ate: o.b })),
@@ -246,9 +245,47 @@ export function planFromOpenings(
   };
 }
 
+/** Is the opening fine where it is? "off" = off the walls or not allowed there. */
+export function openingState(
+  walls: readonly WallSegment[],
+  o: DraftOpening,
+): "ok" | "off" {
+  const wall = wallOf(walls, o);
+  return wall && !wallRule(o.kind, wall) ? "ok" : "off";
+}
+
+/** Keys of the openings that overlap another one on the same wall. */
+export function overlappingOpenings(
+  openings: readonly { key: string; a: Point; b: Point }[],
+): Set<string> {
+  const hits = new Set<string>();
+  for (let i = 0; i < openings.length; i++)
+    for (let j = i + 1; j < openings.length; j++) {
+      const p = openings[i];
+      const q = openings[j];
+      // Same line: q's ends on p's line (not necessarily inside p).
+      const dx = p.b[0] - p.a[0];
+      const dy = p.b[1] - p.a[1];
+      const len = Math.hypot(dx, dy);
+      if (!len) continue;
+      const off = (r: Point) =>
+        Math.abs((r[0] - p.a[0]) * dy - (r[1] - p.a[1]) * dx) / len;
+      if (off(q.a) > EPS || off(q.b) > EPS) continue;
+      const t = (r: Point) =>
+        ((r[0] - p.a[0]) * dx + (r[1] - p.a[1]) * dy) / len;
+      const [q0, q1] = [t(q.a), t(q.b)].sort((x, y) => x - y);
+      if (Math.min(len, q1) - Math.max(0, q0) > 0.01) {
+        hits.add(p.key);
+        hits.add(q.key);
+      }
+    }
+  return hits;
+}
+
 /**
  * Server check of a plan against the rooms it goes with: every door and
- * window on a wall, windows (not glass doors) only on exterior walls.
+ * window on a wall, windows (not glass doors) only on exterior walls, and
+ * no two of them in the same place.
  */
 export function planProblem(
   rooms: readonly Room[],
@@ -264,5 +301,11 @@ export function planProblem(
     const rule = wallRule(w.peitoril === 0 ? "vidro" : "janela", wall);
     if (rule) return rule;
   }
+  const all = [
+    ...plan.portas.map((d, i) => ({ key: `p${i}`, a: d.de, b: d.ate })),
+    ...plan.janelas.map((w, i) => ({ key: `j${i}`, a: w.de, b: w.ate })),
+  ];
+  if (overlappingOpenings(all).size)
+    return "Há duas portas ou janelas no mesmo lugar. Afaste uma delas.";
   return null;
 }

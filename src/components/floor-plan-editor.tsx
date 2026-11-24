@@ -54,7 +54,9 @@ import {
   OPENING_DEFAULTS,
   OPENING_WIDTHS,
   type OpeningKind,
+  openingState,
   openingsFromPlan,
+  overlappingOpenings,
   placeOnWall,
   planFromOpenings,
   slideOpening,
@@ -237,7 +239,9 @@ type Drag =
   | { kind: "draw"; start: Point; current: Point }
   | { kind: "move"; key: string; origin: Point; current: Point }
   | { kind: "resize"; key: string; handle: Handle; current: Point }
-  | { kind: "slide"; key: string; current: Point };
+  | { kind: "slide"; key: string; origin: Point; current: Point }
+  /** Door/window tool: a tap places it; a drag (scrolling) doesn't. */
+  | { kind: "tap"; start: Point; current: Point };
 
 const PAD = 0.6; // meters of margin around the grid
 const ZOOMS = [1, 1.5, 2, 3] as const;
@@ -278,7 +282,7 @@ function toInput(rooms: DraftRoom[]): PlanRoomInput[] {
 
 /** The rooms as they look right now, with the drag in progress applied. */
 function applyDrag(rooms: DraftRoom[], drag: Drag | null): DraftRoom[] {
-  if (!drag || drag.kind === "draw" || drag.kind === "slide") return rooms;
+  if (!drag || (drag.kind !== "move" && drag.kind !== "resize")) return rooms;
   return rooms.map((room) => {
     if (room.key !== drag.key) return room;
     if (drag.kind === "move")
@@ -323,7 +327,7 @@ export function FloorPlanEditor({
 }: {
   rooms: PlanEditorRoom[];
   /** Saved doors and windows (tipologias.planta); none: automatic doors. */
-  plan?: Pick<FloorPlan, "portas" | "janelas">;
+  plan?: Pick<FloorPlan, "portas" | "janelas" | "portas_definidas">;
   /** Saves the whole plan; returns an error message, or null when saved. */
   onSave: (plan: PlanSaveInput) => Promise<string | null>;
   onDirtyChange?: (dirty: boolean) => void;
@@ -354,11 +358,9 @@ export function FloorPlanEditor({
   const rooms = applyDrag(state.rooms, drag);
   const walls = useMemo(() => wallsOf(asWallRooms(rooms)), [rooms]);
   // Openings as they look now: the one being dragged, or carried by a room.
-  const openings = state.openings.map((o) => {
-    if (drag?.kind === "slide" && drag.key === o.key)
-      return slideOpening(walls, o, drag.current);
-    return o;
-  });
+  const openings = state.openings.map((o) =>
+    drag?.kind === "slide" && drag.key === o.key ? slid(o, drag) : o,
+  );
   const movingRoom =
     drag?.kind === "move"
       ? state.rooms.find((r) => r.key === drag.key)
@@ -383,6 +385,7 @@ export function FloorPlanEditor({
   const drawnRect =
     drag?.kind === "draw" ? rectFromCorners(drag.start, drag.current) : null;
   const overlaps = overlapPairs(rooms);
+  const stacked = overlappingOpenings(shownOpenings);
   const overlapping = new Set(overlaps.flatMap(([a, b]) => [a.key, b.key]));
 
   // What would be saved, and what the page loaded (to know if it changed).
@@ -418,7 +421,8 @@ export function FloorPlanEditor({
   const invalidKey =
     problemIndex !== null ? state.rooms[problemIndex]?.key : null;
 
-  // Rooms nobody can walk into (the tour then opens an automatic door).
+  // Rooms nobody can walk into: the tour opens a door to them when it can
+  // (a stretch of shared wall of 0,9 m or more); otherwise they stay closed.
   const hub =
     state.rooms.find((r) => r.type === "sala" || r.type === "outro") ??
     state.rooms[0];
@@ -432,8 +436,23 @@ export function FloorPlanEditor({
     hub && state.rooms.length > 1
       ? roomsReachable(wallRooms, doorsForReach, hub.key)
       : null;
+  const glassForReach = doorsForReach.slice(openingsPlan.portas.length);
+  const reachedInTour =
+    hub && state.rooms.length > 1
+      ? roomsReachable(
+          wallRooms,
+          [
+            ...planDoors(wallRooms, openingsPlan.portas, glassForReach, true),
+            ...glassForReach,
+          ],
+          hub.key,
+        )
+      : null;
   const closedRooms = reached
     ? state.rooms.filter((r) => !reached.has(r.key)).map((r) => r.name)
+    : [];
+  const lockedRooms = reachedInTour
+    ? state.rooms.filter((r) => !reachedInTour.has(r.key)).map((r) => r.name)
     : [];
 
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
@@ -492,6 +511,21 @@ export function FloorPlanEditor({
     setDrag(next);
   }
 
+  /** The dragged opening: moved by how far the pointer went (not to it). */
+  function slid(
+    o: DraftOpening,
+    d: { origin: Point; current: Point },
+  ): DraftOpening {
+    const dx = d.current[0] - d.origin[0];
+    const dy = d.current[1] - d.origin[1];
+    if (Math.hypot(dx, dy) < 0.05) return o; // a tap only selects it
+    const center: Point = [
+      (o.a[0] + o.b[0]) / 2 + dx,
+      (o.a[1] + o.b[1]) / 2 + dy,
+    ];
+    return slideOpening(walls, o, center);
+  }
+
   function placeOpening(point: Point) {
     const kind: OpeningKind = tool === "door" ? "porta" : "janela";
     const wall = nearestWall(walls, point, wallReach);
@@ -508,6 +542,14 @@ export function FloorPlanEditor({
     const placed = placeOnWall(wall, point, defaults.width);
     if (!placed) {
       setHint("Esta parede é curta demais.");
+      return;
+    }
+    if (
+      overlappingOpenings([...state.openings, { key: "nova", ...placed }]).has(
+        "nova",
+      )
+    ) {
+      setHint("Já tem uma porta ou janela aqui. Toque em outro ponto.");
       return;
     }
     setHint(null);
@@ -532,8 +574,8 @@ export function FloorPlanEditor({
       return;
     }
     if (tool === "door" || tool === "window") {
-      event.preventDefault();
-      if (point) placeOpening(point);
+      // Placed on release, if the finger didn't move (a swipe scrolls).
+      if (point) setDrag({ kind: "tap", start: point, current: point });
       return;
     }
     dispatch({ type: "select", key: null });
@@ -559,9 +601,15 @@ export function FloorPlanEditor({
       } else {
         setCorner([snap(point[0]), snap(point[1])]);
       }
+    } else if (drag.kind === "tap") {
+      if (
+        Math.hypot(point[0] - drag.start[0], point[1] - drag.start[1]) <
+        wallReach
+      )
+        placeOpening(drag.start);
     } else if (drag.kind === "slide") {
       const before = state.openings.find((o) => o.key === drag.key);
-      const after = before && slideOpening(walls, before, point);
+      const after = before && slid(before, { ...drag, current: point });
       if (before && after && JSON.stringify(after) !== JSON.stringify(before))
         dispatch({ type: "setOpening", opening: after });
     } else {
@@ -680,6 +728,9 @@ export function FloorPlanEditor({
   }
 
   function suggestDoors() {
+    // Only the doors between rooms are redone; the entrance door stays.
+    const isInterior = (o: DraftOpening) =>
+      (wallOf(walls, o)?.rooms.length ?? 0) > 1;
     const glass = state.openings
       .filter((o) => o.kind === "vidro")
       .map((o) => ({ a: o.a, b: o.b }));
@@ -693,7 +744,10 @@ export function FloorPlanEditor({
     }));
     dispatch({
       type: "setOpenings",
-      openings: [...state.openings.filter((o) => o.kind !== "porta"), ...doors],
+      openings: [
+        ...state.openings.filter((o) => o.kind !== "porta" || !isInterior(o)),
+        ...doors,
+      ],
     });
     setHint(
       doors.length
@@ -921,7 +975,8 @@ export function FloorPlanEditor({
           {/* Doors (amber) and windows (blue; glass doors dashed). */}
           {shownOpenings.map((o) => {
             const isSelected = o.key === state.selected;
-            const offWall = !wallOf(walls, o);
+            const offWall =
+              openingState(walls, o) === "off" || stacked.has(o.key);
             return (
               <g
                 key={o.key}
@@ -939,6 +994,7 @@ export function FloorPlanEditor({
                     startDrag(event, {
                       kind: "slide",
                       key: o.key,
+                      origin: point,
                       current: point,
                     });
                 }}
@@ -1074,15 +1130,32 @@ export function FloorPlanEditor({
             : `${dropped} portas ou janelas ficaram fora das paredes (em vermelho) e saem ao salvar.`}
         </p>
       )}
-      {closedRooms.length > 0 && (
+      {stacked.size > 0 && (
+        <p role="alert" className="text-sm text-destructive">
+          Há duas portas ou janelas no mesmo lugar (em vermelho). Afaste uma
+          delas antes de salvar.
+        </p>
+      )}
+      {lockedRooms.length > 0 ? (
         <p
           role="status"
-          className="text-sm text-muted-foreground"
+          className="text-sm text-amber-800"
           data-testid="plan-closed"
         >
-          Sem porta: {closedRooms.join(", ")}. No tour, uma porta automática é
-          aberta para dar acesso.
+          Sem acesso: {lockedRooms.join(", ")}. Ponha uma porta, senão o
+          visitante não entra nesse cômodo no tour.
         </p>
+      ) : (
+        closedRooms.length > 0 && (
+          <p
+            role="status"
+            className="text-sm text-muted-foreground"
+            data-testid="plan-closed"
+          >
+            Sem porta: {closedRooms.join(", ")}. No tour, uma porta automática é
+            aberta para dar acesso.
+          </p>
+        )
       )}
 
       {selected && (
@@ -1141,7 +1214,7 @@ export function FloorPlanEditor({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={save}
-          disabled={!dirty || pending || Boolean(problem)}
+          disabled={!dirty || pending || Boolean(problem) || stacked.size > 0}
           data-testid="plan-save"
         >
           {pending ? "Salvando…" : "Salvar planta"}

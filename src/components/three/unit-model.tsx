@@ -120,7 +120,10 @@ export function buildUnitGeometry(
   };
 }
 
-export type ModelPlan = Pick<FloorPlan, "portas" | "janelas">;
+export type ModelPlan = Pick<
+  FloorPlan,
+  "portas" | "janelas" | "portas_definidas"
+>;
 
 export function UnitModel({
   rooms,
