@@ -28,6 +28,7 @@ describe("editor visual da planta (#105)", () => {
     });
     expect(rectFromCorners([1, 1], [1.02, 1.03])).toBeNull();
     expect(rectFromCorners([0, 0], [0.4, 3])).toBeNull(); // lado < 0,5 m
+    expect(rectFromCorners([0, 0], [0.5, 1])).toBeNull(); // 0,5 m²: pequeno demais
   });
 
   it("move encaixado e nunca sai da área da planta", () => {
@@ -60,6 +61,9 @@ describe("editor visual da planta (#105)", () => {
       width: 0.5,
       depth: 3,
     });
+    // Encolher até 0,5 m² ou menos: a bolinha para onde estava.
+    const small = { x: 0, y: 0, width: 1, depth: 1 };
+    expect(resizeRect(small, "e", [0.5, 0])).toEqual(small);
     expect(handlePoint(rect, "n")).toEqual([2, 3]);
     expect(handlePoint(rect, "sw")).toEqual([0, 0]);
   });
@@ -88,6 +92,39 @@ describe("editor visual da planta (#105)", () => {
       room("fora-do-L", 12.5, 2.5, 1, 1), // no recorte do L: não sobrepõe
     ]);
     expect([...hits].sort()).toEqual(["banho", "quarto"]);
+  });
+
+  it("dois cômodos em L encaixados não contam como sobrepostos", () => {
+    // Cozinha em L e área de serviço em L, uma no recorte da outra.
+    const cozinha = {
+      key: "cozinha",
+      points: [
+        [0, 0],
+        [4, 0],
+        [4, 2],
+        [2, 2],
+        [2, 4],
+        [0, 4],
+      ] as [number, number][],
+    };
+    const servico = {
+      key: "servico",
+      points: [
+        [4, 0],
+        [6, 0],
+        [6, 4],
+        [2, 4],
+        [2, 2],
+        [4, 2],
+      ] as [number, number][],
+    };
+    expect(overlappingKeys([cozinha, servico]).size).toBe(0);
+    // Mas se uma invade a outra, conta.
+    const invade = {
+      ...servico,
+      points: servico.points.map(([x, y]) => [x - 0.5, y] as [number, number]),
+    };
+    expect(overlappingKeys([cozinha, invade]).size).toBe(2);
   });
 
   it("sugere um nome livre", () => {

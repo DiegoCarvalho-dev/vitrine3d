@@ -38,6 +38,8 @@ import {
 } from "@/lib/planta/geometry";
 import {
   type PlanRoomInput,
+  type PlanSaveInput,
+  planSaveSchema,
   ROOM_TYPES,
   type RoomType,
 } from "@/lib/validacoes/comodo";
@@ -170,13 +172,16 @@ const toDraft = (room: PlanEditorRoom): DraftRoom => ({
   points: room.points,
 });
 
-/** What the server receives (and what "unsaved changes" compares). */
+/**
+ * What the server receives (and what "unsaved changes" compares): trimmed
+ * like the server stores it, so a trailing space doesn't stay "unsaved".
+ */
 function toInput(rooms: DraftRoom[]): PlanRoomInput[] {
   return rooms.map((room) => ({
     id: room.id,
-    name: room.name,
+    name: room.name.trim(),
     type: room.type,
-    description: room.description,
+    description: room.description.trim(),
     ceilingHeight: room.ceilingHeight,
     points: room.points,
   }));
@@ -216,7 +221,7 @@ export function FloorPlanEditor({
 }: {
   rooms: PlanEditorRoom[];
   /** Saves the whole plan; returns an error message, or null when saved. */
-  onSave: (rooms: PlanRoomInput[]) => Promise<string | null>;
+  onSave: (plan: PlanSaveInput) => Promise<string | null>;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({
@@ -247,6 +252,18 @@ export function FloorPlanEditor({
     [initialRooms],
   );
   const dirty = JSON.stringify(toInput(state.rooms)) !== initialSignature;
+  // The rooms the broker took out: only these are deleted when saving.
+  const removed = initialRooms
+    .map((room) => room.id)
+    .filter((id) => !state.rooms.some((room) => room.id === id));
+  const plan: PlanSaveInput = { rooms: toInput(state.rooms), removed };
+  // Same Zod rules as the server (name, area, overlaps), checked here first.
+  const check = planSaveSchema.safeParse(plan);
+  const problem = check.success ? null : check.error.issues[0];
+  const problemIndex =
+    problem && typeof problem.path[1] === "number" ? problem.path[1] : null;
+  const invalidKey =
+    problemIndex !== null ? state.rooms[problemIndex]?.key : null;
   useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
   // Leaving the page with unsaved changes: the browser asks first.
   useEffect(() => {
@@ -288,6 +305,9 @@ export function FloorPlanEditor({
   function startDrag(event: React.PointerEvent, next: Drag) {
     event.preventDefault();
     event.stopPropagation();
+    // preventDefault also stops the focus: give it back, so the arrows work
+    // right after a click (without scrolling the page).
+    svgRef.current?.focus({ preventScroll: true });
     svgRef.current?.setPointerCapture(event.pointerId);
     setDrag(next);
   }
@@ -410,7 +430,7 @@ export function FloorPlanEditor({
   function save() {
     startTransition(async () => {
       try {
-        const error = await onSave(toInput(state.rooms));
+        const error = await onSave(plan);
         if (error) toast.error(error);
         else toast.success("Planta salva.");
       } catch {
@@ -532,7 +552,8 @@ export function FloorPlanEditor({
           </g>
           {rooms.map((room) => {
             const isSelected = room.key === state.selected;
-            const isOverlap = overlapping.has(room.key);
+            const isOverlap =
+              overlapping.has(room.key) || room.key === invalidKey;
             const [lx, ly] = labelPoint(room.points);
             return (
               <g
@@ -543,6 +564,8 @@ export function FloorPlanEditor({
                 className={drawing ? "" : "cursor-move"}
                 onPointerDown={(event) => {
                   if (drawing) return; // let the background draw
+                  // Never reaches the background (it would unselect).
+                  event.stopPropagation();
                   dispatch({ type: "select", key: room.key });
                   const point = toPlan(event);
                   if (point)
@@ -661,7 +684,7 @@ export function FloorPlanEditor({
         </svg>
       </div>
 
-      {overlaps.length > 0 && (
+      {overlaps.length > 0 ? (
         <p
           role="alert"
           className="text-sm text-destructive"
@@ -670,6 +693,19 @@ export function FloorPlanEditor({
           “{overlaps[0][0].name}” e “{overlaps[0][1].name}” estão um em cima do
           outro. Ajuste antes de salvar.
         </p>
+      ) : (
+        problem &&
+        dirty && (
+          <p
+            role="alert"
+            className="text-sm text-destructive"
+            data-testid="plan-problem"
+          >
+            {problem.code === "invalid_type"
+              ? "Confira os cômodos da planta."
+              : problem.message}
+          </p>
+        )
       )}
 
       {selected && (
@@ -686,7 +722,7 @@ export function FloorPlanEditor({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={save}
-          disabled={!dirty || pending || overlaps.length > 0}
+          disabled={!dirty || pending || Boolean(problem)}
           data-testid="plan-save"
         >
           {pending ? "Salvando…" : "Salvar planta"}

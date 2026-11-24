@@ -106,8 +106,9 @@ export function rectGeometry(r: z.output<typeof roomRectSchema>) {
 
 /**
  * The whole plan from the visual editor (issue #105), saved at once: rooms
- * with an id are updated, without id are created, missing ones are deleted.
- * Same rules as the form: name, type, 0,5 m² minimum, no overlaps.
+ * with an id are updated, without id are created, and the ids in `removed`
+ * (the rooms the broker took out) are deleted. Nothing else is touched.
+ * Same rules as the form: name, type, more than 0,5 m², no overlaps.
  */
 export const planRoomSchema = roomDetailsSchema.extend({
   id: z.uuid().nullable(),
@@ -116,7 +117,7 @@ export const planRoomSchema = roomDetailsSchema.extend({
 });
 export type PlanRoomInput = z.input<typeof planRoomSchema>;
 
-export const planSaveSchema = z
+export const planRoomsSchema = z
   .array(planRoomSchema)
   .max(60, "No máximo 60 cômodos por tipologia.")
   .superRefine((rooms, ctx) => {
@@ -138,3 +139,15 @@ export const planSaveSchema = z
         message: `“${pair[0].name}” e “${pair[1].name}” estão um em cima do outro. Ajuste antes de salvar.`,
       });
   });
+
+export const planSaveSchema = z
+  .object({
+    rooms: planRoomsSchema,
+    removed: z.array(z.uuid()).max(60),
+  })
+  .refine(
+    ({ rooms, removed }) =>
+      !rooms.some((room) => room.id && removed.includes(room.id)),
+    { message: "Cômodo repetido na planta." },
+  );
+export type PlanSaveInput = z.input<typeof planSaveSchema>;

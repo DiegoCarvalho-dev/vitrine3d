@@ -1,9 +1,4 @@
-import {
-  overlapArea,
-  polygonToRect,
-  type Rect,
-  rectToPolygon,
-} from "@/lib/planta/geometry";
+import { overlapArea, type Rect, rectToPolygon } from "@/lib/planta/geometry";
 import type { Point } from "@/lib/validacoes/planta";
 
 // Pure logic of the visual floor plan editor (issue #105): snapping to the
@@ -14,6 +9,8 @@ import type { Point } from "@/lib/validacoes/planta";
 export const SNAP = 0.1;
 /** Smallest room side (same rule as the form: 0,5 m). */
 export const MIN_SIDE = 0.5;
+/** A room needs MORE than 0,5 m² (same rule as the stored plan). */
+export const MIN_AREA = 0.5;
 /** The plan never goes past 100 m (same as the stored format). */
 export const MAX_COORD = 100;
 
@@ -36,6 +33,7 @@ export function rectFromCorners(a: Point, b: Point): Rect | null {
   const y0 = snap(Math.min(a[1], b[1]));
   const y1 = snap(Math.max(a[1], b[1]));
   if (x1 - x0 < MIN_SIDE - 1e-9 || y1 - y0 < MIN_SIDE - 1e-9) return null;
+  if ((x1 - x0) * (y1 - y0) <= MIN_AREA + 1e-9) return null;
   return { x: x0, y: y0, width: round3(x1 - x0), depth: round3(y1 - y0) };
 }
 
@@ -95,6 +93,8 @@ export function resizeRect(rect: Rect, handle: Handle, [x, y]: Point): Rect {
   if (handle.includes("e")) x1 = Math.max(snap(x), round3(x0 + MIN_SIDE));
   if (handle.includes("s")) y0 = Math.min(snap(y), round3(y1 - MIN_SIDE));
   if (handle.includes("n")) y1 = Math.max(snap(y), round3(y0 + MIN_SIDE));
+  // Too small to be a room (0,5 m²): the handle stops where it was.
+  if ((x1 - x0) * (y1 - y0) <= MIN_AREA + 1e-9) return rect;
   return { x: x0, y: y0, width: round3(x1 - x0), depth: round3(y1 - y0) };
 }
 
@@ -102,10 +102,49 @@ export function resizeRect(rect: Rect, handle: Handle, [x, y]: Point): Rect {
 const OVERLAP_TOLERANCE_M2 = 0.0001;
 
 /**
- * Pairs of rooms that overlap. Checked whenever one of the pair is a
- * rectangle (the editor only draws rectangles; two old L-shaped rooms are
- * compared by the bounding box of one of them, a safe approximation).
+ * A room as rectangles: an axis-aligned polygon (rectangle, L, U…) is cut in
+ * vertical strips, each one a rectangle. Other shapes (slanted walls): their
+ * bounding box, a safe approximation.
  */
+export function rectsOf(points: readonly Point[]): Rect[] {
+  const axisAligned = points.every((p, i) => {
+    const q = points[(i + 1) % points.length];
+    return Math.abs(p[0] - q[0]) < 1e-9 || Math.abs(p[1] - q[1]) < 1e-9;
+  });
+  if (!axisAligned) return [boundsRect(points)];
+  const xs = [...new Set(points.map((p) => p[0]))].sort((a, b) => a - b);
+  const rects: Rect[] = [];
+  for (let i = 0; i + 1 < xs.length; i++) {
+    const mid = (xs[i] + xs[i + 1]) / 2;
+    // Where the vertical line x = mid crosses the horizontal edges.
+    const ys: number[] = [];
+    for (let k = 0; k < points.length; k++) {
+      const [x1, y1] = points[k];
+      const [x2, y2] = points[(k + 1) % points.length];
+      if (y1 === y2 && Math.min(x1, x2) < mid && mid < Math.max(x1, x2))
+        ys.push(y1);
+    }
+    ys.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < ys.length; k += 2)
+      rects.push({
+        x: xs[i],
+        y: ys[k],
+        width: xs[i + 1] - xs[i],
+        depth: ys[k + 1] - ys[k],
+      });
+  }
+  return rects;
+}
+
+/** Overlapping area (m²) of two rooms of any shape the editor handles. */
+export function roomsOverlapArea(
+  a: readonly Point[],
+  b: readonly Point[],
+): number {
+  return rectsOf(b).reduce((sum, rect) => sum + overlapArea(a, rect), 0);
+}
+
+/** Pairs of rooms that overlap (any shape: L-shaped rooms included). */
 export function overlapPairs<T extends { points: readonly Point[] }>(
   rooms: readonly T[],
 ): [T, T][] {
@@ -114,14 +153,8 @@ export function overlapPairs<T extends { points: readonly Point[] }>(
     for (let j = i + 1; j < rooms.length; j++) {
       const a = rooms[i];
       const b = rooms[j];
-      const rectA = polygonToRect(a.points);
-      const rectB = polygonToRect(b.points);
-      const area = rectA
-        ? overlapArea(b.points, rectA)
-        : rectB
-          ? overlapArea(a.points, rectB)
-          : overlapArea(a.points, boundsRect(b.points));
-      if (area > OVERLAP_TOLERANCE_M2) pairs.push([a, b]);
+      if (roomsOverlapArea(a.points, b.points) > OVERLAP_TOLERANCE_M2)
+        pairs.push([a, b]);
     }
   }
   return pairs;

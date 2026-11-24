@@ -235,9 +235,9 @@ export async function moveRoom(
 /**
  * Saves the whole plan drawn in the visual editor (issue #105) at once, in a
  * single database transaction (public.salvar_comodos): rooms with an id are
- * updated, without id are created, and rooms missing from the list are
- * deleted. Zod checks every room and the overlaps; the database checks the
- * owner (RLS + the function's own check).
+ * updated, without id are created, and only the rooms the broker took out
+ * (`removed`) are deleted. Zod checks every room and the overlaps; the
+ * database checks the owner (RLS + the function's own check).
  */
 export async function savePlan(
   rawProjectId: unknown,
@@ -257,14 +257,33 @@ export async function savePlan(
     };
   }
 
+  const stale = {
+    error:
+      "A planta mudou em outra aba. Recarregue a página e desenhe de novo.",
+  };
+  const stored = await listRooms(loaded.typology.id);
+  const existing = new Set(stored.map((room) => room.id));
+  const { rooms: drawn, removed } = parsed.data;
   // Every id sent must be a room of THIS typology (never another one's).
-  const existing = new Set(
-    (await listRooms(loaded.typology.id)).map((room) => room.id),
+  if (
+    drawn.some((room) => room.id && !existing.has(room.id)) ||
+    removed.some((id) => !existing.has(id))
+  )
+    return stale;
+  // A room the editor never saw (created in another tab since the page
+  // opened) would be left out of the overlap check: refuse instead.
+  const known = new Set([
+    ...drawn.flatMap((room) => (room.id ? [room.id] : [])),
+    ...removed,
+  ]);
+  const unseen = stored.some(
+    (room) =>
+      !known.has(room.id) &&
+      roomGeometrySchema.safeParse(room.geometria).success,
   );
-  if (parsed.data.some((room) => room.id && !existing.has(room.id)))
-    return { error: "A planta mudou em outra aba. Recarregue a página." };
+  if (unseen) return stale;
 
-  const rooms = parsed.data.map((room) => {
+  const rooms = drawn.map((room) => {
     const geometry = roomGeometrySchema.parse({
       tipo: "poligono",
       pontos: room.points,
@@ -284,6 +303,7 @@ export async function savePlan(
   const { error } = await supabase.rpc("salvar_comodos", {
     p_tipologia_id: loaded.typology.id,
     p_comodos: rooms,
+    p_remover: removed,
   });
   if (error)
     return { error: "Não foi possível salvar a planta. Tente de novo." };

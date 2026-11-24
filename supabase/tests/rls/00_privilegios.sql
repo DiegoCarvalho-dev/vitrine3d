@@ -108,8 +108,8 @@ begin
 
   -- salvar_comodos (#105): só o corretor logado (security invoker: o RLS decide).
   r := r || format(E'\n[%s] salvar_comodos: corretor logado executa, anônimo não',
-    case when has_function_privilege('authenticated', 'public.salvar_comodos(uuid, jsonb)', 'EXECUTE')
-          and not has_function_privilege('anon', 'public.salvar_comodos(uuid, jsonb)', 'EXECUTE')
+    case when has_function_privilege('authenticated', 'public.salvar_comodos(uuid, jsonb, uuid[], jsonb)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.salvar_comodos(uuid, jsonb, uuid[], jsonb)', 'EXECUTE')
       then 'OK' else 'FALHOU' end);
   -- resumo_visitas (#72) é liberada só para o corretor logado, nunca para o anônimo.
   r := r || format(E'

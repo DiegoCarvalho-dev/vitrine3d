@@ -138,5 +138,24 @@ test.describe("Editor visual da planta", () => {
     // Depois de salvar, a aba "Medidas" mostra os mesmos cômodos.
     await page.getByRole("tab", { name: "Medidas" }).click();
     await expect(page.getByTestId("room-item")).toHaveCount(2);
+
+    // 6) Outra aba criou um cômodo: salvar a planta antiga NÃO apaga ele.
+    runSql(
+      `insert into public.comodos (tipologia_id, nome, tipo, geometria, area_m2)
+       values ('${typologyId}', 'Banheiro outra aba', 'banheiro',
+         '{"tipo":"poligono","pontos":[[8,0],[10,0],[10,2],[8,2]],"pe_direito":2.7}', 4)`,
+    );
+    await page.getByRole("tab", { name: "Desenhar" }).click();
+    await page.getByTestId("plan-room").filter({ hasText: "Sala" }).click();
+    await page.keyboard.press("ArrowUp"); // sobe a sala 10 cm
+    await page.getByTestId("plan-save").click();
+    await expect(page.getByText("A planta mudou em outra aba")).toBeVisible({
+      timeout: 15_000,
+    });
+    expect(
+      querySql<{ n: number }>(
+        `select count(*)::int as n from public.comodos where tipologia_id = '${typologyId}'`,
+      )[0].n,
+    ).toBe(3);
   });
 });

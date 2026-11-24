@@ -90,7 +90,7 @@ begin
 
   -- Salvar a planta inteira (#105): B não mexe na planta de A (nem apaga tudo).
   begin
-    perform public.salvar_comodos(tip_a, '[]'::jsonb);
+    perform public.salvar_comodos(tip_a, '[]'::jsonb, array[sala_a]);
     r := r || E'\n[FALHOU] B salvou (apagou) a planta de A';
   exception when insufficient_privilege then
     r := r || E'\n[OK] B NÃO salva a planta de uma tipologia de A';
@@ -138,7 +138,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
 
   begin
-    perform public.salvar_comodos(tip_a, '[]'::jsonb);
+    perform public.salvar_comodos(tip_a, '[]'::jsonb, array[sala_a]);
     r := r || E'\n[FALHOU] visitante chamou salvar_comodos';
   exception when insufficient_privilege then
     r := r || E'\n[OK] visitante NÃO chama salvar_comodos';
@@ -225,13 +225,29 @@ begin
   select count(*) into n from public.comodos where id = sala_a and nome = 'Sala ampla';
   r := r || format(E'\n[%s] ... e nada mudou (a sala manteve o nome)', case when n = 1 then 'OK' else 'FALHOU' end);
 
-  -- Cômodo que saiu da lista é apagado.
+  -- Cômodo fora da lista e NÃO pedido para remover continua (outra aba, dado antigo).
   perform public.salvar_comodos(tip_a, jsonb_build_array(
     jsonb_build_object('id', sala_a, 'nome', 'Sala ampla', 'tipo', 'sala', 'area_m2', 12,
       'geometria', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}'::jsonb)
   ));
   select count(*) into n from public.comodos where tipologia_id = tip_a;
-  r := r || format(E'\n[%s] cômodo que saiu da planta é apagado (%s)', case when n = 1 then 'OK' else 'FALHOU' end, n);
+  r := r || format(E'\n[%s] cômodo fora da lista e não removido continua (%s)', case when n = 2 then 'OK' else 'FALHOU' end, n);
+
+  -- Só o que foi pedido em p_remover é apagado; as portas vão na mesma transação.
+  perform public.salvar_comodos(tip_a, jsonb_build_array(
+      jsonb_build_object('id', sala_a, 'nome', 'Sala ampla', 'tipo', 'sala', 'area_m2', 12,
+        'geometria', '{"tipo":"poligono","pontos":[[0,0],[4,0],[4,3],[0,3]],"pe_direito":2.7}'::jsonb)),
+    (select array_agg(id) from public.comodos where tipologia_id = tip_a and id <> sala_a),
+    '{"versao":1,"portas":[{"de":[4,1],"ate":[4,1.8]}],"janelas":[]}'::jsonb);
+  select count(*) into n from public.comodos where tipologia_id = tip_a;
+  r := r || format(E'\n[%s] cômodo pedido em p_remover é apagado (%s)', case when n = 1 then 'OK' else 'FALHOU' end, n);
+  select count(*) into n from public.tipologias where id = tip_a and planta->'portas'->0->>'ate' is not null;
+  r := r || format(E'\n[%s] ... e as portas são salvas na mesma transação', case when n = 1 then 'OK' else 'FALHOU' end);
+  -- Pedir para remover cômodo de OUTRA tipologia não apaga nada dela.
+  perform public.salvar_comodos(tip_a, '[]'::jsonb,
+    (select array_agg(id) from public.comodos where tipologia_id = tip_rasc));
+  select count(*) into n from public.comodos where tipologia_id = tip_rasc;
+  r := r || format(E'\n[%s] p_remover não apaga cômodo de outra tipologia (%s)', case when n = 1 then 'OK' else 'FALHOU' end, n);
 
   delete from public.tipologias where id = tip_a;
   select count(*) into n from public.unidades where id in (uni_oculta, uni_visivel) and tipologia_id is null;

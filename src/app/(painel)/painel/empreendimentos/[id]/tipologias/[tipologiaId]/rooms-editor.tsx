@@ -133,7 +133,17 @@ export function RoomsEditor(props: {
   const [dirty, setDirty] = useState(false);
   // After a save the page brings the new rooms: the editor starts over from them.
   const signature = useMemo(
-    () => JSON.stringify(rooms.map((r) => [r.id, r.points, r.name, r.type])),
+    () =>
+      JSON.stringify(
+        rooms.map((r) => [
+          r.id,
+          r.points,
+          r.name,
+          r.type,
+          r.description,
+          r.ceilingHeight,
+        ]),
+      ),
     [rooms],
   );
 
