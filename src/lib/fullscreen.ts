@@ -61,6 +61,9 @@ export function useFullscreen(ref: RefObject<HTMLElement | null>) {
   const [real, setReal] = useState(false);
   const [pseudo, setPseudo] = useState(false);
 
+  // Leaving the page: the phone must not stay locked in landscape.
+  useEffect(() => unlockOrientation, []);
+
   // The browser's own full screen starts and ends (button, Esc, back).
   useEffect(() => {
     const onChange = () => {
@@ -79,8 +82,11 @@ export function useFullscreen(ref: RefObject<HTMLElement | null>) {
     if (!pseudo) return;
     lockPageScroll(true);
     const close = () => setPseudo(false);
+    // Esc takes our history entry away too (like the Sair button does).
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key !== "Escape") return;
+      if (window.history.state?.[HISTORY_MARK]) window.history.back();
+      else close();
     };
     window.addEventListener("popstate", close);
     window.addEventListener("keydown", onKey);
@@ -112,8 +118,11 @@ export function useFullscreen(ref: RefObject<HTMLElement | null>) {
   }, [ref]);
 
   const exit = useCallback(() => {
-    if (document.fullscreenElement)
-      void document.exitFullscreen().catch(() => {});
+    if (document.fullscreenElement) {
+      unlockOrientation();
+      // If the browser refuses to leave, don't leave the visitor stuck.
+      document.exitFullscreen().catch(() => setReal(false));
+    }
     if (pseudo) {
       // Leaving through "back" also takes our history entry away.
       if (window.history.state?.[HISTORY_MARK]) window.history.back();

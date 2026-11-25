@@ -2,7 +2,7 @@
 
 import { Maximize, RotateCw } from "lucide-react";
 import dynamic from "next/dynamic";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { ModelPlan } from "@/components/three/unit-model";
 import type { ViewerRoom, ViewMode } from "@/components/three/unit-viewer";
@@ -56,6 +56,28 @@ export function UnitTour({
   const fullscreen = useFullscreen(frame);
   const touch = useMediaQuery("(pointer: coarse)");
   const portrait = useMediaQuery("(orientation: portrait)");
+  // "Turn the phone" hint: a few seconds, not a permanent cover.
+  const [hintOn, setHintOn] = useState(false);
+  useEffect(() => {
+    if (!hintOn) return;
+    const timer = setTimeout(() => setHintOn(false), 5000);
+    return () => clearTimeout(timer);
+  }, [hintOn]);
+  // Focus goes to "Sair" on entering and back to "Tela cheia" on leaving.
+  const exitButton = useRef<HTMLButtonElement>(null);
+  const openButton = useRef<HTMLButtonElement>(null);
+  const wasActive = useRef(false);
+  const { active } = fullscreen;
+  useEffect(() => {
+    if (active) exitButton.current?.focus({ preventScroll: true });
+    else if (wasActive.current)
+      openButton.current?.focus({ preventScroll: true });
+    wasActive.current = active;
+  }, [active]);
+  function enterFullscreen() {
+    setHintOn(true);
+    void fullscreen.enter();
+  }
   const selected = rooms.find((room) => room.id === selectedId) ?? null;
 
   /** Opens (or closes) a room's description; opening is a visit event. */
@@ -107,7 +129,11 @@ export function UnitTour({
               </Button>
             )}
             {touch && (
-              <Button variant="outline" onClick={fullscreen.enter}>
+              <Button
+                ref={openButton}
+                variant="outline"
+                onClick={enterFullscreen}
+              >
                 <Maximize aria-hidden />
                 Tela cheia
               </Button>
@@ -125,6 +151,12 @@ export function UnitTour({
               }
               data-testid="unit-3d"
               data-fullscreen={fullscreen.kind ?? "no"}
+              // Covering the screen, it acts as a dialog for assistive tech.
+              role={fullscreen.active ? "dialog" : undefined}
+              aria-modal={fullscreen.active ? true : undefined}
+              aria-label={
+                fullscreen.active ? "Unidade em tela cheia" : undefined
+              }
             >
               <UnitViewer
                 rooms={rooms}
@@ -138,6 +170,7 @@ export function UnitTour({
                 <div className="absolute top-3 left-3 z-40 flex flex-col items-start gap-2">
                   <div className="flex gap-2">
                     <Button
+                      ref={exitButton}
                       size="sm"
                       variant="secondary"
                       onClick={fullscreen.exit}
@@ -167,7 +200,7 @@ export function UnitTour({
                   Imagem ilustrativa
                 </span>
               )}
-              {fullscreen.active && touch && portrait && (
+              {fullscreen.active && hintOn && portrait && (
                 <p
                   role="status"
                   data-testid="rotate-hint"
