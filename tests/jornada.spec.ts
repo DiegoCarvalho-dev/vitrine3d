@@ -65,18 +65,39 @@ test.describe("Jornada completa", () => {
       anon.getByRole("heading", { level: 1, name: "Unidade 101" }),
     ).toBeVisible({ timeout: 30_000 });
 
-    // Caminhar por dentro (sem WebGL no navegador do teste, fica a planta 2D).
-    const walk = anon.getByRole("button", { name: "Caminhar por dentro" });
-    const walked = await walk
+    // A unidade abre por dentro (#110); sem WebGL no navegador, planta 2D.
+    const inside = anon.locator('[data-mode="walk"]');
+    const walked = await inside
+      .locator("canvas")
       .waitFor({ timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
     if (walked) {
-      await walk.click();
-      await expect(
-        anon.locator('[data-mode="walk"]').locator("canvas"),
-      ).toBeVisible({ timeout: 30_000 });
-      await anon.waitForTimeout(1_000);
+      // Dar uns passos ("caminhou" conta só quando a pessoa anda de verdade).
+      await inside.scrollIntoViewIfNeeded();
+      const area = (await inside.boundingBox())!;
+      if (isMobile) {
+        await anon.touchscreen.tap(
+          area.x + area.width / 2,
+          area.y + area.height * 0.8,
+        );
+        await expect(inside).toHaveAttribute("data-walk-at", /^-?\d/, {
+          timeout: 10_000,
+        });
+      } else {
+        await expect(inside).toHaveAttribute("data-walk-ready", "true");
+        const walkedEvent = anon.waitForRequest(
+          (r) =>
+            r.url().includes("/api/eventos") &&
+            (r.postData() ?? "").includes('"caminhou"'),
+          { timeout: 10_000 },
+        );
+        await inside.focus();
+        await anon.keyboard.down("KeyW");
+        await anon.waitForTimeout(1_500);
+        await anon.keyboard.up("KeyW");
+        await walkedEvent; // a real step counts as "caminhou"
+      }
       await anon
         .getByRole("button", { name: "Voltar à vista de cima" })
         .click();

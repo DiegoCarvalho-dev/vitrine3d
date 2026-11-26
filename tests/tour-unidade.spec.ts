@@ -80,6 +80,9 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     await expect(anon.getByTestId("unit-3d").locator("canvas")).toBeVisible({
       timeout: 30_000,
     });
+    // A unidade abre por dentro (#110); a vista de cima fica a um toque.
+    await expect(anon.locator('[data-mode="walk"]')).toBeVisible();
+    await anon.getByRole("button", { name: "Voltar à vista de cima" }).click();
 
     // Vista de cima (#50): etiqueta por cômodo; tocar mostra a descrição.
     const labels = anon.getByTestId("room-label");
@@ -138,9 +141,20 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
       await anon.mouse.up();
     } else {
       await expect(viewer).toContainText("W A S D");
+      // The canvas appears before the walk listens to the keys.
+      await expect(viewer).toHaveAttribute("data-walk-ready", "true");
+      // Long enough for a few frames even with software 3D (CI): a real
+      // step is what counts as "caminhou" (#110).
+      const walkedEvent = anon.waitForRequest(
+        (r) =>
+          r.url().includes("/api/eventos") &&
+          (r.postData() ?? "").includes('"caminhou"'),
+        { timeout: 10_000 },
+      );
       await anon.keyboard.down("KeyW");
-      await anon.waitForTimeout(500);
+      await anon.waitForTimeout(1_500);
       await anon.keyboard.up("KeyW");
+      await walkedEvent; // the step was sent as "caminhou"
     }
     await anon.getByRole("button", { name: "Voltar à vista de cima" }).click();
     await expect(anon.locator('[data-mode="top"]')).toBeVisible();
@@ -256,8 +270,9 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
         { timeout: 20_000 },
       )
       .toBe(1);
-    await anon.getByRole("button", { name: "Caminhar por dentro" }).click();
-    await expect(whats).toBeHidden();
+    // Abre por dentro, com o WhatsApp à mão (#110); na vista de cima também.
+    await expect(anon.locator('[data-mode="walk"]')).toBeVisible();
+    await expect(whats).toBeVisible();
     await anon.getByRole("button", { name: "Voltar à vista de cima" }).click();
     await expect(whats).toBeVisible();
     runSql(`update public.perfis set whatsapp = null where id = ${ownerSql}`);

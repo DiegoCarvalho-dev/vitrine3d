@@ -2,7 +2,14 @@
 
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { MathUtils, type Vector3 } from "three";
 
 import { blockingSegments, startPoint } from "@/lib/planta/collision";
@@ -89,12 +96,22 @@ export function UnitViewer({
   selectedId,
   onSelectRoom,
   mode = "top",
+  onWalk,
+  ownsTouch = false,
 }: {
   rooms: readonly ViewerRoom[];
   plan?: ModelPlan;
   selectedId: string | null;
   onSelectRoom: (id: string) => void;
   mode?: ViewMode;
+  /** The visitor took the first real step inside (once per walk). */
+  onWalk?: () => void;
+  /**
+   * The 3D covers the screen (full screen): every touch is for the walk.
+   * Otherwise a vertical swipe scrolls the page (only sideways drags look
+   * around), so the page below is still reachable on a phone.
+   */
+  ownsTouch?: boolean;
 }) {
   const box = bounds(rooms.map((room) => room.points));
   const center: [number, number, number] = [
@@ -171,14 +188,24 @@ export function UnitViewer({
   const walking = mode === "walk";
   // Lowered by AdaptiveQuality on a slow phone (kept across re-renders).
   const [dpr, setDpr] = useState<[number, number]>([1, 2]);
+  // Focus goes into the 3D only when the visitor CHOOSES to walk; opening the
+  // page already inside (#110) must not take the keyboard (arrows scroll).
+  const firstMode = useRef(true);
   useEffect(() => {
-    if (walking) frame.current?.focus({ preventScroll: true });
+    if (walking && !firstMode.current)
+      frame.current?.focus({ preventScroll: true });
+    if (!walking) frame.current?.removeAttribute("data-walk-ready");
+    firstMode.current = false;
   }, [walking]);
+  const markWalkReady = useCallback(
+    () => frame.current?.setAttribute("data-walk-ready", "true"),
+    [],
+  );
 
   return (
     <div
       ref={frame}
-      className={`relative size-full ${walking ? "touch-none" : ""}`}
+      className={`relative size-full ${walking ? (ownsTouch ? "touch-none" : "touch-pan-y") : ""}`}
       data-mode={mode}
       // Phone, walk mode: dragging on the 3D looks around.
       onPointerDown={(event) => {
@@ -257,6 +284,10 @@ export function UnitViewer({
               input={walkInput}
               keyTarget={frame}
               reducedMotion={reducedMotion}
+              onMove={onWalk}
+              // The 3D canvas shows up before the walk inside it listens:
+              // this marks the moment it does (read by the e2e tests).
+              onReady={markWalkReady}
               // Where a tap-to-walk ended (read by the e2e tests).
               onArrive={(at) =>
                 frame.current?.setAttribute(

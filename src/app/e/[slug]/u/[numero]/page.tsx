@@ -94,7 +94,7 @@ export default async function UnitPage({ params, searchParams }: Props) {
     ];
   });
   const plan = floorPlanSchema.safeParse(data.plan).data;
-  // Hidden while walking (the joystick is there): UnitTour decides.
+  // Always at hand, also while walking (the joystick is optional, #108).
   const whatsapp = (
     <WhatsAppButton
       projectId={project.id}

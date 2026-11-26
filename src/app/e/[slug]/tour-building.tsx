@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Component,
   type ReactNode,
@@ -21,6 +21,7 @@ import { NativeSelect } from "@/components/native-select";
 import type { SelectedUnit } from "@/components/three/BuildingPreview";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { STATUS_LABEL, type UnitStatus } from "@/lib/building";
+import { useMediaQuery } from "@/lib/fullscreen";
 import { track } from "@/lib/tour/events";
 import { WhatsAppButton } from "./whatsapp-button";
 import { useWebGL } from "@/lib/webgl";
@@ -95,7 +96,9 @@ const toSelected = (unit: TourUnit): SelectedUnit => ({
  * Prédio do tour (issues #44 a #46). O 3D só existe no navegador (WebGL):
  * carregado com ssr: false. Enquanto carrega, sem WebGL ou se o 3D falhar,
  * aparece o prédio em SVG com os mesmos dados. Os filtros e a unidade aberta
- * ficam na URL (?quartos=3&unidade=902); a unidade abre já no andar dela.
+ * ficam na URL (?quartos=3&unidade=902). Escolher uma unidade não corta o
+ * prédio (#110): a câmera vai até ela, que fica destacada; o corte por andar
+ * é só pelo filtro "Ver andar".
  */
 export function TourBuilding({
   projectId,
@@ -133,10 +136,8 @@ export function TourBuilding({
   const [selected, setSelected] = useState<SelectedUnit | null>(
     linkedUnit ? toSelected(linkedUnit) : null,
   );
-  // A unit from the link opens already on its floor.
-  const [cutFloor, setCutFloor] = useState<number | null>(
-    linkedUnit?.andar ?? null,
-  );
+  // The floor cut comes only from "Ver andar" (a unit no longer cuts, #110).
+  const [cutFloor, setCutFloor] = useState<number | null>(null);
   const bedroomOptions = useMemo(
     () =>
       [
@@ -156,11 +157,15 @@ export function TourBuilding({
     syncUrl(next, selected);
   }
 
-  /** Opening a unit (3D tap or list) also cuts the building at its floor. */
+  /**
+   * Opening a unit (3D tap or list). The building stays whole (#110); only
+   * when a floor is already cut, the cut follows the unit to its floor.
+   */
   function selectUnit(unit: SelectedUnit | null) {
+    cancelEntering();
     setSelected(unit);
     if (unit) {
-      setCutFloor(unit.floor);
+      if (cutFloor !== null && cutFloor !== unit.floor) setCutFloor(unit.floor);
       const id = byNumber.get(unit.number)?.id;
       if (id)
         track({
@@ -205,6 +210,24 @@ export function TourBuilding({
   // null on the server (no document); true/false in the browser.
   const webgl = useWebGL();
   const pathname = usePathname();
+  const router = useRouter();
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  // "Ver por dentro" (#110): the camera flies into the unit, then its page.
+  const [entering, setEntering] = useState(false);
+  const regionRef = useRef<HTMLDivElement>(null);
+  const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Changing the unit (or leaving) during the fly-in cancels it. */
+  function cancelEntering() {
+    if (enterTimer.current) clearTimeout(enterTimer.current);
+    enterTimer.current = null;
+    setEntering(false);
+  }
+  useEffect(
+    () => () => {
+      if (enterTimer.current) clearTimeout(enterTimer.current);
+    },
+    [],
+  );
 
   // The heavy 3D code (~250 KB) only starts after the page has fully loaded
   // (cover included) and the browser is idle: on 4G it used to share the
@@ -272,6 +295,12 @@ export function TourBuilding({
     : null;
   const floorOptions = Array.from({ length: floors }, (_, i) => floors - i);
 
+  const insideHref = selectedUnit
+    ? `${pathname}/u/${encodeURIComponent(selectedUnit.numero)}${
+        filtersToSearch(filters) ? `?${filtersToSearch(filters)}` : ""
+      }`
+    : "";
+
   return (
     <div className="flex flex-col gap-3">
       <TourFilters
@@ -321,9 +350,11 @@ export function TourBuilding({
       <div
         role="region"
         aria-label={`Prédio com ${floors} andares e ${unitsPerFloor} unidades por andar${cutFloor ? `, mostrando o ${cutFloor}º andar visto de cima` : ""}. Toque numa unidade ou use a lista "Escolher unidade" para abrir a ficha.`}
+        ref={regionRef}
         className="relative h-[60svh] max-h-[34rem] min-h-80 w-full overflow-hidden rounded-md"
         data-testid="tour-building-3d"
         data-cut-floor={cutFloor ?? ""}
+        data-entering={entering ? "true" : undefined}
       >
         <span className="absolute top-3 left-3 z-10 rounded-full bg-background/90 px-2 py-0.5 text-xs text-muted-foreground">
           Imagem ilustrativa
@@ -351,9 +382,19 @@ export function TourBuilding({
                 accentColor={accentColor}
                 isDimmed={isDimmed}
                 cutFloor={cutFloor}
+                entering={entering}
               />
             </Fallback3D>
           </div>
+        )}
+        {entering && (
+          // The scene fades into the page color while the camera goes in:
+          // no white flash before the unit page.
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-20 animate-in bg-background duration-500 fade-in-0"
+            style={{ animationDelay: "500ms", animationFillMode: "both" }}
+          />
         )}
       </div>
 
@@ -452,10 +493,32 @@ export function TourBuilding({
           <div className="flex flex-wrap items-center gap-3">
             {/* Inside the unit in 3D (#52), keeping the filters for the way back. */}
             <Link
-              href={`${pathname}/u/${encodeURIComponent(selectedUnit.numero)}${
-                filtersToSearch(filters) ? `?${filtersToSearch(filters)}` : ""
-              }`}
+              href={insideHref}
               className={buttonVariants()}
+              onClick={(event) => {
+                // With the 3D on screen: fly in first (~1 s), then the page.
+                // Without it, or with "reduce motion": straight to the page.
+                if (!webgl || !idle || reducedMotion || entering) return;
+                // New tab, download, middle click: the browser's own way.
+                if (
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey ||
+                  event.button !== 0
+                )
+                  return;
+                event.preventDefault();
+                setEntering(true);
+                regionRef.current?.scrollIntoView({
+                  block: "center",
+                  behavior: "smooth",
+                });
+                enterTimer.current = setTimeout(
+                  () => router.push(insideHref),
+                  1000,
+                );
+              }}
             >
               Ver por dentro
             </Link>

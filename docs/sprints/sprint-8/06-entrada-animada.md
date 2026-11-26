@@ -11,6 +11,8 @@ Ideia do usuário: ao escolher a unidade no prédio, a câmera "entra" nela com 
 - [ ] Sem WebGL ou com "menos movimento": sem animação, abre direto (planta 2D continua igual)
 - [ ] Link compartilhado (`/e/[slug]/u/[numero]`) também abre por dentro
 
+- [ ] **Sem corte automático do prédio** (pedido do usuário, 24/11): ao escolher uma unidade, o prédio continua inteiro; a unidade ganha destaque (contorno na cor da marca) e a câmera gira devagar até ela. O corte por andar só acontece quando a pessoa escolhe o andar no filtro
+
 ## Referências
 - Seletores de unidades (Planpoint, CuEngine): zoom contínuo do prédio até a unidade
 
@@ -21,6 +23,8 @@ Ideia do usuário: ao escolher a unidade no prédio, a câmera "entra" nela com 
 - [ ] Do prédio até dentro da unidade em uma transição contínua (sem tela branca)
 - [ ] Abrir o link direto da unidade mostra o interior em menos de 3 s no Android médio
 - [ ] Não adiciona botão fixo na tela sem tirar ou esconder outro (opções secundárias em menu/gaveta; ver docs/sprints/sprint-9.md, "tela limpa")
+
+- [ ] Escolher uma unidade não esconde os andares de cima; ela aparece destacada e a câmera vai até ela
 
 ## Como testar
 No celular, escolher a 603 no prédio, tocar "Ver por dentro" e ver a câmera entrando; trocar para a vista de cima e voltar.
