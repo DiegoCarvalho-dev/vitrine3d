@@ -27,9 +27,9 @@ const UnitViewer = dynamic(
 );
 
 /**
- * The unit seen from above, with a label per room (issue #50); tapping a
- * label shows the room's description under the 3D. "Caminhar por dentro"
- * walks inside at eye height (issue #51).
+ * The unit opens INSIDE, at eye height (#110, walk mode of #51); "Voltar à
+ * vista de cima" shows it from above with a label per room (#50), and
+ * tapping a label shows the room's description under the 3D.
  */
 export function UnitTour({
   projectId,
@@ -49,7 +49,9 @@ export function UnitTour({
   privateArea: number | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<ViewMode>("top");
+  const [mode, setMode] = useState<ViewMode>("walk");
+  // "caminhou" is a real step inside, not just the page opening inside.
+  const walked = useRef(false);
   const webgl = useWebGL(); // null on the server, then true/false
   // Full screen (#109): an option for phones, where the 3D is small.
   const frame = useRef<HTMLDivElement>(null);
@@ -96,6 +98,12 @@ export function UnitTour({
 
   function startWalking() {
     setMode("walk");
+  }
+
+  /** The first real step inside: a visit event, once per page. */
+  function walkedInside() {
+    if (walked.current) return;
+    walked.current = true;
     track({ empreendimentoId: projectId, unidadeId: unitId, tipo: "caminhou" });
   }
 
@@ -164,6 +172,7 @@ export function UnitTour({
                 selectedId={selectedId}
                 onSelectRoom={(id) => toggleRoom(id, "etiqueta")}
                 mode={mode}
+                onWalk={walkedInside}
               />
               {fullscreen.active ? (
                 // Only the essentials: leave, and top view / walk.
@@ -216,7 +225,9 @@ export function UnitTour({
       )}
       <p className="text-sm text-muted-foreground">
         {webgl !== false &&
-          "Arraste para girar e use dois dedos (ou a roda do mouse) para aproximar. "}
+          (mode === "walk"
+            ? "Você está dentro da unidade. "
+            : "Arraste para girar e use dois dedos (ou a roda do mouse) para aproximar. ")}
         Toque no nome de um cômodo para ver a descrição.
         {privateArea ? (
           <>
@@ -268,7 +279,8 @@ export function UnitTour({
           </div>
         )}
       </div>
-      {mode !== "walk" && whatsapp}
+      {/* Always at hand: the joystick is optional now, nothing to cover. */}
+      {whatsapp}
     </section>
   );
 }

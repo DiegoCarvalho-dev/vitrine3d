@@ -2,7 +2,14 @@
 
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { MathUtils, type Vector3 } from "three";
 
 import { blockingSegments, startPoint } from "@/lib/planta/collision";
@@ -89,12 +96,15 @@ export function UnitViewer({
   selectedId,
   onSelectRoom,
   mode = "top",
+  onWalk,
 }: {
   rooms: readonly ViewerRoom[];
   plan?: ModelPlan;
   selectedId: string | null;
   onSelectRoom: (id: string) => void;
   mode?: ViewMode;
+  /** The visitor took the first real step inside (once per walk). */
+  onWalk?: () => void;
 }) {
   const box = bounds(rooms.map((room) => room.points));
   const center: [number, number, number] = [
@@ -173,7 +183,12 @@ export function UnitViewer({
   const [dpr, setDpr] = useState<[number, number]>([1, 2]);
   useEffect(() => {
     if (walking) frame.current?.focus({ preventScroll: true });
+    else frame.current?.removeAttribute("data-walk-ready");
   }, [walking]);
+  const markWalkReady = useCallback(
+    () => frame.current?.setAttribute("data-walk-ready", "true"),
+    [],
+  );
 
   return (
     <div
@@ -257,6 +272,10 @@ export function UnitViewer({
               input={walkInput}
               keyTarget={frame}
               reducedMotion={reducedMotion}
+              onMove={onWalk}
+              // The 3D canvas shows up before the walk inside it listens:
+              // this marks the moment it does (read by the e2e tests).
+              onReady={markWalkReady}
               // Where a tap-to-walk ended (read by the e2e tests).
               onArrive={(at) =>
                 frame.current?.setAttribute(

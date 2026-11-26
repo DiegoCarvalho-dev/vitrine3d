@@ -155,6 +155,8 @@ export function WalkControls({
   keyTarget,
   reducedMotion = false,
   onArrive,
+  onMove,
+  onReady,
 }: {
   walls: readonly Segment[];
   /** Where the body fits, for tap-to-walk (built once per plan). */
@@ -167,6 +169,10 @@ export function WalkControls({
   reducedMotion?: boolean;
   /** Called once when a tap-to-walk arrives (plan meters). */
   onArrive?: (at: Point) => void;
+  /** Called once, the first time the visitor actually moves. */
+  onMove?: () => void;
+  /** The walk is listening (keys and mouse): it's mounted inside the 3D. */
+  onReady?: () => void;
 }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera;
   const canvas = useThree((state) => state.gl.domElement);
@@ -178,6 +184,7 @@ export function WalkControls({
   /** Points still to walk through after a tap (empty: none). */
   const route = useRef<Point[]>([]);
   const marker = useRef<Mesh>(null);
+  const moved = useRef(false);
 
   useLayoutEffect(() => setupEyeCamera(camera), [camera]);
 
@@ -201,13 +208,14 @@ export function WalkControls({
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", clear);
+    onReady?.();
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", clear);
       input.reset(); // leaving: nothing keeps walking next time
     };
-  }, [input, keyTarget, canvas]);
+  }, [input, keyTarget, canvas, onReady]);
 
   // Mouse: a click on the 3D locks the pointer; moving it looks around.
   useEffect(() => {
@@ -305,6 +313,15 @@ export function WalkControls({
       const dx = (-sin * forward + cos * right) * SPEED * delta;
       const dy = (cos * forward + sin * right) * SPEED * delta;
       position.current = step(position.current, [dx, dy], walls);
+    }
+    // The first real step (keys, joystick or tap) counts as "walked".
+    if (!moved.current) {
+      const [sx, sy] = start.at;
+      const [px, py] = position.current;
+      if (Math.hypot(px - sx, py - sy) > 0.05) {
+        moved.current = true;
+        onMove?.();
+      }
     }
     placeCamera(
       camera,

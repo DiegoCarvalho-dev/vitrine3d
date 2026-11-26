@@ -62,6 +62,11 @@ type BuildingPreviewProps = {
   isDimmed?: (floor: number, position: number) => boolean;
   /** Floor "cut": floors above it disappear and the camera looks at it from above. */
   cutFloor?: number | null;
+  /**
+   * "Ver por dentro" (#110): the camera flies up to the selected unit's
+   * facade (~1 s) before the unit page opens.
+   */
+  entering?: boolean;
 };
 
 const LOBBY_H = 1.3; // térreo mais alto que os andares
@@ -82,6 +87,7 @@ export function BuildingPreview({
   accentColor = SELECTED_EDGE,
   isDimmed,
   cutFloor = null,
+  entering = false,
 }: BuildingPreviewProps) {
   // Térreo + andares + cobertura.
   const height = LOBBY_H + floors * (UNIT_H + GAP) + 1;
@@ -91,13 +97,39 @@ export function BuildingPreview({
   const floorRadius = 0.5 * Math.hypot(width, UNIT_D, UNIT_H * 2);
   const cut =
     cutFloor !== null && cutFloor >= 1 && cutFloor <= floors ? cutFloor : null;
-  const view = cut
-    ? {
-        targetY: LOBBY_H + (cut - 1) * (UNIT_H + GAP) + UNIT_H / 2,
-        radius: floorRadius,
-        direction: TOP_DIRECTION,
-      }
-    : { targetY: height / 2, radius, direction: VIEW_DIRECTION };
+  // The selected unit's place in the scene (the camera goes to it, #110).
+  const focus = useMemo(
+    () =>
+      selected
+        ? (layoutUnits(floors, unitsPerFloor, getStatus, getNumber).find(
+            (unit) => unit.number === selected,
+          ) ?? null)
+        : null,
+    [selected, floors, unitsPerFloor, getStatus, getNumber],
+  );
+  const view: CameraView =
+    entering && focus
+      ? {
+          // Close to its facade, as if walking in.
+          target: [focus.x, LOBBY_H + focus.y, UNIT_D / 2],
+          radius: UNIT_W * 0.9,
+          direction: ENTER_DIRECTION,
+          seconds: 1,
+        }
+      : cut
+        ? {
+            target: [0, LOBBY_H + (cut - 1) * (UNIT_H + GAP) + UNIT_H / 2, 0],
+            radius: floorRadius,
+            direction: TOP_DIRECTION,
+          }
+        : focus
+          ? {
+              // The whole building stays; the camera turns to the unit.
+              target: [focus.x, LOBBY_H + focus.y, 0],
+              radius: Math.max(floorRadius, radius * 0.6),
+              direction: VIEW_DIRECTION,
+            }
+          : { target: [0, height / 2, 0], radius, direction: VIEW_DIRECTION };
 
   return (
     <Canvas
@@ -164,14 +196,17 @@ export function BuildingPreview({
         enableDamping
         enablePan={false} // no celular, arrastar com 2 dedos não "perde" o prédio
         // The smaller view's limit, so switching views never jumps.
-        minDistance={floorRadius * 1.2}
+        minDistance={entering ? UNIT_W : floorRadius * 1.2}
         maxDistance={radius * 8}
         maxPolarAngle={Math.PI / 2 - 0.05} // não deixa a câmera ir para baixo do chão
       />
       <FitCamera
-        targetY={view.targetY}
+        targetX={view.target[0]}
+        targetY={view.target[1]}
+        targetZ={view.target[2]}
         radius={view.radius}
         direction={view.direction}
+        seconds={view.seconds}
       />
     </Canvas>
   );
@@ -187,6 +222,16 @@ type OrbitControlsLike = {
 };
 
 const VIEW_DIRECTION = new Vector3(0.55, 0.3, 0.78).normalize();
+// Walking up to a unit: almost straight in front of it, at its height.
+const ENTER_DIRECTION = new Vector3(0.2, 0.12, 0.97).normalize();
+
+type CameraView = {
+  target: [number, number, number];
+  radius: number;
+  direction: Vector3;
+  /** How long the slide to this view takes (default 0,6 s). */
+  seconds?: number;
+};
 // Vendo um andar cortado: bem de cima, ainda um pouco de lado.
 const TOP_DIRECTION = new Vector3(0.3, 0.85, 0.45).normalize();
 const ANIMATION_SECONDS = 0.6;
@@ -197,13 +242,19 @@ const ANIMATION_SECONDS = 0.6;
  * câmera desliza (0,6 s) em vez de pular; a primeira vista é direta.
  */
 function FitCamera({
+  targetX,
   targetY,
+  targetZ,
   radius,
   direction,
+  seconds = ANIMATION_SECONDS,
 }: {
+  targetX: number;
   targetY: number;
+  targetZ: number;
   radius: number;
   direction: Vector3;
+  seconds?: number;
 }) {
   const camera = useThree((state) => state.camera) as PerspectiveCamera;
   const size = useThree((state) => state.size);
@@ -217,13 +268,14 @@ function FitCamera({
     toPosition: Vector3;
     toTarget: Vector3;
     progress: number;
+    seconds: number;
   } | null>(null);
 
   // Which view the camera last fitted (an animation only when it changes).
   const lastView = useRef<string | null>(null);
 
   useEffect(() => {
-    const target = new Vector3(0, targetY, 0);
+    const target = new Vector3(targetX, targetY, targetZ);
     const verticalFov = MathUtils.degToRad(camera.fov);
     const horizontalFov =
       2 * Math.atan(Math.tan(verticalFov / 2) * (size.width / size.height));
@@ -231,7 +283,7 @@ function FitCamera({
     const distance =
       (radius / Math.sin(Math.min(verticalFov, horizontalFov) / 2)) * 1.02;
     const position = target.clone().addScaledVector(direction, distance);
-    const view = `${targetY}|${radius}|${direction.toArray().join(",")}`;
+    const view = `${targetX}|${targetY}|${targetZ}|${radius}|${direction.toArray().join(",")}`;
     const viewChanged = lastView.current !== null && lastView.current !== view;
 
     if (viewChanged && controls) {
@@ -242,6 +294,7 @@ function FitCamera({
         toPosition: position,
         toTarget: target,
         progress: 0,
+        seconds,
       };
     } else if (lastView.current === null || !controls) {
       // First fit: place it directly.
@@ -261,9 +314,12 @@ function FitCamera({
     controls,
     size.width,
     size.height,
+    targetX,
     targetY,
+    targetZ,
     radius,
     direction,
+    seconds,
     invalidate,
   ]);
 
@@ -280,7 +336,7 @@ function FitCamera({
   useFrame((_, delta) => {
     const anim = animation.current;
     if (!anim || !controls) return;
-    anim.progress = Math.min(1, anim.progress + delta / ANIMATION_SECONDS);
+    anim.progress = Math.min(1, anim.progress + delta / anim.seconds);
     const t = 1 - (1 - anim.progress) ** 3; // começa rápido, chega devagar
     camera.position.lerpVectors(anim.fromPosition, anim.toPosition, t);
     controls.target.lerpVectors(anim.fromTarget, anim.toTarget, t);
@@ -648,8 +704,9 @@ function Building({
             >
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               <Edges
-                color={unit.number === selected ? SELECTED_EDGE : "#17202b"}
-                lineWidth={unit.number === selected ? 3 : 1.5}
+                // The chosen unit stands out in the broker's brand color.
+                color={unit.number === selected ? accentColor : "#17202b"}
+                lineWidth={unit.number === selected ? 4 : 1.5}
               />
             </mesh>
           ))}

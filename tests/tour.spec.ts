@@ -231,7 +231,8 @@ test.describe("Filtros do tour", () => {
     await expect(
       sheet.getByRole("link", { name: "Ver por dentro" }),
     ).toHaveAttribute("href", `/e/${slug}/u/601`);
-    await expect(region).toHaveAttribute("data-cut-floor", "6");
+    // Escolher a unidade não corta o prédio (#110): só o filtro "Ver andar".
+    await expect(region).toHaveAttribute("data-cut-floor", "");
 
     // Escolher o 2º andar e abrir a 202 pela lista: preço público e link com a unidade.
     await anon.getByLabel("Ver andar").selectOption("2");
