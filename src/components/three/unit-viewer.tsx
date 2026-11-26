@@ -97,6 +97,7 @@ export function UnitViewer({
   onSelectRoom,
   mode = "top",
   onWalk,
+  ownsTouch = false,
 }: {
   rooms: readonly ViewerRoom[];
   plan?: ModelPlan;
@@ -105,6 +106,12 @@ export function UnitViewer({
   mode?: ViewMode;
   /** The visitor took the first real step inside (once per walk). */
   onWalk?: () => void;
+  /**
+   * The 3D covers the screen (full screen): every touch is for the walk.
+   * Otherwise a vertical swipe scrolls the page (only sideways drags look
+   * around), so the page below is still reachable on a phone.
+   */
+  ownsTouch?: boolean;
 }) {
   const box = bounds(rooms.map((room) => room.points));
   const center: [number, number, number] = [
@@ -181,9 +188,14 @@ export function UnitViewer({
   const walking = mode === "walk";
   // Lowered by AdaptiveQuality on a slow phone (kept across re-renders).
   const [dpr, setDpr] = useState<[number, number]>([1, 2]);
+  // Focus goes into the 3D only when the visitor CHOOSES to walk; opening the
+  // page already inside (#110) must not take the keyboard (arrows scroll).
+  const firstMode = useRef(true);
   useEffect(() => {
-    if (walking) frame.current?.focus({ preventScroll: true });
-    else frame.current?.removeAttribute("data-walk-ready");
+    if (walking && !firstMode.current)
+      frame.current?.focus({ preventScroll: true });
+    if (!walking) frame.current?.removeAttribute("data-walk-ready");
+    firstMode.current = false;
   }, [walking]);
   const markWalkReady = useCallback(
     () => frame.current?.setAttribute("data-walk-ready", "true"),
@@ -193,7 +205,7 @@ export function UnitViewer({
   return (
     <div
       ref={frame}
-      className={`relative size-full ${walking ? "touch-none" : ""}`}
+      className={`relative size-full ${walking ? (ownsTouch ? "touch-none" : "touch-pan-y") : ""}`}
       data-mode={mode}
       // Phone, walk mode: dragging on the 3D looks around.
       onPointerDown={(event) => {

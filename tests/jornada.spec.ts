@@ -86,10 +86,17 @@ test.describe("Jornada completa", () => {
         });
       } else {
         await expect(inside).toHaveAttribute("data-walk-ready", "true");
+        const walkedEvent = anon.waitForRequest(
+          (r) =>
+            r.url().includes("/api/eventos") &&
+            (r.postData() ?? "").includes('"caminhou"'),
+          { timeout: 10_000 },
+        );
         await inside.focus();
         await anon.keyboard.down("KeyW");
         await anon.waitForTimeout(1_500);
         await anon.keyboard.up("KeyW");
+        await walkedEvent; // a real step counts as "caminhou"
       }
       await anon
         .getByRole("button", { name: "Voltar à vista de cima" })

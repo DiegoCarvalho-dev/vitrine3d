@@ -162,6 +162,7 @@ export function TourBuilding({
    * when a floor is already cut, the cut follows the unit to its floor.
    */
   function selectUnit(unit: SelectedUnit | null) {
+    cancelEntering();
     setSelected(unit);
     if (unit) {
       if (cutFloor !== null && cutFloor !== unit.floor) setCutFloor(unit.floor);
@@ -214,6 +215,19 @@ export function TourBuilding({
   // "Ver por dentro" (#110): the camera flies into the unit, then its page.
   const [entering, setEntering] = useState(false);
   const regionRef = useRef<HTMLDivElement>(null);
+  const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Changing the unit (or leaving) during the fly-in cancels it. */
+  function cancelEntering() {
+    if (enterTimer.current) clearTimeout(enterTimer.current);
+    enterTimer.current = null;
+    setEntering(false);
+  }
+  useEffect(
+    () => () => {
+      if (enterTimer.current) clearTimeout(enterTimer.current);
+    },
+    [],
+  );
 
   // The heavy 3D code (~250 KB) only starts after the page has fully loaded
   // (cover included) and the browser is idle: on 4G it used to share the
@@ -485,14 +499,25 @@ export function TourBuilding({
                 // With the 3D on screen: fly in first (~1 s), then the page.
                 // Without it, or with "reduce motion": straight to the page.
                 if (!webgl || !idle || reducedMotion || entering) return;
-                if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+                // New tab, download, middle click: the browser's own way.
+                if (
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey ||
+                  event.button !== 0
+                )
+                  return;
                 event.preventDefault();
                 setEntering(true);
                 regionRef.current?.scrollIntoView({
                   block: "center",
                   behavior: "smooth",
                 });
-                setTimeout(() => router.push(insideHref), 1000);
+                enterTimer.current = setTimeout(
+                  () => router.push(insideHref),
+                  1000,
+                );
               }}
             >
               Ver por dentro

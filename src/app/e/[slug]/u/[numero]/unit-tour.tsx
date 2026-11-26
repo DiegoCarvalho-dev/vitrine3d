@@ -42,7 +42,7 @@ export function UnitTour({
   /** For the visit events (issue #67). */
   projectId: string;
   unitId: string;
-  /** The WhatsApp button (hidden while walking: it would cover the controls). */
+  /** The WhatsApp button (always shown: the joystick is optional now). */
   whatsapp: ReactNode;
   rooms: UnitRoom[];
   plan?: ModelPlan;
@@ -173,6 +173,7 @@ export function UnitTour({
                 onSelectRoom={(id) => toggleRoom(id, "etiqueta")}
                 mode={mode}
                 onWalk={walkedInside}
+                ownsTouch={fullscreen.active}
               />
               {fullscreen.active ? (
                 // Only the essentials: leave, and top view / walk.
