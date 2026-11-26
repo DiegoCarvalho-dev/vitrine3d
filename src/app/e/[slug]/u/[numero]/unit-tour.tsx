@@ -1,12 +1,14 @@
 "use client";
 
+import { Maximize, RotateCw } from "lucide-react";
 import dynamic from "next/dynamic";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { ModelPlan } from "@/components/three/unit-model";
 import type { ViewerRoom, ViewMode } from "@/components/three/unit-viewer";
 import { FloorPlanPreview } from "@/components/floor-plan-preview";
 import { Button } from "@/components/ui/button";
+import { useFullscreen, useMediaQuery } from "@/lib/fullscreen";
 import { track } from "@/lib/tour/events";
 import { useWebGL } from "@/lib/webgl";
 import { formatDecimal } from "@/lib/validacoes/numero";
@@ -49,6 +51,33 @@ export function UnitTour({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("top");
   const webgl = useWebGL(); // null on the server, then true/false
+  // Full screen (#109): an option for phones, where the 3D is small.
+  const frame = useRef<HTMLDivElement>(null);
+  const fullscreen = useFullscreen(frame);
+  const touch = useMediaQuery("(pointer: coarse)");
+  const portrait = useMediaQuery("(orientation: portrait)");
+  // "Turn the phone" hint: a few seconds, not a permanent cover.
+  const [hintOn, setHintOn] = useState(false);
+  useEffect(() => {
+    if (!hintOn) return;
+    const timer = setTimeout(() => setHintOn(false), 5000);
+    return () => clearTimeout(timer);
+  }, [hintOn]);
+  // Focus goes to "Sair" on entering and back to "Tela cheia" on leaving.
+  const exitButton = useRef<HTMLButtonElement>(null);
+  const openButton = useRef<HTMLButtonElement>(null);
+  const wasActive = useRef(false);
+  const { active } = fullscreen;
+  useEffect(() => {
+    if (active) exitButton.current?.focus({ preventScroll: true });
+    else if (wasActive.current)
+      openButton.current?.focus({ preventScroll: true });
+    wasActive.current = active;
+  }, [active]);
+  function enterFullscreen() {
+    setHintOn(true);
+    void fullscreen.enter();
+  }
   const selected = rooms.find((room) => room.id === selectedId) ?? null;
 
   /** Opens (or closes) a room's description; opening is a visit event. */
@@ -99,21 +128,89 @@ export function UnitTour({
                 Voltar à vista de cima
               </Button>
             )}
+            {touch && (
+              <Button
+                ref={openButton}
+                variant="outline"
+                onClick={enterFullscreen}
+              >
+                <Maximize aria-hidden />
+                Tela cheia
+              </Button>
+            )}
           </div>
-          <div
-            className="relative aspect-[4/5] overflow-hidden rounded-lg border sm:aspect-[16/10]"
-            data-testid="unit-3d"
-          >
-            <UnitViewer
-              rooms={rooms}
-              plan={plan}
-              selectedId={selectedId}
-              onSelectRoom={(id) => toggleRoom(id, "etiqueta")}
-              mode={mode}
-            />
-            <span className="pointer-events-none absolute top-3 left-3 z-30 rounded-full bg-white/85 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
-              Imagem ilustrativa
-            </span>
+          {/* This box keeps its place in the page while the 3D covers the
+              screen, so the page doesn't jump when full screen ends. */}
+          <div className="relative aspect-[4/5] sm:aspect-[16/10]">
+            <div
+              ref={frame}
+              className={
+                fullscreen.active
+                  ? "fixed inset-0 z-50 h-dvh w-screen overflow-hidden bg-background"
+                  : "absolute inset-0 overflow-hidden rounded-lg border"
+              }
+              data-testid="unit-3d"
+              data-fullscreen={fullscreen.kind ?? "no"}
+              // Covering the screen, it acts as a dialog for assistive tech.
+              role={fullscreen.active ? "dialog" : undefined}
+              aria-modal={fullscreen.active ? true : undefined}
+              aria-label={
+                fullscreen.active ? "Unidade em tela cheia" : undefined
+              }
+            >
+              <UnitViewer
+                rooms={rooms}
+                plan={plan}
+                selectedId={selectedId}
+                onSelectRoom={(id) => toggleRoom(id, "etiqueta")}
+                mode={mode}
+              />
+              {fullscreen.active ? (
+                // Only the essentials: leave, and top view / walk.
+                <div className="absolute top-3 left-3 z-40 flex flex-col items-start gap-2">
+                  <div className="flex gap-2">
+                    <Button
+                      ref={exitButton}
+                      size="sm"
+                      variant="secondary"
+                      onClick={fullscreen.exit}
+                    >
+                      Sair da tela cheia
+                    </Button>
+                    {mode === "top" ? (
+                      <Button size="sm" onClick={startWalking}>
+                        Caminhar
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setMode("top")}
+                      >
+                        Vista de cima
+                      </Button>
+                    )}
+                  </div>
+                  <span className="pointer-events-none rounded-full bg-white/85 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
+                    Imagem ilustrativa
+                  </span>
+                </div>
+              ) : (
+                <span className="pointer-events-none absolute top-3 left-3 z-30 rounded-full bg-white/85 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
+                  Imagem ilustrativa
+                </span>
+              )}
+              {fullscreen.active && hintOn && portrait && (
+                <p
+                  role="status"
+                  data-testid="rotate-hint"
+                  className="pointer-events-none absolute top-1/2 left-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-black/65 px-4 py-2 text-sm text-white"
+                >
+                  <RotateCw className="size-4" aria-hidden />
+                  Vire o celular para ver melhor
+                </p>
+              )}
+            </div>
           </div>
         </>
       )}

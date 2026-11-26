@@ -147,6 +147,46 @@ test.describe("Tour da unidade /e/[slug]/u/[numero]", () => {
     await expect(labels).toHaveCount(2);
     expect(pageErrors).toEqual([]);
 
+    // Tela cheia (#109): opção só para telas de toque (o 3D é pequeno nelas).
+    const fullscreenButton = anon.getByRole("button", { name: "Tela cheia" });
+    if (!isMobile) {
+      await expect(fullscreenButton).toHaveCount(0);
+    } else {
+      const frame = anon.getByTestId("unit-3d");
+      const unitUrl = anon.url();
+      await fullscreenButton.click();
+      await expect(frame).not.toHaveAttribute("data-fullscreen", "no");
+      // Só o essencial: sair e alternar entre vista de cima e caminhar.
+      const exit = frame.getByRole("button", { name: "Sair da tela cheia" });
+      await expect(exit).toBeVisible();
+      await expect(frame).toContainText("Imagem ilustrativa");
+      // Em pé (retrato), a dica pede para virar o celular.
+      await expect(frame.getByTestId("rotate-hint")).toContainText(
+        "Vire o celular",
+      );
+      await frame.getByRole("button", { name: "Caminhar" }).click();
+      await expect(frame.locator('[data-mode="walk"]')).toBeVisible();
+      await frame.getByRole("button", { name: "Vista de cima" }).click();
+      await expect(frame.locator('[data-mode="top"]')).toBeVisible();
+      await exit.click();
+      await expect(frame).toHaveAttribute("data-fullscreen", "no");
+      await expect(fullscreenButton).toBeVisible();
+      expect(anon.url()).toBe(unitUrl); // a página ficou como estava
+
+      // Gesto de voltar (tela cheia por cima da página, como no iPhone):
+      // fecha a tela cheia e continua na unidade.
+      await fullscreenButton.click();
+      await expect(frame).not.toHaveAttribute("data-fullscreen", "no");
+      if ((await frame.getAttribute("data-fullscreen")) === "pseudo") {
+        await anon.goBack();
+        await expect(frame).toHaveAttribute("data-fullscreen", "no");
+        expect(anon.url()).toBe(unitUrl);
+      } else {
+        await frame.getByRole("button", { name: "Sair da tela cheia" }).click();
+      }
+      await expect(frame).toHaveAttribute("data-fullscreen", "no");
+    }
+
     // Voltar ao prédio: mesmos filtros e a ficha da 101 aberta.
     await anon.getByRole("link", { name: "← Voltar ao prédio" }).click();
     await expect(anon.getByTestId("tour-unit-sheet")).toContainText(
